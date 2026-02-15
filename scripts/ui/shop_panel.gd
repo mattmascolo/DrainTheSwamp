@@ -58,6 +58,10 @@ func _refresh() -> void:
 			var output: float = GameManager.get_tool_output(tid)
 			if defn["type"] == "semi_auto":
 				info_label.text = "%s Lv%d (%.3f g/s)" % [defn["name"], owned_data["level"], output]
+			elif output >= 10.0:
+				info_label.text = "%s Lv%d (%.1f g)" % [defn["name"], owned_data["level"], output]
+			elif output >= 1.0:
+				info_label.text = "%s Lv%d (%.2f g)" % [defn["name"], owned_data["level"], output]
 			else:
 				info_label.text = "%s Lv%d (%.4f g)" % [defn["name"], owned_data["level"], output]
 			if GameManager.current_tool_id == tid:

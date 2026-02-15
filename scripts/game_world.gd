@@ -63,6 +63,9 @@ var dragonflies: Array[Dictionary] = []
 var pump_light_ref: ColorRect = null
 var water_highlights: Array[Dictionary] = []
 var sun_node: Node2D = null
+var fish: Array[Dictionary] = []
+var frogs: Array[Dictionary] = []
+var glow_plants: Array[Dictionary] = []
 
 # Colors
 const SKY_COLOR_TOP := Color(0.22, 0.38, 0.72)
@@ -110,6 +113,9 @@ func _ready() -> void:
 	_build_fog_patches()
 	_build_dragonflies()
 	_build_water_highlights()
+	_build_fish()
+	_build_frogs()
+	_build_glow_plants()
 
 	GameManager.water_level_changed.connect(_on_water_level_changed)
 	GameManager.swamp_completed.connect(_on_swamp_completed)
@@ -1064,6 +1070,189 @@ func _spawn_pollen() -> void:
 		"base_y": py,
 	})
 
+# --- Fish ---
+func _build_fish() -> void:
+	for i in range(SWAMP_COUNT):
+		var geo: Dictionary = _get_swamp_geometry(i)
+		var basin_left: Vector2 = geo["basin_left"]
+		var basin_right: Vector2 = geo["basin_right"]
+		var basin_w: float = basin_right.x - basin_left.x
+		var count: int = clampi(int(basin_w / 40.0), 1, 5)
+		for j in range(count):
+			var fish_node := Node2D.new()
+			fish_node.z_index = 4
+			add_child(fish_node)
+			# Fish body
+			var body := ColorRect.new()
+			body.size = Vector2(6, 3)
+			body.position = Vector2(-3, -1.5)
+			var fish_hue: float = randf_range(0.05, 0.15)
+			body.color = Color.from_hsv(fish_hue, 0.6, 0.7, 0.9)
+			fish_node.add_child(body)
+			# Tail
+			var tail := ColorRect.new()
+			tail.size = Vector2(3, 4)
+			tail.position = Vector2(-6, -2)
+			tail.color = Color.from_hsv(fish_hue, 0.5, 0.6, 0.85)
+			fish_node.add_child(tail)
+			# Eye
+			var eye := ColorRect.new()
+			eye.size = Vector2(1, 1)
+			eye.position = Vector2(1, -1)
+			eye.color = Color(0.1, 0.1, 0.1)
+			fish_node.add_child(eye)
+			# Belly highlight
+			var belly := ColorRect.new()
+			belly.size = Vector2(4, 1)
+			belly.position = Vector2(-2, 0.5)
+			belly.color = Color(0.9, 0.85, 0.7, 0.5)
+			fish_node.add_child(belly)
+
+			var fx: float = basin_left.x + randf_range(12, basin_w - 12)
+			fish.append({
+				"node": fish_node,
+				"swamp": i,
+				"x": fx,
+				"swim_phase": randf() * TAU,
+				"swim_speed": randf_range(0.6, 1.4),
+				"swim_range": randf_range(15, 35),
+				"depth_offset": randf_range(0.3, 0.7),
+				"direction": 1.0 if randf() > 0.5 else -1.0,
+				"alive": true,
+				"death_timer": 0.0,
+			})
+
+# --- Frogs ---
+func _build_frogs() -> void:
+	var placed: int = 0
+	for lp in lily_pads:
+		if placed >= 8:
+			break
+		if randf() < 0.4:
+			continue
+		var pad_node: Node2D = lp["node"]
+		var frog_node := Node2D.new()
+		frog_node.z_index = 5
+		pad_node.add_child(frog_node)
+		# Body
+		var body := ColorRect.new()
+		body.size = Vector2(5, 4)
+		body.position = Vector2(-2.5, -6)
+		body.color = Color(0.2, 0.5, 0.15, 0.95)
+		frog_node.add_child(body)
+		# Head
+		var head := ColorRect.new()
+		head.size = Vector2(4, 3)
+		head.position = Vector2(-2, -9)
+		head.color = Color(0.25, 0.55, 0.18, 0.95)
+		frog_node.add_child(head)
+		# Left eye
+		var eye_l := ColorRect.new()
+		eye_l.size = Vector2(2, 2)
+		eye_l.position = Vector2(-2, -11)
+		eye_l.color = Color(0.8, 0.75, 0.1)
+		frog_node.add_child(eye_l)
+		# Right eye
+		var eye_r := ColorRect.new()
+		eye_r.size = Vector2(2, 2)
+		eye_r.position = Vector2(1, -11)
+		eye_r.color = Color(0.8, 0.75, 0.1)
+		frog_node.add_child(eye_r)
+		# Eye pupils
+		var pupil_l := ColorRect.new()
+		pupil_l.size = Vector2(1, 1)
+		pupil_l.position = Vector2(-1, -10)
+		pupil_l.color = Color(0.05, 0.05, 0.05)
+		frog_node.add_child(pupil_l)
+		var pupil_r := ColorRect.new()
+		pupil_r.size = Vector2(1, 1)
+		pupil_r.position = Vector2(2, -10)
+		pupil_r.color = Color(0.05, 0.05, 0.05)
+		frog_node.add_child(pupil_r)
+		# Belly
+		var belly := ColorRect.new()
+		belly.size = Vector2(3, 2)
+		belly.position = Vector2(-1.5, -4)
+		belly.color = Color(0.55, 0.7, 0.35, 0.7)
+		frog_node.add_child(belly)
+
+		frogs.append({
+			"node": frog_node,
+			"swamp": lp["swamp"],
+			"hop_timer": randf_range(3.0, 10.0),
+			"hopping": false,
+			"hop_progress": 0.0,
+			"base_y": 0.0,
+		})
+		placed += 1
+
+# --- Bioluminescent Plants ---
+func _build_glow_plants() -> void:
+	for i in range(SWAMP_COUNT):
+		var geo: Dictionary = _get_swamp_geometry(i)
+		var entry_top: Vector2 = geo["entry_top"]
+		var basin_left: Vector2 = geo["basin_left"]
+		var basin_right: Vector2 = geo["basin_right"]
+		var exit_top: Vector2 = geo["exit_top"]
+		# Place 2-3 glow plants per swamp near water edges
+		var positions: Array[Vector2] = [
+			Vector2(entry_top.x + randf_range(2, 12), entry_top.y),
+			Vector2(exit_top.x + randf_range(-12, -2), exit_top.y),
+		]
+		if randf() < 0.6:
+			var mid_x: float = lerpf(basin_left.x, basin_right.x, randf_range(0.2, 0.8))
+			positions.append(Vector2(mid_x - 8, _get_terrain_y_at(mid_x - 8)))
+		for pos in positions:
+			if pos.y <= 0:
+				continue
+			var plant := Node2D.new()
+			plant.z_index = 4
+			add_child(plant)
+			# Stem
+			var stem_h: float = randf_range(8, 16)
+			var stem := ColorRect.new()
+			stem.size = Vector2(2, stem_h)
+			stem.position = Vector2(pos.x - 1, pos.y - stem_h)
+			stem.color = Color(0.1, 0.3, 0.15, 0.8)
+			plant.add_child(stem)
+			# Glowing bulb
+			var bulb := ColorRect.new()
+			var bulb_size: float = randf_range(4, 7)
+			bulb.size = Vector2(bulb_size, bulb_size)
+			bulb.position = Vector2(pos.x - bulb_size * 0.5, pos.y - stem_h - bulb_size * 0.5)
+			var glow_color: Color
+			var color_roll: float = randf()
+			if color_roll < 0.4:
+				glow_color = Color(0.2, 0.9, 0.4, 0.0)  # Green
+			elif color_roll < 0.7:
+				glow_color = Color(0.3, 0.6, 1.0, 0.0)   # Blue
+			else:
+				glow_color = Color(0.8, 0.4, 0.9, 0.0)    # Purple
+			bulb.color = glow_color
+			plant.add_child(bulb)
+			# Outer glow aura
+			var aura := ColorRect.new()
+			var aura_size: float = bulb_size + 6
+			aura.size = Vector2(aura_size, aura_size)
+			aura.position = Vector2(pos.x - aura_size * 0.5, pos.y - stem_h - aura_size * 0.5)
+			aura.color = Color(glow_color.r, glow_color.g, glow_color.b, 0.0)
+			plant.add_child(aura)
+			# Small leaves on stem
+			var leaf := ColorRect.new()
+			leaf.size = Vector2(4, 2)
+			leaf.position = Vector2(pos.x, pos.y - stem_h * 0.5)
+			leaf.color = Color(0.12, 0.35, 0.12, 0.7)
+			plant.add_child(leaf)
+
+			glow_plants.append({
+				"node": plant,
+				"bulb": bulb,
+				"aura": aura,
+				"glow_color": glow_color,
+				"phase": randf() * TAU,
+				"pulse_speed": randf_range(1.2, 2.5),
+			})
+
 func _get_terrain_y_at(x: float) -> float:
 	for i in range(terrain_points.size() - 1):
 		if x >= terrain_points[i].x and x <= terrain_points[i + 1].x:
@@ -1778,6 +1967,101 @@ func _process(delta: float) -> void:
 		var idx: int = birds_to_remove[i]
 		birds[idx]["node"].queue_free()
 		birds.remove_at(idx)
+
+	# Fish: swim in water, die when water drains
+	for fd in fish:
+		var fnode: Node2D = fd["node"]
+		var swamp_i: int = fd["swamp"]
+		var fill: float = GameManager.get_swamp_fill_fraction(swamp_i)
+
+		if fill < 0.02:
+			# Fish is dead on the ground
+			if fd["alive"]:
+				fd["alive"] = false
+				fd["death_timer"] = 0.0
+			fd["death_timer"] += delta
+			fnode.visible = true
+			var geo_f: Dictionary = _get_swamp_geometry(swamp_i)
+			fnode.position.y = geo_f["basin_left"].y - 2
+			# Flop animation for first 3 seconds, then go still
+			if fd["death_timer"] < 3.0:
+				fnode.rotation = sin(fd["death_timer"] * 12.0) * 0.8
+			else:
+				fnode.rotation = PI * 0.5  # Belly up
+				fnode.modulate.a = maxf(0.3, 1.0 - (fd["death_timer"] - 3.0) * 0.05)
+			continue
+
+		if fill < 0.15:
+			# Low water - fish panics, swims faster
+			fd["swim_speed"] = 2.5
+		elif not fd["alive"]:
+			fd["alive"] = true
+			fnode.modulate.a = 1.0
+			fnode.rotation = 0.0
+
+		fnode.visible = true
+		var geo_f: Dictionary = _get_swamp_geometry(swamp_i)
+		var entry_top_f: Vector2 = geo_f["entry_top"]
+		var basin_left_f: Vector2 = geo_f["basin_left"]
+		var basin_right_f: Vector2 = geo_f["basin_right"]
+		var exit_top_f: Vector2 = geo_f["exit_top"]
+		var basin_y_f: float = basin_left_f.y
+		var overflow_y_f: float = maxf(entry_top_f.y, exit_top_f.y)
+		var water_y_f: float = basin_y_f - fill * (basin_y_f - overflow_y_f)
+
+		# Swim horizontally
+		fd["swim_phase"] += delta * fd["swim_speed"]
+		var swim_x: float = fd["x"] + sin(fd["swim_phase"]) * fd["swim_range"]
+		# Clamp to basin
+		swim_x = clampf(swim_x, basin_left_f.x + 6, basin_right_f.x - 6)
+		# Depth: between surface and bottom
+		var fish_y: float = lerpf(water_y_f + 4, basin_y_f - 4, fd["depth_offset"])
+		fish_y += sin(fd["swim_phase"] * 0.7) * 2.0
+
+		fnode.position = Vector2(swim_x, fish_y)
+		# Face swim direction
+		var swim_dir: float = cos(fd["swim_phase"])
+		fnode.scale.x = 1.0 if swim_dir > 0 else -1.0
+		# Gentle body undulation
+		fnode.rotation = sin(fd["swim_phase"] * 2.0) * 0.1
+
+	# Frogs: occasional hop animation
+	for fg in frogs:
+		var frog_node: Node2D = fg["node"]
+		if not frog_node.get_parent().visible:
+			continue
+		if fg["hopping"]:
+			fg["hop_progress"] += delta * 3.0
+			if fg["hop_progress"] >= 1.0:
+				fg["hopping"] = false
+				fg["hop_progress"] = 0.0
+				frog_node.position.y = fg["base_y"]
+				fg["hop_timer"] = randf_range(4.0, 12.0)
+			else:
+				# Arc jump
+				var hop_arc: float = sin(fg["hop_progress"] * PI) * -8.0
+				frog_node.position.y = fg["base_y"] + hop_arc
+		else:
+			fg["hop_timer"] -= delta
+			if fg["hop_timer"] <= 0.0:
+				fg["hopping"] = true
+				fg["hop_progress"] = 0.0
+				fg["base_y"] = frog_node.position.y
+
+	# Bioluminescent plants: glow at night
+	var glow_alpha: float = 0.0
+	if t > 0.6:
+		glow_alpha = clampf((t - 0.6) / 0.08, 0.0, 1.0)
+	elif t < 0.15:
+		glow_alpha = 1.0
+	elif t < 0.22:
+		glow_alpha = clampf(1.0 - (t - 0.15) / 0.07, 0.0, 1.0)
+	for gp in glow_plants:
+		var pulse: float = (sin(wave_time * gp["pulse_speed"] + gp["phase"]) + 1.0) * 0.5
+		var gc: Color = gp["glow_color"]
+		var intensity: float = glow_alpha * lerpf(0.4, 1.0, pulse)
+		gp["bulb"].color = Color(gc.r, gc.g, gc.b, intensity)
+		gp["aura"].color = Color(gc.r, gc.g, gc.b, intensity * 0.25)
 
 	# Cattail wind sway
 	for ct in cattails:

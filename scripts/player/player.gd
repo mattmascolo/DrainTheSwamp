@@ -144,7 +144,7 @@ func _handle_scoop() -> void:
 		scoop_cooldown_timer = SCOOP_COOLDOWN
 		stamina_idle_timer = 0.0
 		_scoop_feedback()
-	elif GameManager.current_stamina >= 1.0 and GameManager.is_inventory_full():
+	elif GameManager.current_stamina >= GameManager.get_stamina_cost() and GameManager.is_inventory_full():
 		_spawn_floating_text("FULL!", Color(1.0, 0.4, 0.3))
 		scoop_cooldown_timer = SCOOP_COOLDOWN
 
@@ -170,7 +170,14 @@ func _scoop_feedback() -> void:
 
 	# Show gallons collected (blue)
 	var output: float = GameManager.get_tool_output(GameManager.current_tool_id)
-	_spawn_floating_text("+%.4f gal" % output, Color(0.4, 0.8, 1.0))
+	var gal_text: String
+	if output >= 10.0:
+		gal_text = "+%.1f gal" % output
+	elif output >= 1.0:
+		gal_text = "+%.2f gal" % output
+	else:
+		gal_text = "+%.4f gal" % output
+	_spawn_floating_text(gal_text, Color(0.4, 0.8, 1.0))
 
 	# Splash particles
 	_spawn_splash()
@@ -198,6 +205,9 @@ func _update_tool_visual() -> void:
 
 	var tool_id: String = GameManager.current_tool_id
 	match tool_id:
+		"hands":
+			# No tool visual — bare hands
+			pass
 		"spoon":
 			var handle := ColorRect.new()
 			handle.size = Vector2(2, 10)
@@ -243,6 +253,88 @@ func _update_tool_visual() -> void:
 			rim.color = Color(0.5, 0.5, 0.55)
 			tool_sprite.add_child(rim)
 			tool_visuals.append(rim)
+		"shovel":
+			var shaft := ColorRect.new()
+			shaft.size = Vector2(2, 14)
+			shaft.position = Vector2(0, -6)
+			shaft.color = Color(0.55, 0.35, 0.15)
+			tool_sprite.add_child(shaft)
+			tool_visuals.append(shaft)
+			var blade := ColorRect.new()
+			blade.size = Vector2(8, 6)
+			blade.position = Vector2(-3, 8)
+			blade.color = Color(0.55, 0.55, 0.6)
+			tool_sprite.add_child(blade)
+			tool_visuals.append(blade)
+			var edge := ColorRect.new()
+			edge.size = Vector2(8, 2)
+			edge.position = Vector2(-3, 14)
+			edge.color = Color(0.7, 0.7, 0.75)
+			tool_sprite.add_child(edge)
+			tool_visuals.append(edge)
+		"wheelbarrow":
+			var tray := ColorRect.new()
+			tray.size = Vector2(12, 8)
+			tray.position = Vector2(-6, -2)
+			tray.color = Color(0.45, 0.5, 0.45)
+			tool_sprite.add_child(tray)
+			tool_visuals.append(tray)
+			var wheel := ColorRect.new()
+			wheel.size = Vector2(4, 4)
+			wheel.position = Vector2(-2, 6)
+			wheel.color = Color(0.3, 0.3, 0.35)
+			tool_sprite.add_child(wheel)
+			tool_visuals.append(wheel)
+			var leg := ColorRect.new()
+			leg.size = Vector2(2, 6)
+			leg.position = Vector2(4, 2)
+			leg.color = Color(0.5, 0.35, 0.15)
+			tool_sprite.add_child(leg)
+			tool_visuals.append(leg)
+		"barrel":
+			var body := ColorRect.new()
+			body.size = Vector2(10, 14)
+			body.position = Vector2(-5, -4)
+			body.color = Color(0.5, 0.3, 0.12)
+			tool_sprite.add_child(body)
+			tool_visuals.append(body)
+			var band_top := ColorRect.new()
+			band_top.size = Vector2(12, 2)
+			band_top.position = Vector2(-6, -2)
+			band_top.color = Color(0.45, 0.45, 0.5)
+			tool_sprite.add_child(band_top)
+			tool_visuals.append(band_top)
+			var band_bot := ColorRect.new()
+			band_bot.size = Vector2(12, 2)
+			band_bot.position = Vector2(-6, 8)
+			band_bot.color = Color(0.45, 0.45, 0.5)
+			tool_sprite.add_child(band_bot)
+			tool_visuals.append(band_bot)
+		"water_wagon":
+			var tank := ColorRect.new()
+			tank.size = Vector2(16, 10)
+			tank.position = Vector2(-8, -6)
+			tank.color = Color(0.5, 0.3, 0.12)
+			tool_sprite.add_child(tank)
+			tool_visuals.append(tank)
+			var band := ColorRect.new()
+			band.size = Vector2(16, 2)
+			band.position = Vector2(-8, -2)
+			band.color = Color(0.45, 0.45, 0.5)
+			tool_sprite.add_child(band)
+			tool_visuals.append(band)
+			var wheel_l := ColorRect.new()
+			wheel_l.size = Vector2(4, 4)
+			wheel_l.position = Vector2(-7, 4)
+			wheel_l.color = Color(0.3, 0.3, 0.35)
+			tool_sprite.add_child(wheel_l)
+			tool_visuals.append(wheel_l)
+			var wheel_r := ColorRect.new()
+			wheel_r.size = Vector2(4, 4)
+			wheel_r.position = Vector2(3, 4)
+			wheel_r.color = Color(0.3, 0.3, 0.35)
+			tool_sprite.add_child(wheel_r)
+			tool_visuals.append(wheel_r)
 		"hose":
 			var nozzle := ColorRect.new()
 			nozzle.size = Vector2(10, 4)

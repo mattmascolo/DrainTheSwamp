@@ -50,14 +50,18 @@ func _refresh() -> void:
 		info_label.add_theme_constant_override("shadow_offset_x", 2)
 		info_label.add_theme_constant_override("shadow_offset_y", 2)
 
-		if sid == "carrying_capacity":
-			info_label.text = "%s Lv%d: %.3f gal" % [defn["name"], level, value]
-		elif sid == "movement_speed":
-			info_label.text = "%s Lv%d: %.1fx" % [defn["name"], level, value]
-		elif sid == "stamina_regen":
-			info_label.text = "%s Lv%d: %.1f/s" % [defn["name"], level, value]
-		else:
-			info_label.text = "%s Lv%d: %.0f" % [defn["name"], level, value]
+		var fmt: String = defn.get("format", "value")
+		match fmt:
+			"gal":
+				info_label.text = "%s Lv%d: %.1f gal" % [defn["name"], level, value]
+			"multiplier":
+				info_label.text = "%s Lv%d: %.1fx" % [defn["name"], level, value]
+			"per_sec":
+				info_label.text = "%s Lv%d: %.1f/s" % [defn["name"], level, value]
+			"percent":
+				info_label.text = "%s Lv%d: %.0f%%" % [defn["name"], level, value * 100.0]
+			_:
+				info_label.text = "%s Lv%d: %.0f" % [defn["name"], level, value]
 		entry.add_child(info_label)
 
 		# Level indicator dots

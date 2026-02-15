@@ -82,7 +82,12 @@ func _update_tool_label() -> void:
 		tool_label.text = "%s (%.3f g/s)" % [tool_data["name"], output]
 	else:
 		var output: float = GameManager.get_effective_scoop(GameManager.current_tool_id)
-		tool_label.text = "%s (%.4f g)" % [tool_data["name"], output]
+		if output >= 10.0:
+			tool_label.text = "%s (%.1f g)" % [tool_data["name"], output]
+		elif output >= 1.0:
+			tool_label.text = "%s (%.2f g)" % [tool_data["name"], output]
+		else:
+			tool_label.text = "%s (%.4f g)" % [tool_data["name"], output]
 
 func _on_stamina_changed(current: float, maximum: float) -> void:
 	stamina_bar.max_value = maximum
@@ -98,7 +103,12 @@ func _on_stat_upgraded(_stat_id: String, _new_level: int) -> void:
 	_on_water_carried_changed(GameManager.water_carried, GameManager.get_stat_value("carrying_capacity"))
 
 func _on_water_carried_changed(current: float, capacity: float) -> void:
-	carry_label.text = "Bag: %.3f/%.3f" % [current, capacity]
+	if capacity >= 10.0:
+		carry_label.text = "Bag: %.1f/%.1f" % [current, capacity]
+	elif capacity >= 1.0:
+		carry_label.text = "Bag: %.2f/%.2f" % [current, capacity]
+	else:
+		carry_label.text = "Bag: %.3f/%.3f" % [current, capacity]
 
 func _on_swamp_completed(swamp_index: int, _reward: float) -> void:
 	_update_water_label()
