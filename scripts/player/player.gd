@@ -122,8 +122,8 @@ func _physics_process(delta: float) -> void:
 	if stamina_idle_timer >= STAMINA_REGEN_DELAY_TIME:
 		GameManager.regen_stamina(delta)
 
-	# Hold-to-scoop: auto-scoop while space held
-	if Input.is_action_pressed("scoop") and scoop_cooldown_timer <= 0.0:
+	# Manual scoop: single press
+	if Input.is_action_just_pressed("scoop") and scoop_cooldown_timer <= 0.0:
 		_handle_scoop()
 
 	# Auto-scoop on timer when near water (always active, upgrades speed it up)
