@@ -623,7 +623,7 @@ func get_lantern_radius() -> float:
 	var level: int = upgrades_owned["lantern"]
 	if level <= 0:
 		return 0.0
-	return 48.0 * pow(1.20, level - 1)
+	return 48.0 * pow(1.40, level - 1)
 
 func get_lantern_energy() -> float:
 	var level: int = upgrades_owned["lantern"]

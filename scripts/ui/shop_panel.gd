@@ -416,7 +416,7 @@ func _get_upgrade_tooltip(uid: String, defn: Dictionary, level: int) -> String:
 		"lantern":
 			if level > 0:
 				tip += "\nRadius: %.0fpx, Brightness: %.2f" % [GameManager.get_lantern_radius(), GameManager.get_lantern_energy()]
-				var next_radius: float = 48.0 * pow(1.20, level)
+				var next_radius: float = 48.0 * pow(1.40, level)
 				var next_energy: float = minf(2.4 * pow(1.12, level), 8.0)
 				tip += "\nNext: %.0fpx radius, %.2f brightness" % [next_radius, next_energy]
 			else:
