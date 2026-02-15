@@ -20,6 +20,14 @@ var is_walking: bool = false
 var prev_walk_sin: float = 0.0
 var auto_scoop_timer: float = 0.0
 
+# Phase 12: Player immersion
+var idle_timer: float = 0.0
+var idle_state: int = 0
+var drip_timer: float = 0.0
+
+# Phase 16: Speed lines
+var speed_line_timer: float = 0.0
+
 @onready var visual: Node2D = $Visual
 @onready var tool_sprite: Node2D = $Visual/ToolSprite
 @onready var boot_left: ColorRect = $Visual/BootLeft
@@ -143,6 +151,64 @@ func _physics_process(delta: float) -> void:
 		hand_right.position.y = -13.0
 		tool_sprite.rotation = 0.0
 
+		# Idle animations (Phase 12c)
+		idle_timer += delta
+		if idle_timer >= 10.0:
+			idle_timer = 0.0
+			idle_state = 0
+		elif idle_timer >= 6.0 and idle_state < 2:
+			idle_state = 2
+			# Tap foot
+			var tap_tw := create_tween()
+			tap_tw.tween_property(boot_right, "position:y", -10.0, 0.1)
+			tap_tw.tween_property(boot_right, "position:y", -8.0, 0.1)
+			tap_tw.tween_property(boot_right, "position:y", -10.0, 0.1)
+			tap_tw.tween_property(boot_right, "position:y", -8.0, 0.1)
+		elif idle_timer >= 3.0 and idle_state < 1:
+			idle_state = 1
+			# Look around
+			var look_tw := create_tween()
+			look_tw.tween_property(visual, "position:x", 1.5, 0.3)
+			look_tw.tween_interval(0.6)
+			look_tw.tween_property(visual, "position:x", -1.5, 0.4)
+			look_tw.tween_interval(0.6)
+			look_tw.tween_property(visual, "position:x", 0.0, 0.3)
+
+	if is_walking:
+		idle_timer = 0.0
+		idle_state = 0
+
+	# Water drip trail (Phase 12a) — drip when carrying water
+	var water_carried: float = GameManager.water_carried
+	if water_carried > 0.0 and is_walking:
+		drip_timer += delta
+		var drip_interval: float = lerpf(0.6, 0.15, clampf(water_carried / GameManager.get_carrying_capacity(), 0.0, 1.0))
+		if drip_timer >= drip_interval:
+			drip_timer = 0.0
+			var drip := ColorRect.new()
+			drip.size = Vector2(1, 2)
+			drip.color = Color(0.3, 0.55, 0.8, 0.6)
+			drip.position = Vector2(randf_range(-3, 3), 0)
+			drip.z_index = -1
+			add_child(drip)
+			var dtw := create_tween()
+			dtw.tween_property(drip, "position:y", 4.0, 0.4)
+			dtw.parallel().tween_property(drip, "modulate:a", 0.0, 0.5)
+			dtw.tween_callback(drip.queue_free)
+	else:
+		drip_timer = 0.0
+
+	# Speed lines (Phase 16b)
+	var speed_mult: float = GameManager.get_movement_speed_multiplier()
+	if speed_mult > 1.5 and is_walking:
+		speed_line_timer += delta
+		var line_interval: float = lerpf(0.15, 0.04, clampf((speed_mult - 1.5) / 3.0, 0.0, 1.0))
+		if speed_line_timer >= line_interval:
+			speed_line_timer = 0.0
+			_spawn_speed_line()
+	else:
+		speed_line_timer = 0.0
+
 	# Scoop cooldown
 	if scoop_cooldown_timer > 0.0:
 		scoop_cooldown_timer -= delta
@@ -221,25 +287,129 @@ func _scoop_feedback() -> void:
 	_spawn_splash()
 
 func _spawn_splash() -> void:
-	for i in range(6):
+	var tid: String = GameManager.current_tool_id
+	var count: int = 4
+	var spread_x: float = 10.0
+	var spread_y: float = 16.0
+	var dot_size: Vector2 = Vector2(2, 2)
+	var life: float = 0.4
+	var base_color: Color = Color(0.4, 0.65, 0.85, 0.8)
+	var shake_amount: float = 0.0
+
+	match tid:
+		"hands":
+			count = 3
+			spread_x = 6.0
+			spread_y = 10.0
+			dot_size = Vector2(1, 1)
+			life = 0.3
+		"spoon":
+			count = 4
+			spread_x = 8.0
+			spread_y = 12.0
+		"cup":
+			count = 5
+			spread_x = 10.0
+			spread_y = 14.0
+		"bucket":
+			count = 8
+			spread_x = 16.0
+			spread_y = 22.0
+			dot_size = Vector2(3, 3)
+			life = 0.5
+			shake_amount = 1.0
+		"shovel":
+			count = 10
+			spread_x = 18.0
+			spread_y = 24.0
+			dot_size = Vector2(3, 2)
+			life = 0.5
+			shake_amount = 1.5
+		"wheelbarrow":
+			count = 14
+			spread_x = 24.0
+			spread_y = 28.0
+			dot_size = Vector2(3, 3)
+			life = 0.55
+			shake_amount = 2.0
+		"barrel":
+			count = 18
+			spread_x = 28.0
+			spread_y = 32.0
+			dot_size = Vector2(4, 3)
+			life = 0.6
+			shake_amount = 2.5
+		"water_wagon":
+			count = 24
+			spread_x = 32.0
+			spread_y = 36.0
+			dot_size = Vector2(4, 4)
+			life = 0.65
+			shake_amount = 3.0
+		"hose":
+			count = 8
+			spread_x = 20.0
+			spread_y = 6.0
+			dot_size = Vector2(1, 1)
+			life = 0.3
+			base_color = Color(0.5, 0.75, 0.9, 0.6)
+
+	# Screen shake via camera
+	if shake_amount > 0.0:
+		var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+		if cam:
+			var shake_tw := create_tween()
+			shake_tw.tween_property(cam, "offset", Vector2(randf_range(-shake_amount, shake_amount), randf_range(-shake_amount, shake_amount)), 0.05)
+			shake_tw.tween_property(cam, "offset", Vector2.ZERO, 0.1)
+
+	for i in range(count):
 		var dot := ColorRect.new()
-		dot.size = Vector2(2, 2)
-		dot.color = Color(0.4, 0.65, 0.85, 0.8)
-		dot.position = Vector2(randf_range(-12, 12), -4)
+		dot.size = dot_size
+		dot.color = base_color
+		dot.position = Vector2(randf_range(-spread_x * 0.5, spread_x * 0.5), -4)
 		dot.z_index = 8
 		add_child(dot)
 
 		var tw := create_tween()
-		tw.tween_property(dot, "position", dot.position + Vector2(randf_range(-16, 16), randf_range(-24, -8)), 0.4)
-		tw.parallel().tween_property(dot, "modulate:a", 0.0, 0.4)
+		tw.tween_property(dot, "position", dot.position + Vector2(randf_range(-spread_x, spread_x), randf_range(-spread_y, -spread_y * 0.3)), life)
+		tw.parallel().tween_property(dot, "modulate:a", 0.0, life)
 		tw.tween_callback(dot.queue_free)
 
+	# Shovel-specific: dirt chunk particles
+	if tid == "shovel":
+		for i in range(4):
+			var dirt := ColorRect.new()
+			dirt.size = Vector2(2, 2)
+			dirt.color = Color(0.45, 0.35, 0.2, 0.7)
+			dirt.position = Vector2(randf_range(-8, 8), -2)
+			dirt.z_index = 7
+			add_child(dirt)
+			var dtw := create_tween()
+			dtw.tween_property(dirt, "position", dirt.position + Vector2(randf_range(-12, 12), randf_range(-10, 6)), 0.45)
+			dtw.parallel().tween_property(dirt, "modulate:a", 0.0, 0.45)
+			dtw.tween_callback(dirt.queue_free)
+
 func _update_tool_visual() -> void:
-	# Clear existing tool visuals
+	# Tool equip animation (Phase 12d): shrink old, grow new
+	var had_tool: bool = tool_visuals.size() > 0
 	for v in tool_visuals:
 		if is_instance_valid(v):
 			v.queue_free()
 	tool_visuals.clear()
+
+	# Animate tool sprite: shrink then grow
+	if had_tool:
+		tool_sprite.scale = Vector2(0.0, 0.0)
+		var equip_tw := create_tween()
+		equip_tw.set_ease(Tween.EASE_OUT)
+		equip_tw.set_trans(Tween.TRANS_BACK)
+		equip_tw.tween_property(tool_sprite, "scale", Vector2(1.0, 1.0), 0.15)
+	else:
+		tool_sprite.scale = Vector2(0.0, 0.0)
+		var equip_tw := create_tween()
+		equip_tw.set_ease(Tween.EASE_OUT)
+		equip_tw.set_trans(Tween.TRANS_BACK)
+		equip_tw.tween_property(tool_sprite, "scale", Vector2(1.0, 1.0), 0.2)
 
 	var tool_id: String = GameManager.current_tool_id
 	match tool_id:
@@ -437,3 +607,15 @@ func _spawn_dust_puff(foot_x: float) -> void:
 		tw.tween_property(puff, "modulate:a", 0.0, 0.6)
 		tw.set_parallel(false)
 		tw.tween_callback(puff.queue_free)
+
+func _spawn_speed_line() -> void:
+	var line := ColorRect.new()
+	line.size = Vector2(randf_range(6, 14), 1)
+	var dir_offset: float = -12.0 if facing_right else 12.0
+	line.position = Vector2(dir_offset + randf_range(-4, 4), randf_range(-20, 4))
+	line.color = Color(1.0, 1.0, 1.0, 0.25)
+	line.z_index = -1
+	add_child(line)
+	var tw := create_tween()
+	tw.tween_property(line, "modulate:a", 0.0, 0.15)
+	tw.tween_callback(line.queue_free)

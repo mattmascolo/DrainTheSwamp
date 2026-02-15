@@ -8,7 +8,7 @@ var _refresh_cooldown: float = 0.0
 const REFRESH_INTERVAL: float = 0.3
 
 func _ready() -> void:
-	close_button.pressed.connect(func() -> void: visible = false)
+	close_button.pressed.connect(func() -> void: close())
 	GameManager.money_changed.connect(func(_m: float) -> void: _dirty = true)
 	GameManager.tool_upgraded.connect(func(_t: String, _l: int) -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	GameManager.tool_changed.connect(func(_d: Dictionary) -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
@@ -28,6 +28,19 @@ func open() -> void:
 	visible = true
 	_refresh_cooldown = 0.0
 	_refresh()
+	# Slide in from right (Phase 10a)
+	position.x = 320
+	var tw := create_tween()
+	tw.set_ease(Tween.EASE_OUT)
+	tw.set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(self, "position:x", 0.0, 0.2)
+
+func close() -> void:
+	var tw := create_tween()
+	tw.set_ease(Tween.EASE_IN)
+	tw.set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(self, "position:x", 320.0, 0.15)
+	tw.tween_callback(func() -> void: visible = false)
 
 func _refresh() -> void:
 	for child in tool_list.get_children():

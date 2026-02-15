@@ -28,6 +28,8 @@ func _on_stats_pressed() -> void:
 	stat_panel.open()
 
 func _on_pump_requested() -> void:
+	if pump_panel.visible:
+		return
 	_close_all_panels()
 	pump_panel.open()
 

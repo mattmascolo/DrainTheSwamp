@@ -8,7 +8,7 @@ var _refresh_cooldown: float = 0.0
 const REFRESH_INTERVAL: float = 0.3
 
 func _ready() -> void:
-	close_button.pressed.connect(func() -> void: visible = false)
+	close_button.pressed.connect(func() -> void: close())
 	GameManager.money_changed.connect(func(_m: float) -> void: _dirty = true)
 	GameManager.pump_changed.connect(func() -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	visible = false
@@ -25,6 +25,19 @@ func open() -> void:
 	visible = true
 	_refresh_cooldown = 0.0
 	_refresh()
+	# Slide in from right (Phase 10a)
+	position.x = 320
+	var tw := create_tween()
+	tw.set_ease(Tween.EASE_OUT)
+	tw.set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(self, "position:x", 0.0, 0.2)
+
+func close() -> void:
+	var tw := create_tween()
+	tw.set_ease(Tween.EASE_IN)
+	tw.set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(self, "position:x", 320.0, 0.15)
+	tw.tween_callback(func() -> void: visible = false)
 
 func _refresh() -> void:
 	for child in content.get_children():
@@ -66,13 +79,13 @@ func _refresh() -> void:
 		status.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 		status.add_theme_constant_override("shadow_offset_x", 2)
 		status.add_theme_constant_override("shadow_offset_y", 2)
-		status.text = "Pump Lv%d (%.4f g/s)" % [GameManager.pump_level, drain_rate]
+		status.text = "Pump Lv%d (%.4f g/s base)" % [GameManager.pump_level, drain_rate]
 		if income > 0:
-			status.text += "\nEarning: %s/s" % Economy.format_money(income)
+			status.text += "\nTotal: %s/s" % Economy.format_money(income)
 			status.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
 		else:
-			status.text += "\nNo target selected!"
-			status.add_theme_color_override("font_color", Color(1.0, 0.5, 0.5))
+			status.text += "\nAll pools drained!"
+			status.add_theme_color_override("font_color", Color(0.8, 0.8, 0.4))
 		content.add_child(status)
 
 		# Upgrade button
@@ -88,42 +101,36 @@ func _refresh() -> void:
 		_style_button(up_btn, Color(0.1, 0.18, 0.3))
 		content.add_child(up_btn)
 
-		# Target selection
+		# Per-swamp drain status
 		var sep := HSeparator.new()
 		content.add_child(sep)
 
-		var target_header := Label.new()
-		target_header.add_theme_font_size_override("font_size", 14)
-		target_header.text = "Connect to:"
-		target_header.add_theme_color_override("font_color", Color(0.4, 0.85, 1))
-		target_header.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-		target_header.add_theme_constant_override("shadow_offset_x", 2)
-		target_header.add_theme_constant_override("shadow_offset_y", 2)
-		content.add_child(target_header)
+		var drain_header := Label.new()
+		drain_header.add_theme_font_size_override("font_size", 14)
+		drain_header.text = "Draining:"
+		drain_header.add_theme_color_override("font_color", Color(0.4, 0.85, 1))
+		drain_header.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+		drain_header.add_theme_constant_override("shadow_offset_x", 2)
+		drain_header.add_theme_constant_override("shadow_offset_y", 2)
+		content.add_child(drain_header)
 
 		for i in range(GameManager.get_swamp_count()):
-			var idx: int = i
 			var defn: Dictionary = GameManager.swamp_definitions[i]
-			var btn := Button.new()
-			btn.add_theme_font_size_override("font_size", 14)
-
+			var eff: float = GameManager.PUMP_SWAMP_EFFICIENCY[i] if i < GameManager.PUMP_SWAMP_EFFICIENCY.size() else 0.05
+			var lbl := Label.new()
+			lbl.add_theme_font_size_override("font_size", 12)
 			if GameManager.is_swamp_completed(i):
-				btn.text = "%s [DONE]" % defn["name"]
-				btn.disabled = true
-				_style_button(btn, Color(0.1, 0.15, 0.1))
-			elif GameManager.pump_target_swamp == i:
-				btn.text = "> %s [ACTIVE] <" % defn["name"]
-				btn.disabled = true
-				btn.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
-				_style_button(btn, Color(0.08, 0.22, 0.1))
+				lbl.text = "%s - DONE" % defn["name"]
+				lbl.add_theme_color_override("font_color", Color(0.4, 0.5, 0.4))
 			else:
-				btn.text = defn["name"]
-				btn.add_theme_color_override("font_color", Color(0.85, 0.88, 0.95))
-				btn.pressed.connect(func() -> void: GameManager.set_pump_target(idx))
-				_style_button(btn, Color(0.12, 0.15, 0.2))
-			content.add_child(btn)
+				var swamp_rate: float = drain_rate * eff
+				var swamp_income: float = swamp_rate * defn["money_per_gallon"] * GameManager.get_money_multiplier()
+				lbl.text = "%s (%d%%) %.4f g/s  %s/s" % [defn["name"], int(eff * 100), swamp_rate, Economy.format_money(swamp_income)]
+				lbl.add_theme_color_override("font_color", Color(0.7, 0.85, 0.7))
+			content.add_child(lbl)
 
 func _style_button(btn: Button, bg_color: Color) -> void:
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	var style := StyleBoxFlat.new()
 	style.bg_color = bg_color
 	style.border_width_left = 2

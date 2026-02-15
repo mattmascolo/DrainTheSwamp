@@ -15,6 +15,10 @@ signal shop_pressed
 signal stats_pressed
 signal menu_pressed
 
+# Phase 10c: Money counter animation
+var displayed_money: float = 0.0
+var money_tween: Tween = null
+
 func _ready() -> void:
 	GameManager.money_changed.connect(_on_money_changed)
 	GameManager.water_level_changed.connect(_on_water_level_changed)
@@ -32,6 +36,7 @@ func _ready() -> void:
 	menu_button.pressed.connect(func() -> void: menu_pressed.emit())
 
 	# Initialize
+	displayed_money = GameManager.money
 	_on_money_changed(GameManager.money)
 	_update_water_label()
 	_update_tool_label()
@@ -66,7 +71,23 @@ func _on_day_changed(_day: int) -> void:
 	_update_day_label()
 
 func _on_money_changed(amount: float) -> void:
-	money_label.text = Economy.format_money(amount)
+	var delta_money: float = amount - displayed_money
+	# Smooth roll-up animation (Phase 10c)
+	if money_tween and money_tween.is_valid():
+		money_tween.kill()
+	money_tween = create_tween()
+	money_tween.tween_method(func(val: float) -> void:
+		displayed_money = val
+		money_label.text = Economy.format_money(val)
+	, displayed_money, amount, 0.3)
+	# Golden pulse on big earnings
+	if delta_money > 10.0:
+		money_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
+		var glow_tw := create_tween()
+		glow_tw.tween_interval(0.15)
+		glow_tw.tween_callback(func() -> void:
+			money_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
+		)
 
 func _on_water_level_changed(_swamp_index: int, _percent: float) -> void:
 	_update_water_label()

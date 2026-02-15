@@ -31,7 +31,7 @@ var swamp_states: Array = []
 var tool_definitions: Dictionary = {
 	"hands": {
 		"name": "Hands",
-		"base_output": 0.005,
+		"base_output": 0.015,
 		"cost": 0.0,
 		"type": "manual",
 		"order": 0
@@ -39,7 +39,7 @@ var tool_definitions: Dictionary = {
 	"spoon": {
 		"name": "Spoon",
 		"base_output": 0.02,
-		"cost": 25.0,
+		"cost": 15.0,
 		"type": "manual",
 		"order": 1
 	},
@@ -87,8 +87,8 @@ var tool_definitions: Dictionary = {
 	},
 	"hose": {
 		"name": "Garden Hose",
-		"base_output": 0.1,
-		"cost": 8000.0,
+		"base_output": 0.3,
+		"cost": 3000.0,
 		"type": "semi_auto",
 		"order": 8
 	}
@@ -124,7 +124,7 @@ var stat_definitions: Dictionary = {
 	},
 	"stamina_regen": {
 		"name": "Stamina Regen",
-		"base_value": 1.0,
+		"base_value": 0.8,
 		"per_level": 0.5,
 		"base_cost": 8.0,
 		"cost_exponent": 1.12,
@@ -148,14 +148,6 @@ var stat_definitions: Dictionary = {
 		"base_cost": 35.0,
 		"cost_exponent": 1.3,
 		"format": "multiplier"
-	},
-	"lucky_scoop": {
-		"name": "Lucky Scoop",
-		"base_value": 0.0,
-		"per_level": 0.05,
-		"base_cost": 75.0,
-		"cost_exponent": 1.4,
-		"format": "percent"
 	},
 	"drain_mastery": {
 		"name": "Drain Mastery",
@@ -198,7 +190,6 @@ var stat_levels: Dictionary = {
 	"stamina_regen": 0,
 	"water_value": 0,
 	"scoop_power": 0,
-	"lucky_scoop": 0,
 	"drain_mastery": 0
 }
 
@@ -212,7 +203,7 @@ var last_scoop_swamp: int = 0
 var hose_active: bool = false
 var hose_timer: float = 0.0
 var hose_swamp_index: int = -1
-const HOSE_DURATION: float = 20.0
+const HOSE_DURATION: float = 30.0
 
 # Pump state
 var pump_owned: bool = false
@@ -364,11 +355,8 @@ func get_stat_value_at_level(stat_id: String, level: int) -> float:
 func get_money_multiplier() -> float:
 	return get_stat_value("water_value")
 
-func get_lucky_scoop_chance() -> float:
-	return get_stat_value("lucky_scoop")
-
 func get_stamina_cost() -> float:
-	var base: float = maxf(1.0 - get_stat_value("drain_mastery"), 0.5)
+	var base: float = maxf(2.0 - get_stat_value("drain_mastery"), 0.5)
 	return base * get_splash_guard_multiplier()
 
 func get_max_stamina() -> float:
@@ -463,13 +451,6 @@ func try_scoop(swamp_index: int) -> bool:
 		return false
 
 	var tool_output: float = get_tool_output(current_tool_id)
-
-	# Lucky scoop: chance to double
-	var lucky: bool = false
-	if randf() < get_lucky_scoop_chance():
-		tool_output *= 2.0
-		lucky = true
-
 	var scoop_amount: float = minf(tool_output, remaining_space)
 
 	current_stamina -= stamina_cost
@@ -740,7 +721,6 @@ func reset_game() -> void:
 		"stamina_regen": 0,
 		"water_value": 0,
 		"scoop_power": 0,
-		"lucky_scoop": 0,
 		"drain_mastery": 0
 	}
 	current_stamina = get_max_stamina()

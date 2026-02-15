@@ -25,6 +25,8 @@ var terrain_points: Array[Vector2] = [
 
 # Swamp geometry indices: swamp i -> terrain_points indices
 const SWAMP_COUNT: int = 5
+const WATER_SHADER = preload("res://shaders/water.gdshader")
+const POST_PROCESS_SHADER = preload("res://shaders/post_process.gdshader")
 
 # Visual nodes created procedurally
 var water_polygons: Array[Polygon2D] = []
@@ -78,6 +80,55 @@ var shooting_star_timer: float = 0.0
 var turtles: Array[Dictionary] = []
 var tadpoles: Array[Dictionary] = []
 
+# Shader effects
+var post_process_layer: CanvasLayer = null
+var post_process_rect: ColorRect = null
+var water_glow_lines: Array[Line2D] = []
+
+# Parallax layers
+var parallax_bg: ParallaxBackground = null
+var sky_layer: ParallaxLayer = null
+var far_hills_layer: ParallaxLayer = null
+var near_hills_layer: ParallaxLayer = null
+var treeline_layer: ParallaxLayer = null
+
+# Weather system
+var weather_state: String = "clear"
+var weather_timer: float = 0.0
+var weather_duration: float = 90.0
+var lightning_timer: float = 20.0
+var rain_layer: CanvasLayer = null
+var rain_particles: CPUParticles2D = null
+var lightning_rect: ColorRect = null
+
+# Enhanced vegetation
+var ferns_list: Array[Node2D] = []
+var wind_direction: float = 1.0
+var wind_timer: float = 0.0
+
+# Drain-revealed objects per swamp
+var drain_reveals: Array[Array] = []
+
+# Growing vegetation on drained land (Phase 15b)
+var grown_plants: Array[Dictionary] = []
+var last_drain_thresholds: Array[float] = []
+
+# Atmosphere effects (Phase 17)
+var pump_steam_particles: Array[Dictionary] = []
+var morning_mist_rects: Array[ColorRect] = []
+var aurora_lines: Array[Dictionary] = []
+var aurora_active: bool = false
+var aurora_timer: float = 0.0
+var aurora_fade: float = 0.0
+var owl_node: Node2D = null
+var owl_blink_timer: float = 4.0
+
+# Dynamic shadows (Phase 13c)
+var player_shadow: ColorRect = null
+
+# Pump station glow (Phase 11b)
+var pump_glow_rect: ColorRect = null
+
 # Colors
 const SKY_COLOR_TOP := Color(0.22, 0.38, 0.72)
 const SKY_COLOR_MID := Color(0.45, 0.62, 0.88)
@@ -120,6 +171,7 @@ var wave_time: float = 0.0
 
 func _ready() -> void:
 	cycle_time = CYCLE_DURATION * 0.2
+	_build_parallax()
 	_build_sky()
 	_build_sun()
 	_build_clouds()
@@ -156,11 +208,34 @@ func _ready() -> void:
 	_build_pool_features()
 	_build_left_boundary()
 	_build_right_boundary()
+	_build_post_processing()
+	_build_weather()
+	_build_drain_reveals()
+	_build_atmosphere()
+	_build_player_shadow()
+	_init_drain_thresholds()
 
 	GameManager.water_level_changed.connect(_on_water_level_changed)
 	GameManager.swamp_completed.connect(_on_swamp_completed)
 	GameManager.camel_changed.connect(_on_camel_changed)
 	_build_camels()
+
+# --- Parallax ---
+func _build_parallax() -> void:
+	parallax_bg = ParallaxBackground.new()
+	add_child(parallax_bg)
+	sky_layer = ParallaxLayer.new()
+	sky_layer.motion_scale = Vector2(0, 0)
+	parallax_bg.add_child(sky_layer)
+	far_hills_layer = ParallaxLayer.new()
+	far_hills_layer.motion_scale = Vector2(0.1, 0)
+	parallax_bg.add_child(far_hills_layer)
+	near_hills_layer = ParallaxLayer.new()
+	near_hills_layer.motion_scale = Vector2(0.3, 0)
+	parallax_bg.add_child(near_hills_layer)
+	treeline_layer = ParallaxLayer.new()
+	treeline_layer.motion_scale = Vector2(0.6, 0)
+	parallax_bg.add_child(treeline_layer)
 
 # --- Sky & Atmosphere ---
 func _build_sky() -> void:
@@ -170,21 +245,21 @@ func _build_sky() -> void:
 	sky_top.size = Vector2(2120, 100)
 	sky_top.color = SKY_COLOR_TOP
 	sky_top.z_index = -12
-	add_child(sky_top)
+	sky_layer.add_child(sky_top)
 
 	var sky_mid := ColorRect.new()
 	sky_mid.position = Vector2(-100, 20)
 	sky_mid.size = Vector2(2120, 80)
 	sky_mid.color = SKY_COLOR_MID
 	sky_mid.z_index = -12
-	add_child(sky_mid)
+	sky_layer.add_child(sky_mid)
 
 	var sky_bot := ColorRect.new()
 	sky_bot.position = Vector2(-100, 96)
 	sky_bot.size = Vector2(2120, 100)
 	sky_bot.color = SKY_COLOR_BOTTOM
 	sky_bot.z_index = -12
-	add_child(sky_bot)
+	sky_layer.add_child(sky_bot)
 
 func _build_sun() -> void:
 	sun_node = Node2D.new()
@@ -277,7 +352,7 @@ func _build_distant_hills() -> void:
 	])
 	hills.color = Color(0.12, 0.28, 0.12, 0.6)
 	hills.z_index = -7
-	add_child(hills)
+	far_hills_layer.add_child(hills)
 
 	# Mid hills
 	var hills2 := Polygon2D.new()
@@ -289,7 +364,7 @@ func _build_distant_hills() -> void:
 	])
 	hills2.color = Color(0.08, 0.22, 0.08, 0.7)
 	hills2.z_index = -6
-	add_child(hills2)
+	near_hills_layer.add_child(hills2)
 
 func _build_treeline() -> void:
 	# Dense treeline - jagged top edge for tree canopy look
@@ -308,7 +383,7 @@ func _build_treeline() -> void:
 	treeline.polygon = tree_points
 	treeline.color = Color(0.06, 0.18, 0.05)
 	treeline.z_index = -5
-	add_child(treeline)
+	treeline_layer.add_child(treeline)
 
 	# Lighter highlight trees in front
 	var tree_points2 := PackedVector2Array()
@@ -326,7 +401,7 @@ func _build_treeline() -> void:
 	treeline2.polygon = tree_points2
 	treeline2.color = Color(0.1, 0.25, 0.08)
 	treeline2.z_index = -4
-	add_child(treeline2)
+	treeline_layer.add_child(treeline2)
 
 func _build_terrain() -> void:
 	# Main ground polygon
@@ -381,6 +456,20 @@ func _build_terrain() -> void:
 		grass_light.add_point(Vector2(pt.x, pt.y - 1.0))
 	grass_light.z_index = 1
 	add_child(grass_light)
+
+	# Dithered transition at grass-to-dirt boundary (Phase 18a)
+	for pt_idx in range(0, terrain_points.size() - 1, 2):
+		var tp: Vector2 = terrain_points[pt_idx]
+		for dx in range(0, 4):
+			for dy in range(0, 3):
+				if (dx + dy) % 2 == 0:
+					var dither := ColorRect.new()
+					dither.size = Vector2(1, 1)
+					dither.position = Vector2(tp.x + dx, tp.y + 3 + dy)
+					dither.color = GRASS_COLOR.lerp(GROUND_COLOR, float(dy) / 3.0)
+					dither.color.a = 0.5
+					dither.z_index = 1
+					add_child(dither)
 
 	# Collision: build segments between each pair of terrain points
 	terrain_body = StaticBody2D.new()
@@ -672,8 +761,19 @@ func _build_fireflies() -> void:
 		var base_y: float = randf_range(80, 260)
 		fly.position = Vector2(base_x, base_y)
 		add_child(fly)
+		# Additive glow pool under each firefly
+		var glow := ColorRect.new()
+		glow.size = Vector2(8, 6)
+		glow.position = Vector2(-3, -2)
+		glow.color = Color(0.9, 1.0, 0.4, 0.0)
+		glow.z_index = 5
+		var glow_mat := CanvasItemMaterial.new()
+		glow_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		glow.material = glow_mat
+		fly.add_child(glow)
 		fireflies.append({
 			"node": fly,
+			"glow": glow,
 			"base_x": base_x,
 			"base_y": base_y,
 			"phase_x": randf() * TAU,
@@ -916,6 +1016,7 @@ func _place_fern(pos: Vector2) -> void:
 	var fern := Node2D.new()
 	fern.z_index = 1
 	add_child(fern)
+	ferns_list.append(fern)
 	var frond_count: int = randi_range(3, 5)
 	for i in range(frond_count):
 		var frond := Line2D.new()
@@ -1364,6 +1465,9 @@ func _build_fish() -> void:
 				"direction": 1.0 if randf() > 0.5 else -1.0,
 				"alive": true,
 				"death_timer": 0.0,
+				"jump_timer": randf_range(12.0, 35.0),
+				"jumping": false,
+				"jump_time": 0.0,
 			})
 
 # --- Frogs ---
@@ -1427,6 +1531,9 @@ func _build_frogs() -> void:
 			"hopping": false,
 			"hop_progress": 0.0,
 			"base_y": 0.0,
+			"eye_l": eye_l,
+			"eye_r": eye_r,
+			"blink_timer": randf_range(2.0, 6.0),
 		})
 		placed += 1
 
@@ -1894,10 +2001,14 @@ func _get_swamp_geometry(swamp_index: int) -> Dictionary:
 func _build_water() -> void:
 	water_polygons.clear()
 	water_surface_lines.clear()
+	water_glow_lines.clear()
 	for i in range(SWAMP_COUNT):
 		var wp := Polygon2D.new()
 		wp.color = SWAMP_WATER_COLORS[i]
 		wp.z_index = 2
+		var wmat := ShaderMaterial.new()
+		wmat.shader = WATER_SHADER
+		wp.material = wmat
 		add_child(wp)
 		water_polygons.append(wp)
 
@@ -1908,6 +2019,17 @@ func _build_water() -> void:
 		wl.z_index = 3
 		add_child(wl)
 		water_surface_lines.append(wl)
+
+		# Water edge glow (additive blend)
+		var glow := Line2D.new()
+		glow.width = 8.0
+		glow.default_color = Color(0.2, 0.75, 0.65, 0.12)
+		glow.z_index = 3
+		var glow_mat := CanvasItemMaterial.new()
+		glow_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		glow.material = glow_mat
+		add_child(glow)
+		water_glow_lines.append(glow)
 
 		_update_water_polygon(i)
 
@@ -1922,6 +2044,8 @@ func _update_water_polygon(swamp_index: int) -> void:
 	if fill <= 0.001:
 		water_polygons[swamp_index].polygon = PackedVector2Array()
 		water_surface_lines[swamp_index].clear_points()
+		if swamp_index < water_glow_lines.size():
+			water_glow_lines[swamp_index].clear_points()
 		return
 
 	# Use the deeper basin point as reference for water level
@@ -1939,6 +2063,9 @@ func _update_water_polygon(swamp_index: int) -> void:
 	points.append(Vector2(right_x, water_y))
 
 	water_polygons[swamp_index].polygon = points
+	water_polygons[swamp_index].uv = PackedVector2Array([
+		Vector2(0, 0), Vector2(0, 1), Vector2(1, 1), Vector2(1, 0)
+	])
 
 	# Tint water based on fill using per-pool colors
 	var col: Color = SWAMP_WATER_COLORS[swamp_index].lerp(SWAMP_WATER_EMPTY_COLORS[swamp_index], 1.0 - fill)
@@ -1957,6 +2084,15 @@ func _update_water_surface_line(swamp_index: int, left_x: float, right_x: float,
 		var px: float = lerpf(left_x, right_x, t)
 		var wave_offset: float = sin(wave_time * 2.0 + px * 0.15) * 1.6
 		line.add_point(Vector2(px, water_y + wave_offset))
+	# Update water edge glow
+	if swamp_index < water_glow_lines.size():
+		var glow: Line2D = water_glow_lines[swamp_index]
+		glow.clear_points()
+		for i in range(segments + 1):
+			var gt: float = float(i) / float(segments)
+			var gpx: float = lerpf(left_x, right_x, gt)
+			var gwave: float = sin(wave_time * 1.5 + gpx * 0.12) * 2.0
+			glow.add_point(Vector2(gpx, water_y + gwave))
 
 func _lerp_x_at_y(p1: Vector2, p2: Vector2, target_y: float) -> float:
 	if absf(p2.y - p1.y) < 0.001:
@@ -2337,6 +2473,14 @@ func _update_camels(delta: float) -> void:
 		# Flip direction
 		node.scale.x = 1.0 if cd["facing_right"] else -1.0
 
+		# Camel dust trail when walking
+		var is_walking: bool = (cs["state"] == "to_player" or cs["state"] == "to_pump")
+		if is_walking:
+			cd["dust_timer"] = cd.get("dust_timer", 0.0) + delta
+			if cd["dust_timer"] >= 0.3:
+				cd["dust_timer"] = 0.0
+				_spawn_camel_dust(cs["x"], node.position.y)
+
 		# Update saddlebag color based on water fill
 		var bag: ColorRect = cd["bag"]
 		var fill_frac: float = 0.0
@@ -2384,6 +2528,21 @@ func _animate_camel_idle(cd: Dictionary) -> void:
 	cd["leg_br"].position.y = -8.0
 	cd["tail"].position.x = -12.0
 
+func _spawn_camel_dust(x: float, y: float) -> void:
+	for i in range(2):
+		var dust := ColorRect.new()
+		dust.size = Vector2(3, 2)
+		dust.color = Color(0.55, 0.45, 0.3, 0.4)
+		dust.position = Vector2(x + randf_range(-4, 4), y + randf_range(-2, 0))
+		dust.z_index = -1
+		add_child(dust)
+		var tw := create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(dust, "position", dust.position + Vector2(randf_range(-6, 6), randf_range(-6, -3)), 0.5)
+		tw.tween_property(dust, "modulate:a", 0.0, 0.5)
+		tw.set_parallel(false)
+		tw.tween_callback(dust.queue_free)
+
 func _spawn_camel_sell_text(x: float, y: float, earned: float) -> void:
 	var label := Label.new()
 	label.text = "+%s" % Economy.format_money(earned)
@@ -2418,6 +2577,10 @@ func _on_swamp_completed(swamp_index: int, _reward: float) -> void:
 	if swamp_index >= 0 and swamp_index < swamp_percent_labels.size():
 		swamp_percent_labels[swamp_index].text = "0.0%"
 		swamp_percent_labels[swamp_index].add_theme_color_override("font_color", Color(0.3, 1.0, 0.4, 0.9))
+	# Phase 7a: Heavy screen shake on swamp drained
+	_screen_shake(5.0, 0.3)
+	# Phase 7c: Milestone flash — golden vignette pulse + brief scale bounce
+	_milestone_flash()
 
 # --- Pump Station ---
 func _build_pump_station() -> void:
@@ -2565,6 +2728,356 @@ func _on_pump_body_exited(body: Node2D) -> void:
 		player_in_pump_area = false
 		pump_player_ref = null
 
+# --- Weather System ---
+func _build_weather() -> void:
+	rain_layer = CanvasLayer.new()
+	rain_layer.layer = 50
+	add_child(rain_layer)
+	rain_particles = CPUParticles2D.new()
+	rain_particles.emitting = false
+	rain_particles.amount = 200
+	rain_particles.lifetime = 0.5
+	rain_particles.position = Vector2(160, -10)
+	rain_particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	rain_particles.emission_rect_extents = Vector2(200, 4)
+	rain_particles.direction = Vector2(-0.2, 1.0)
+	rain_particles.spread = 8.0
+	rain_particles.initial_velocity_min = 200.0
+	rain_particles.initial_velocity_max = 280.0
+	rain_particles.gravity = Vector2(-30, 400)
+	rain_particles.color = Color(0.55, 0.65, 0.85, 0.3)
+	rain_particles.scale_amount_min = 0.5
+	rain_particles.scale_amount_max = 1.2
+	rain_layer.add_child(rain_particles)
+	lightning_rect = ColorRect.new()
+	lightning_rect.size = Vector2(320, 180)
+	lightning_rect.color = Color(1, 1, 1, 0)
+	lightning_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rain_layer.add_child(lightning_rect)
+
+# --- Drain-Revealed Objects ---
+func _build_drain_reveals() -> void:
+	drain_reveals.clear()
+	for i in range(SWAMP_COUNT):
+		var geo: Dictionary = _get_swamp_geometry(i)
+		var bl: Vector2 = geo["basin_left"]
+		var br: Vector2 = geo["basin_right"]
+		var cx: float = (bl.x + br.x) * 0.5
+		var by: float = maxf(bl.y, br.y)
+		var reveals: Array = []
+		# 75% - mud patches at edges
+		var mud_l := ColorRect.new()
+		mud_l.size = Vector2(8, 3)
+		mud_l.position = Vector2(bl.x + 4, by - 2)
+		mud_l.color = Color(0.3, 0.22, 0.1, 0.7)
+		mud_l.z_index = 1
+		mud_l.visible = false
+		add_child(mud_l)
+		var mud_r := ColorRect.new()
+		mud_r.size = Vector2(8, 3)
+		mud_r.position = Vector2(br.x - 12, by - 2)
+		mud_r.color = Color(0.3, 0.22, 0.1, 0.7)
+		mud_r.z_index = 1
+		mud_r.visible = false
+		add_child(mud_r)
+		reveals.append({"threshold": 0.75, "nodes": [mud_l, mud_r]})
+		# 50% - exposed rocks
+		var rock1 := ColorRect.new()
+		rock1.size = Vector2(5, 4)
+		rock1.position = Vector2(cx - 15, by - 3)
+		rock1.color = Color(0.42, 0.4, 0.38, 0.85)
+		rock1.z_index = 1
+		rock1.visible = false
+		add_child(rock1)
+		var rock2 := ColorRect.new()
+		rock2.size = Vector2(4, 3)
+		rock2.position = Vector2(cx + 10, by - 2)
+		rock2.color = Color(0.38, 0.36, 0.34, 0.85)
+		rock2.z_index = 1
+		rock2.visible = false
+		add_child(rock2)
+		reveals.append({"threshold": 0.50, "nodes": [rock1, rock2]})
+		# 25% - rusty sign, old boot
+		var boot := ColorRect.new()
+		boot.size = Vector2(4, 5)
+		boot.position = Vector2(cx + 5, by - 4)
+		boot.color = Color(0.35, 0.2, 0.1, 0.75)
+		boot.z_index = 1
+		boot.visible = false
+		add_child(boot)
+		var sign_post := ColorRect.new()
+		sign_post.size = Vector2(2, 8)
+		sign_post.position = Vector2(cx - 20, by - 7)
+		sign_post.color = Color(0.5, 0.35, 0.2, 0.8)
+		sign_post.z_index = 1
+		sign_post.visible = false
+		add_child(sign_post)
+		var sign_board := ColorRect.new()
+		sign_board.size = Vector2(8, 5)
+		sign_board.position = Vector2(cx - 24, by - 12)
+		sign_board.color = Color(0.55, 0.4, 0.25, 0.7)
+		sign_board.z_index = 1
+		sign_board.visible = false
+		add_child(sign_board)
+		reveals.append({"threshold": 0.25, "nodes": [boot, sign_post, sign_board]})
+		# 0% - treasure chest
+		var chest := ColorRect.new()
+		chest.size = Vector2(8, 6)
+		chest.position = Vector2(cx, by - 5)
+		chest.color = Color(0.7, 0.55, 0.15, 0.9)
+		chest.z_index = 1
+		chest.visible = false
+		add_child(chest)
+		var chest_lid := ColorRect.new()
+		chest_lid.size = Vector2(10, 3)
+		chest_lid.position = Vector2(cx - 1, by - 8)
+		chest_lid.color = Color(0.6, 0.45, 0.1, 0.9)
+		chest_lid.z_index = 1
+		chest_lid.visible = false
+		add_child(chest_lid)
+		reveals.append({"threshold": 0.0, "nodes": [chest, chest_lid]})
+		drain_reveals.append(reveals)
+
+func _flash_lightning() -> void:
+	if lightning_rect:
+		lightning_rect.color.a = 0.5
+
+# --- Coin Fly (Phase 16c) ---
+func _spawn_coin_fly(from_pos: Vector2) -> void:
+	for i in range(3):
+		var coin := ColorRect.new()
+		coin.size = Vector2(2, 2)
+		coin.color = Color(1.0, 0.85, 0.2, 0.9)
+		coin.position = from_pos + Vector2(randf_range(-4, 4), randf_range(-8, -4))
+		coin.z_index = 12
+		add_child(coin)
+		# Fly upward and to the left (toward HUD corner)
+		var target: Vector2 = Vector2(from_pos.x - 40 + randf_range(-20, 20), from_pos.y - 60)
+		var tw := create_tween()
+		tw.tween_property(coin, "position", target, 0.5 + randf_range(0, 0.2))
+		tw.parallel().tween_property(coin, "modulate:a", 0.0, 0.6)
+		tw.tween_callback(coin.queue_free)
+
+# --- Pump Steam (Phase 17a) ---
+func _spawn_pump_steam() -> void:
+	if not pump_light_ref or not is_instance_valid(pump_light_ref):
+		return
+	var px: float = pump_light_ref.global_position.x + randf_range(-6, 6)
+	var py: float = pump_light_ref.global_position.y - 8
+	var steam := ColorRect.new()
+	steam.size = Vector2(randf_range(3, 6), randf_range(2, 4))
+	steam.position = Vector2(px, py)
+	steam.color = Color(0.9, 0.9, 0.95, 0.3)
+	steam.z_index = 8
+	add_child(steam)
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(steam, "position:y", py - randf_range(12, 20), 0.8)
+	tw.tween_property(steam, "position:x", px + randf_range(-6, 6), 0.8)
+	tw.tween_property(steam, "size", steam.size + Vector2(3, 2), 0.8)
+	tw.tween_property(steam, "modulate:a", 0.0, 0.8)
+	tw.set_parallel(false)
+	tw.tween_callback(steam.queue_free)
+
+# --- Screen Effects (Phase 7) ---
+func _screen_shake(amount: float, duration: float) -> void:
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	if not cam:
+		return
+	var shake_tw := create_tween()
+	var steps: int = int(duration / 0.05)
+	for i in range(steps):
+		var offset: Vector2 = Vector2(randf_range(-amount, amount), randf_range(-amount, amount))
+		var decay: float = 1.0 - float(i) / float(steps)
+		shake_tw.tween_property(cam, "offset", offset * decay, 0.05)
+	shake_tw.tween_property(cam, "offset", Vector2.ZERO, 0.05)
+
+func _milestone_flash() -> void:
+	# Golden vignette pulse via post-process tint
+	if post_process_rect and post_process_rect.material:
+		var pp_mat: ShaderMaterial = post_process_rect.material as ShaderMaterial
+		var orig_warmth: float = pp_mat.get_shader_parameter("warmth")
+		var flash_tw := create_tween()
+		flash_tw.tween_method(func(val: float) -> void:
+			pp_mat.set_shader_parameter("warmth", val)
+		, 0.08, orig_warmth, 0.6)
+	# Particle burst around player
+	var player_node: Node2D = get_tree().get_first_node_in_group("player") as Node2D
+	if player_node:
+		for i in range(16):
+			var spark := ColorRect.new()
+			spark.size = Vector2(2, 2)
+			spark.color = Color(1.0, 0.85, 0.2, 0.9)
+			spark.position = player_node.global_position
+			spark.z_index = 10
+			add_child(spark)
+			var angle: float = float(i) / 16.0 * TAU
+			var target: Vector2 = spark.position + Vector2(cos(angle) * 30, sin(angle) * 30)
+			var stw := create_tween()
+			stw.tween_property(spark, "position", target, 0.5)
+			stw.parallel().tween_property(spark, "modulate:a", 0.0, 0.5)
+			stw.tween_callback(spark.queue_free)
+
+# --- Atmosphere (Phase 17) ---
+func _build_atmosphere() -> void:
+	# Morning mist wisps (dawn-specific)
+	for i in range(6):
+		var mist := ColorRect.new()
+		mist.size = Vector2(randf_range(40, 80), randf_range(6, 12))
+		mist.position = Vector2(randf_range(0, 1800), randf_range(100, 140))
+		mist.color = Color(0.9, 0.85, 0.7, 0.0)
+		mist.z_index = 4
+		add_child(mist)
+		morning_mist_rects.append(mist)
+
+	# Aurora borealis lines (rare night event)
+	for i in range(5):
+		var aline := Line2D.new()
+		aline.width = 3.0
+		aline.z_index = 2
+		var aurora_colors: Array[Color] = [
+			Color(0.2, 0.9, 0.4, 0.0),
+			Color(0.3, 0.5, 0.9, 0.0),
+			Color(0.6, 0.2, 0.8, 0.0),
+			Color(0.2, 0.8, 0.7, 0.0),
+			Color(0.4, 0.3, 0.9, 0.0),
+		]
+		aline.default_color = aurora_colors[i]
+		var mat := CanvasItemMaterial.new()
+		mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		aline.material = mat
+		add_child(aline)
+		aurora_lines.append({"line": aline, "base_y": 15.0 + i * 8.0, "speed": randf_range(0.3, 0.6), "phase": randf() * TAU})
+
+	# Owl (perched in treeline at night)
+	owl_node = Node2D.new()
+	owl_node.z_index = 5
+	owl_node.position = Vector2(randf_range(400, 1600), 65)
+	owl_node.visible = false
+	add_child(owl_node)
+	# Body
+	var owl_body := ColorRect.new()
+	owl_body.size = Vector2(6, 8)
+	owl_body.position = Vector2(-3, -4)
+	owl_body.color = Color(0.35, 0.3, 0.25)
+	owl_node.add_child(owl_body)
+	# Head
+	var owl_head := ColorRect.new()
+	owl_head.size = Vector2(8, 6)
+	owl_head.position = Vector2(-4, -10)
+	owl_head.color = Color(0.4, 0.35, 0.28)
+	owl_node.add_child(owl_head)
+	# Eyes
+	var owl_eye_l := ColorRect.new()
+	owl_eye_l.size = Vector2(2, 2)
+	owl_eye_l.position = Vector2(-3, -9)
+	owl_eye_l.color = Color(1.0, 0.9, 0.2, 0.9)
+	owl_node.add_child(owl_eye_l)
+	var owl_eye_r := ColorRect.new()
+	owl_eye_r.size = Vector2(2, 2)
+	owl_eye_r.position = Vector2(1, -9)
+	owl_eye_r.color = Color(1.0, 0.9, 0.2, 0.9)
+	owl_node.add_child(owl_eye_r)
+	# Ear tufts
+	var owl_ear_l := ColorRect.new()
+	owl_ear_l.size = Vector2(2, 3)
+	owl_ear_l.position = Vector2(-4, -13)
+	owl_ear_l.color = Color(0.35, 0.3, 0.22)
+	owl_node.add_child(owl_ear_l)
+	var owl_ear_r := ColorRect.new()
+	owl_ear_r.size = Vector2(2, 3)
+	owl_ear_r.position = Vector2(2, -13)
+	owl_ear_r.color = Color(0.35, 0.3, 0.22)
+	owl_node.add_child(owl_ear_r)
+
+	# Pump station glow
+	if pump_light_ref and is_instance_valid(pump_light_ref):
+		pump_glow_rect = ColorRect.new()
+		pump_glow_rect.size = Vector2(20, 14)
+		pump_glow_rect.position = Vector2(pump_light_ref.global_position.x - 10, pump_light_ref.global_position.y - 7)
+		pump_glow_rect.color = Color(0.2, 0.8, 0.3, 0.0)
+		pump_glow_rect.z_index = 0
+		var glow_mat := CanvasItemMaterial.new()
+		glow_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		pump_glow_rect.material = glow_mat
+		add_child(pump_glow_rect)
+
+# --- Player Shadow (Phase 13c) ---
+func _build_player_shadow() -> void:
+	player_shadow = ColorRect.new()
+	player_shadow.size = Vector2(10, 3)
+	player_shadow.color = Color(0.0, 0.0, 0.0, 0.2)
+	player_shadow.z_index = -1
+	player_shadow.visible = false
+	add_child(player_shadow)
+
+# --- Growing Vegetation Init (Phase 15b) ---
+func _init_drain_thresholds() -> void:
+	for i in range(SWAMP_COUNT):
+		last_drain_thresholds.append(GameManager.get_swamp_fill_fraction(i))
+
+func _spawn_drain_plant(sx: float, sy: float) -> void:
+	var plant := Node2D.new()
+	plant.position = Vector2(sx, sy)
+	plant.z_index = 2
+	plant.scale = Vector2(0.0, 0.0)
+	add_child(plant)
+
+	var plant_type: int = randi() % 3
+	if plant_type == 0:
+		# Small flower
+		var stem := ColorRect.new()
+		stem.size = Vector2(1, 5)
+		stem.position = Vector2(0, -5)
+		stem.color = Color(0.25, 0.55, 0.2)
+		plant.add_child(stem)
+		var petal_colors: Array[Color] = [Color(0.9, 0.3, 0.4), Color(0.9, 0.7, 0.2), Color(0.7, 0.3, 0.9), Color(0.3, 0.6, 0.9)]
+		var petal := ColorRect.new()
+		petal.size = Vector2(4, 3)
+		petal.position = Vector2(-1.5, -8)
+		petal.color = petal_colors[randi() % petal_colors.size()]
+		plant.add_child(petal)
+	elif plant_type == 1:
+		# Grass tuft
+		for j in range(3):
+			var blade := ColorRect.new()
+			blade.size = Vector2(1, randf_range(4, 7))
+			blade.position = Vector2(-1 + j, -blade.size.y)
+			blade.color = Color(0.3, 0.55 + randf_range(0, 0.1), 0.18)
+			plant.add_child(blade)
+	else:
+		# Sapling
+		var trunk := ColorRect.new()
+		trunk.size = Vector2(2, 6)
+		trunk.position = Vector2(-1, -6)
+		trunk.color = Color(0.45, 0.3, 0.15)
+		plant.add_child(trunk)
+		var canopy := ColorRect.new()
+		canopy.size = Vector2(6, 4)
+		canopy.position = Vector2(-3, -10)
+		canopy.color = Color(0.2, 0.5, 0.18)
+		plant.add_child(canopy)
+
+	# Sprout animation: grow from 0 to full
+	var tw := create_tween()
+	tw.set_ease(Tween.EASE_OUT)
+	tw.set_trans(Tween.TRANS_BACK)
+	tw.tween_property(plant, "scale", Vector2(1.0, 1.0), 0.8)
+	grown_plants.append({"node": plant})
+
+# --- Post-Processing ---
+func _build_post_processing() -> void:
+	post_process_layer = CanvasLayer.new()
+	post_process_layer.layer = 100
+	add_child(post_process_layer)
+	post_process_rect = ColorRect.new()
+	post_process_rect.size = Vector2(320, 180)
+	post_process_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat := ShaderMaterial.new()
+	mat.shader = POST_PROCESS_SHADER
+	post_process_rect.material = mat
+	post_process_layer.add_child(post_process_rect)
+
 # --- Day/Night Cycle & Animation ---
 func _process(delta: float) -> void:
 	# Continuous sell while player stands in pump area
@@ -2572,6 +3085,8 @@ func _process(delta: float) -> void:
 		var earned: float = GameManager.sell_water()
 		if earned > 0.01 and pump_player_ref.has_method("show_floating_text"):
 			pump_player_ref.show_floating_text("+%s" % Economy.format_money(earned), Color(1.0, 0.85, 0.2))
+			_spawn_pump_steam()
+			_spawn_coin_fly(pump_player_ref.global_position)
 
 	# Update camels
 	if GameManager.camel_count > 0:
@@ -2587,6 +3102,199 @@ func _process(delta: float) -> void:
 	GameManager.cycle_progress = t
 	var tint: Color = _get_cycle_color(t)
 	canvas_modulate.color = tint
+
+	# Update shader uniforms
+	for wp in water_polygons:
+		if wp.material:
+			(wp.material as ShaderMaterial).set_shader_parameter("time", wave_time)
+	# World progression: drain progress (used by multiple systems)
+	var total_drained: float = 0.0
+	var total_capacity: float = 0.0
+	for si in range(SWAMP_COUNT):
+		var cap: float = GameManager.swamp_definitions[si]["total_gallons"]
+		total_capacity += cap
+		total_drained += GameManager.swamp_states[si]["gallons_drained"]
+	var drain_progress: float = total_drained / maxf(total_capacity, 1.0)
+
+	if post_process_rect and post_process_rect.material:
+		var pp_mat: ShaderMaterial = post_process_rect.material as ShaderMaterial
+		pp_mat.set_shader_parameter("time", wave_time)
+		# Heat shimmer: daytime only (disabled during rain)
+		var shimmer: float = 0.0
+		if weather_state != "rain":
+			if t > 0.25 and t < 0.55:
+				shimmer = 1.0
+			elif t >= 0.2 and t <= 0.25:
+				shimmer = (t - 0.2) / 0.05
+			elif t >= 0.55 and t <= 0.6:
+				shimmer = 1.0 - (t - 0.55) / 0.05
+		pp_mat.set_shader_parameter("heat_shimmer_strength", shimmer)
+		# Warm/cool color shift
+		var warmth: float = 0.0
+		if t >= 0.2 and t <= 0.5:
+			warmth = 0.02
+		elif t > 0.65 or t < 0.15:
+			warmth = -0.02
+		pp_mat.set_shader_parameter("warmth", warmth)
+		pp_mat.set_shader_parameter("saturation", lerpf(0.75, 1.05, drain_progress))
+
+	# Water glow pulse
+	var glow_base_alpha: float = 0.08
+	if t > 0.6 or t < 0.2:
+		glow_base_alpha = 0.18
+	var glow_pulse: float = glow_base_alpha + sin(wave_time * 1.2) * 0.04
+	for gl in water_glow_lines:
+		gl.default_color.a = glow_pulse
+
+	# Weather system
+	weather_timer += delta
+	if weather_state == "clear":
+		if weather_timer >= weather_duration:
+			if randf() < 0.3:
+				weather_state = "rain"
+				weather_duration = randf_range(30.0, 60.0)
+				weather_timer = 0.0
+				rain_particles.emitting = true
+				lightning_timer = randf_range(15.0, 45.0)
+			else:
+				weather_duration = randf_range(60.0, 120.0)
+				weather_timer = 0.0
+	elif weather_state == "rain":
+		if weather_timer >= weather_duration:
+			weather_state = "clear"
+			weather_duration = randf_range(60.0, 120.0)
+			weather_timer = 0.0
+			rain_particles.emitting = false
+		else:
+			lightning_timer -= delta
+			if lightning_timer <= 0.0:
+				lightning_timer = randf_range(15.0, 45.0)
+				_flash_lightning()
+	if lightning_rect and lightning_rect.color.a > 0.0:
+		lightning_rect.color.a = maxf(0.0, lightning_rect.color.a - delta * 3.0)
+
+	# Wind direction shifts
+	wind_timer += delta
+	if wind_timer >= 8.0:
+		wind_timer = 0.0
+		wind_direction = lerpf(wind_direction, randf_range(-1.0, 1.0), 0.4)
+
+	# Fern sway
+	for fn in ferns_list:
+		if is_instance_valid(fn):
+			var sway: float = sin(wave_time * 0.8 + fn.position.x * 0.03) * 0.06 * wind_direction
+			if weather_state == "rain":
+				sway *= 2.0
+			fn.rotation = sway
+
+	# Drain-revealed objects
+	for i in range(mini(drain_reveals.size(), SWAMP_COUNT)):
+		var fill: float = GameManager.get_swamp_fill_fraction(i)
+		for reveal in drain_reveals[i]:
+			var show: bool = fill <= reveal["threshold"]
+			for node in reveal["nodes"]:
+				node.visible = show
+
+	# Growing vegetation on drained land (Phase 15b)
+	for i in range(mini(last_drain_thresholds.size(), SWAMP_COUNT)):
+		var fill_now: float = GameManager.get_swamp_fill_fraction(i)
+		var fill_prev: float = last_drain_thresholds[i]
+		# Spawn plants when crossing 10% drain thresholds
+		if fill_now < fill_prev - 0.05:
+			last_drain_thresholds[i] = fill_now
+			var geo: Dictionary = _get_swamp_geometry(i)
+			var bx: float = randf_range(geo["basin_left"].x - 15, geo["basin_right"].x + 15)
+			var by: float = geo["basin_left"].y + randf_range(-3, 3)
+			if grown_plants.size() < 80:
+				_spawn_drain_plant(bx, by)
+
+	# Morning mist (dawn-specific, Phase 17b)
+	var mist_alpha: float = 0.0
+	if t >= 0.1 and t < 0.15:
+		mist_alpha = (t - 0.1) / 0.05
+	elif t >= 0.15 and t < 0.2:
+		mist_alpha = lerpf(1.0, 0.0, (t - 0.15) / 0.05)
+	for mr in morning_mist_rects:
+		mr.color.a = mist_alpha * 0.12
+		mr.position.x += delta * randf_range(3.0, 8.0)
+		if mr.position.x > 2000:
+			mr.position.x = -80.0
+
+	# Aurora borealis (rare night event, Phase 17c)
+	aurora_timer += delta
+	if not aurora_active and (t > 0.75 or t < 0.1):
+		if aurora_timer >= 30.0:
+			aurora_timer = 0.0
+			if randf() < 0.1:
+				aurora_active = true
+				aurora_fade = 0.0
+	elif aurora_active:
+		if t > 0.12 and t < 0.7:
+			aurora_active = false
+		else:
+			aurora_fade = minf(aurora_fade + delta * 0.05, 1.0)
+	if not aurora_active and aurora_fade > 0.0:
+		aurora_fade = maxf(aurora_fade - delta * 0.05, 0.0)
+	var cam_au: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	var cam_x_au: float = cam_au.get_screen_center_position().x if cam_au else 320.0
+	for al in aurora_lines:
+		var aline: Line2D = al["line"]
+		aline.clear_points()
+		if aurora_fade > 0.01:
+			for s in range(20):
+				var ax: float = cam_x_au - 180.0 + s * 20.0
+				var ay: float = al["base_y"] + sin(wave_time * al["speed"] + s * 0.5 + al["phase"]) * 6.0
+				aline.add_point(Vector2(ax, ay))
+			aline.default_color.a = aurora_fade * 0.3
+
+	# Owl (nighttime perched, Phase 17d)
+	if owl_node:
+		var owl_vis: bool = t > 0.7 or t < 0.12
+		owl_node.visible = owl_vis
+		if owl_vis:
+			owl_blink_timer -= delta
+			if owl_blink_timer <= 0.0:
+				owl_blink_timer = randf_range(3.0, 7.0)
+				# Blink eyes
+				var eyes: Array[Node] = []
+				for ch in owl_node.get_children():
+					if ch is ColorRect and ch.color.g > 0.8:
+						eyes.append(ch)
+				for eye in eyes:
+					var orig_a: float = eye.color.a
+					eye.color.a = 0.0
+					var btw := create_tween()
+					var e: ColorRect = eye as ColorRect
+					btw.tween_interval(0.12)
+					btw.tween_callback(func() -> void:
+						if is_instance_valid(e): e.color.a = orig_a
+					)
+
+	# Pump station glow (Phase 11b)
+	if pump_glow_rect:
+		var pg_pulse: float = (sin(wave_time * 2.0) + 1.0) * 0.5
+		if GameManager.pump_owned:
+			pump_glow_rect.color.a = lerpf(0.05, 0.15, pg_pulse)
+		else:
+			pump_glow_rect.color.a = 0.0
+
+	# Player shadow (Phase 13c)
+	if player_shadow:
+		var player_node: Node2D = get_tree().get_first_node_in_group("player") as Node2D
+		if player_node:
+			# Shadow visible during day, stretch based on sun angle
+			var shadow_vis: bool = t >= 0.15 and t <= 0.7
+			player_shadow.visible = shadow_vis
+			if shadow_vis:
+				var sun_progress: float = (t - 0.15) / 0.55
+				var shadow_len: float = lerpf(16.0, 6.0, sin(sun_progress * PI))
+				var shadow_dir: float = lerpf(-1.0, 1.0, sun_progress)
+				player_shadow.size = Vector2(shadow_len, 2)
+				player_shadow.position = Vector2(
+					player_node.global_position.x + shadow_dir * shadow_len * 0.3,
+					player_node.global_position.y + 2
+				)
+				player_shadow.color.a = lerpf(0.1, 0.25, sin(sun_progress * PI))
 
 	# Animate water surface waves
 	wave_time += delta
@@ -2607,6 +3315,8 @@ func _process(delta: float) -> void:
 			_update_shimmer_line(i, left_x, right_x, water_y)
 		else:
 			shimmer_lines[i].clear_points()
+			if i < water_glow_lines.size():
+				water_glow_lines[i].clear_points()
 
 	# Drift clouds slowly
 	for ci in range(clouds.size()):
@@ -2646,7 +3356,10 @@ func _process(delta: float) -> void:
 		var py: float = fd["base_y"] + sin(wave_time * fd["speed_y"] + fd["phase_y"]) * fd["amp_y"]
 		node.position = Vector2(px, py)
 		var glow: float = (sin(wave_time * 1.8 + fd["glow_phase"]) + 1.0) * 0.5
-		node.color.a = fly_alpha * lerpf(0.2, 0.9, glow)
+		var fly_vis: float = fly_alpha * lerpf(0.2, 0.9, glow)
+		node.color.a = fly_vis
+		if fd.has("glow"):
+			fd["glow"].color.a = fly_vis * 0.35
 
 	# Leaf particles
 	leaf_timer += delta
@@ -2878,7 +3591,9 @@ func _process(delta: float) -> void:
 
 	# Birds
 	bird_timer += delta
-	if bird_timer >= 8.0:
+	# Bird spawn rate scales with world health (more drained = more birds)
+	var bird_interval: float = lerpf(10.0, 4.0, drain_progress)
+	if bird_timer >= bird_interval:
 		bird_timer = 0.0
 		_spawn_bird()
 	var birds_to_remove: Array[int] = []
@@ -2958,6 +3673,22 @@ func _process(delta: float) -> void:
 		var swim_dir: float = cos(fd["swim_phase"])
 		fnode.scale.x = 1.0 if swim_dir > 0 else -1.0
 		fnode.rotation = sin(fd["swim_phase"] * 2.0) * 0.1
+		# Fish jump animation
+		if fd["jumping"]:
+			fd["jump_time"] += delta
+			if fd["jump_time"] >= 0.6:
+				fd["jumping"] = false
+				fd["jump_time"] = 0.0
+			else:
+				var arc: float = sin(fd["jump_time"] / 0.6 * PI) * 14.0
+				fnode.position.y -= arc
+				fnode.rotation -= sin(fd["jump_time"] / 0.6 * PI) * 0.4
+		else:
+			fd["jump_timer"] -= delta
+			if fd["jump_timer"] <= 0.0 and fd["alive"] and fill >= 0.15:
+				fd["jumping"] = true
+				fd["jump_time"] = 0.0
+				fd["jump_timer"] = randf_range(12.0, 35.0)
 
 	# Frogs: occasional hop animation
 	for fg in frogs:
@@ -2981,6 +3712,25 @@ func _process(delta: float) -> void:
 				fg["hopping"] = true
 				fg["hop_progress"] = 0.0
 				fg["base_y"] = frog_node.position.y
+		# Frog blink
+		if fg.has("blink_timer"):
+			fg["blink_timer"] -= delta
+			if fg["blink_timer"] <= 0.0:
+				fg["blink_timer"] = randf_range(2.0, 6.0)
+				# Brief eye close
+				if fg.has("eye_l") and is_instance_valid(fg["eye_l"]):
+					var orig_color_l: Color = fg["eye_l"].color
+					var orig_color_r: Color = fg["eye_r"].color
+					fg["eye_l"].color = Color(0.2, 0.5, 0.15, 0.95)
+					fg["eye_r"].color = Color(0.2, 0.5, 0.15, 0.95)
+					var blink_tw := create_tween()
+					var el: ColorRect = fg["eye_l"]
+					var er: ColorRect = fg["eye_r"]
+					blink_tw.tween_interval(0.1)
+					blink_tw.tween_callback(func() -> void:
+						if is_instance_valid(el): el.color = orig_color_l
+						if is_instance_valid(er): er.color = orig_color_r
+					)
 
 	# Bioluminescent plants: glow at night
 	var glow_alpha: float = 0.0
@@ -3087,7 +3837,8 @@ func _process(delta: float) -> void:
 	elif t >= 0.55 and t <= 0.65:
 		bf_alpha = 1.0 - (t - 0.55) / 0.1
 	butterfly_timer += delta
-	if butterfly_timer >= 3.0 and bf_alpha > 0.1 and butterflies.size() < 6:
+	var bf_max: int = int(lerpf(3.0, 10.0, drain_progress))
+	if butterfly_timer >= 3.0 and bf_alpha > 0.1 and butterflies.size() < bf_max:
 		butterfly_timer = 0.0
 		_spawn_butterfly()
 	var bf_to_remove: Array[int] = []
@@ -3167,27 +3918,40 @@ func _process(delta: float) -> void:
 		var head_bob: float = sin(wave_time * 0.8 + tt["phase"]) * 0.5
 		tt_head.position.y += head_bob * 0.02
 
-	# Cattail wind sway
+	# Cattail wind sway (enhanced with wind direction + rain)
+	var rain_sway_mult: float = 2.0 if weather_state == "rain" else 1.0
 	for ct in cattails:
 		if is_instance_valid(ct):
-			var sway: float = sin(wave_time * 1.2 + ct.position.x * 0.05) * 0.04
+			var sway: float = sin(wave_time * 1.2 + ct.position.x * 0.05) * 0.05 * wind_direction * rain_sway_mult
 			ct.rotation = sway
 
 func _get_cycle_color(t: float) -> Color:
-	var dawn := Color(1.0, 0.82, 0.65)
+	var pre_dawn := Color(0.35, 0.3, 0.55)
+	var dawn := Color(1.0, 0.65, 0.45)
+	var sunrise := Color(1.0, 0.85, 0.7)
 	var noon := Color(1.0, 1.0, 1.0)
-	var dusk := Color(1.0, 0.7, 0.55)
-	var night := Color(0.3, 0.35, 0.6)
+	var golden_hour := Color(1.0, 0.82, 0.55)
+	var sunset := Color(0.95, 0.5, 0.35)
+	var dusk := Color(0.65, 0.35, 0.5)
+	var night := Color(0.28, 0.32, 0.58)
 
-	if t < 0.15:
-		return night.lerp(dawn, t / 0.15)
+	if t < 0.1:
+		return night.lerp(pre_dawn, t / 0.1)
+	elif t < 0.17:
+		return pre_dawn.lerp(dawn, (t - 0.1) / 0.07)
+	elif t < 0.22:
+		return dawn.lerp(sunrise, (t - 0.17) / 0.05)
 	elif t < 0.3:
-		return dawn.lerp(noon, (t - 0.15) / 0.15)
+		return sunrise.lerp(noon, (t - 0.22) / 0.08)
 	elif t < 0.5:
 		return noon
-	elif t < 0.6:
-		return noon.lerp(dusk, (t - 0.5) / 0.1)
-	elif t < 0.7:
-		return dusk.lerp(night, (t - 0.6) / 0.1)
+	elif t < 0.55:
+		return noon.lerp(golden_hour, (t - 0.5) / 0.05)
+	elif t < 0.62:
+		return golden_hour.lerp(sunset, (t - 0.55) / 0.07)
+	elif t < 0.68:
+		return sunset.lerp(dusk, (t - 0.62) / 0.06)
+	elif t < 0.75:
+		return dusk.lerp(night, (t - 0.68) / 0.07)
 	else:
 		return night
