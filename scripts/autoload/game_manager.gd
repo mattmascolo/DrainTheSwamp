@@ -13,14 +13,15 @@ signal swamp_completed(swamp_index: int, reward: float)
 signal pump_changed()
 signal water_carried_changed(current: float, capacity: float)
 signal day_changed(day: int)
+signal camel_changed()
 
 # --- Swamp Definitions ---
 var swamp_definitions: Array = [
-	{"name": "Puddle", "total_gallons": 0.5, "money_per_gallon": 50.0, "reward": 10.0},
-	{"name": "Pond", "total_gallons": 10.0, "money_per_gallon": 50.0, "reward": 100.0},
-	{"name": "Marsh", "total_gallons": 100.0, "money_per_gallon": 50.0, "reward": 1000.0},
-	{"name": "Bog", "total_gallons": 800.0, "money_per_gallon": 50.0, "reward": 5000.0},
-	{"name": "Deep Swamp", "total_gallons": 5000.0, "money_per_gallon": 50.0, "reward": 25000.0}
+	{"name": "Puddle", "total_gallons": 0.5, "money_per_gallon": 50.0, "reward": 15.0},
+	{"name": "Pond", "total_gallons": 10.0, "money_per_gallon": 50.0, "reward": 150.0},
+	{"name": "Marsh", "total_gallons": 100.0, "money_per_gallon": 75.0, "reward": 2500.0},
+	{"name": "Bog", "total_gallons": 800.0, "money_per_gallon": 125.0, "reward": 15000.0},
+	{"name": "Deep Swamp", "total_gallons": 5000.0, "money_per_gallon": 200.0, "reward": 100000.0}
 ]
 
 var swamp_states: Array = []
@@ -29,64 +30,64 @@ var swamp_states: Array = []
 var tool_definitions: Dictionary = {
 	"hands": {
 		"name": "Hands",
-		"base_output": 0.001,
+		"base_output": 0.005,
 		"cost": 0.0,
 		"type": "manual",
 		"order": 0
 	},
 	"spoon": {
 		"name": "Spoon",
-		"base_output": 0.005,
-		"cost": 15.0,
+		"base_output": 0.02,
+		"cost": 25.0,
 		"type": "manual",
 		"order": 1
 	},
 	"cup": {
 		"name": "Cup",
-		"base_output": 0.025,
-		"cost": 150.0,
+		"base_output": 0.1,
+		"cost": 200.0,
 		"type": "manual",
 		"order": 2
 	},
 	"bucket": {
 		"name": "Bucket",
-		"base_output": 0.15,
-		"cost": 1500.0,
+		"base_output": 0.5,
+		"cost": 2000.0,
 		"type": "manual",
 		"order": 3
 	},
 	"shovel": {
 		"name": "Shovel",
-		"base_output": 1.0,
-		"cost": 10000.0,
+		"base_output": 2.5,
+		"cost": 15000.0,
 		"type": "manual",
 		"order": 4
 	},
 	"wheelbarrow": {
 		"name": "Wheelbarrow",
-		"base_output": 5.0,
-		"cost": 50000.0,
+		"base_output": 12.0,
+		"cost": 75000.0,
 		"type": "manual",
 		"order": 5
 	},
 	"barrel": {
 		"name": "Barrel",
-		"base_output": 25.0,
-		"cost": 250000.0,
+		"base_output": 50.0,
+		"cost": 400000.0,
 		"type": "manual",
 		"order": 6
 	},
 	"water_wagon": {
 		"name": "Water Wagon",
-		"base_output": 150.0,
-		"cost": 1500000.0,
+		"base_output": 250.0,
+		"cost": 2500000.0,
 		"type": "manual",
 		"order": 7
 	},
 	"hose": {
 		"name": "Garden Hose",
-		"base_output": 0.05,
-		"cost": 5000.0,
+		"base_output": 0.1,
+		"cost": 8000.0,
 		"type": "semi_auto",
 		"order": 8
 	}
@@ -94,68 +95,73 @@ var tool_definitions: Dictionary = {
 
 # --- Stat Definitions ---
 var stat_definitions: Dictionary = {
+	# --- Core Stats (cheap, QoL) ---
 	"carrying_capacity": {
 		"name": "Carrying Capacity",
-		"base_value": 0.5,
-		"per_level": 1.0,
-		"base_cost": 10.0,
-		"cost_exponent": 1.15,
+		"base_value": 1.0,
+		"growth_rate": 1.18,
+		"scale": "exponential",
+		"base_cost": 5.0,
+		"cost_exponent": 1.12,
 		"format": "gal"
 	},
 	"movement_speed": {
 		"name": "Movement Speed",
 		"base_value": 1.0,
 		"per_level": 0.1,
-		"base_cost": 25.0,
-		"cost_exponent": 1.3,
+		"base_cost": 8.0,
+		"cost_exponent": 1.12,
 		"format": "multiplier"
 	},
 	"stamina": {
 		"name": "Stamina",
 		"base_value": 5.0,
 		"per_level": 3.0,
-		"base_cost": 15.0,
-		"cost_exponent": 1.25,
+		"base_cost": 5.0,
+		"cost_exponent": 1.12,
 		"format": "value"
 	},
 	"stamina_regen": {
 		"name": "Stamina Regen",
 		"base_value": 1.0,
 		"per_level": 0.5,
-		"base_cost": 20.0,
-		"cost_exponent": 1.3,
+		"base_cost": 8.0,
+		"cost_exponent": 1.12,
 		"format": "per_sec"
 	},
+	# --- Global Power Stats (slightly pricier, scales faster) ---
 	"water_value": {
 		"name": "Water Value",
 		"base_value": 1.0,
-		"per_level": 0.1,
+		"growth_rate": 1.08,
+		"scale": "exponential",
 		"base_cost": 50.0,
-		"cost_exponent": 1.5,
+		"cost_exponent": 1.35,
 		"format": "multiplier"
 	},
 	"scoop_power": {
 		"name": "Scoop Power",
 		"base_value": 1.0,
-		"per_level": 0.15,
-		"base_cost": 75.0,
-		"cost_exponent": 1.5,
+		"growth_rate": 1.10,
+		"scale": "exponential",
+		"base_cost": 35.0,
+		"cost_exponent": 1.3,
 		"format": "multiplier"
 	},
 	"lucky_scoop": {
 		"name": "Lucky Scoop",
 		"base_value": 0.0,
 		"per_level": 0.05,
-		"base_cost": 100.0,
-		"cost_exponent": 1.6,
+		"base_cost": 75.0,
+		"cost_exponent": 1.4,
 		"format": "percent"
 	},
 	"drain_mastery": {
 		"name": "Drain Mastery",
 		"base_value": 0.0,
 		"per_level": 0.05,
-		"base_cost": 80.0,
-		"cost_exponent": 1.5,
+		"base_cost": 50.0,
+		"cost_exponent": 1.35,
 		"format": "percent",
 		"max_value": 0.5
 	}
@@ -198,6 +204,7 @@ var current_stamina: float = 5.0
 
 # Carrying water inventory
 var water_carried: float = 0.0
+var last_scoop_swamp: int = 0
 
 # Hose state
 var hose_active: bool = false
@@ -209,6 +216,23 @@ const HOSE_DURATION: float = 20.0
 var pump_owned: bool = false
 var pump_level: int = 0
 var pump_target_swamp: int = -1
+
+# Camel constants
+const CAMEL_BASE_COST: float = 500.0
+const CAMEL_COST_EXPONENT: float = 2.5
+const CAMEL_BASE_CAPACITY: float = 1.0
+const CAMEL_CAPACITY_PER_LEVEL: float = 0.5
+const CAMEL_BASE_SPEED: float = 60.0
+const CAMEL_SPEED_PER_LEVEL: float = 8.0
+const CAMEL_CAPACITY_UPGRADE_BASE: float = 50.0
+const CAMEL_SPEED_UPGRADE_BASE: float = 75.0
+const CAMEL_UPGRADE_EXPONENT: float = 1.25
+
+# Camel state
+var camel_count: int = 0
+var camel_capacity_level: int = 0
+var camel_speed_level: int = 0
+var camel_states: Array = []  # [{state, x, water_carried, source_swamp, state_timer}]
 
 # Day tracking
 var current_day: int = 1
@@ -263,7 +287,11 @@ func get_effective_scoop(tool_id: String) -> float:
 
 func get_stat_value(stat_id: String) -> float:
 	var defn: Dictionary = stat_definitions[stat_id]
-	var value: float = defn["base_value"] + defn["per_level"] * stat_levels[stat_id]
+	var value: float
+	if defn.get("scale", "linear") == "exponential":
+		value = defn["base_value"] * pow(defn["growth_rate"], stat_levels[stat_id])
+	else:
+		value = defn["base_value"] + defn["per_level"] * stat_levels[stat_id]
 	if defn.has("max_value"):
 		value = minf(value, defn["max_value"])
 	return value
@@ -289,9 +317,9 @@ func get_movement_speed_multiplier() -> float:
 func get_tool_upgrade_cost(tool_id: String) -> float:
 	var base_cost: float = tool_definitions[tool_id]["cost"]
 	if base_cost == 0.0:
-		base_cost = 5.0
+		base_cost = 10.0
 	var level: int = tools_owned[tool_id]["level"]
-	return base_cost * pow(1.15, level)
+	return base_cost * pow(1.3, level)
 
 func get_stat_upgrade_cost(stat_id: String) -> float:
 	var defn: Dictionary = stat_definitions[stat_id]
@@ -393,6 +421,7 @@ func try_scoop(swamp_index: int) -> bool:
 	var actual: float = _drain_swamp(swamp_index, scoop_amount)
 	if actual > 0.0:
 		water_carried += actual
+		last_scoop_swamp = swamp_index
 		water_carried_changed.emit(water_carried, capacity)
 		scoop_performed.emit(swamp_index, actual, 0.0)
 	return actual > 0.0
@@ -401,7 +430,8 @@ func try_scoop(swamp_index: int) -> bool:
 func sell_water() -> float:
 	if water_carried <= 0.0001:
 		return 0.0
-	var mpg: float = 50.0 * get_money_multiplier()
+	var base_mpg: float = swamp_definitions[last_scoop_swamp]["money_per_gallon"]
+	var mpg: float = base_mpg * get_money_multiplier()
 	var earned: float = water_carried * mpg
 	money += earned
 	water_carried = 0.0
@@ -494,6 +524,90 @@ func upgrade_pump() -> bool:
 	pump_changed.emit()
 	return true
 
+# --- Camel computed ---
+func get_camel_cost() -> float:
+	return CAMEL_BASE_COST * pow(CAMEL_COST_EXPONENT, camel_count)
+
+func get_camel_capacity() -> float:
+	return CAMEL_BASE_CAPACITY + CAMEL_CAPACITY_PER_LEVEL * camel_capacity_level
+
+func get_camel_speed() -> float:
+	return CAMEL_BASE_SPEED + CAMEL_SPEED_PER_LEVEL * camel_speed_level
+
+func get_camel_capacity_upgrade_cost() -> float:
+	return CAMEL_CAPACITY_UPGRADE_BASE * pow(CAMEL_UPGRADE_EXPONENT, camel_capacity_level)
+
+func get_camel_speed_upgrade_cost() -> float:
+	return CAMEL_SPEED_UPGRADE_BASE * pow(CAMEL_UPGRADE_EXPONENT, camel_speed_level)
+
+# --- Camel actions ---
+func buy_camel() -> bool:
+	var cost: float = get_camel_cost()
+	if money < cost:
+		return false
+	money -= cost
+	camel_count += 1
+	camel_states.append({"state": "to_player", "x": 30.0, "water_carried": 0.0, "source_swamp": 0, "state_timer": 0.0})
+	money_changed.emit(money)
+	camel_changed.emit()
+	return true
+
+func upgrade_camel_capacity() -> bool:
+	if camel_count <= 0:
+		return false
+	var cost: float = get_camel_capacity_upgrade_cost()
+	if money < cost:
+		return false
+	money -= cost
+	camel_capacity_level += 1
+	money_changed.emit(money)
+	camel_changed.emit()
+	return true
+
+func upgrade_camel_speed() -> bool:
+	if camel_count <= 0:
+		return false
+	var cost: float = get_camel_speed_upgrade_cost()
+	if money < cost:
+		return false
+	money -= cost
+	camel_speed_level += 1
+	money_changed.emit(money)
+	camel_changed.emit()
+	return true
+
+func camel_take_water(index: int) -> void:
+	if index < 0 or index >= camel_states.size():
+		return
+	var capacity: float = get_camel_capacity()
+	var take_amount: float = minf(water_carried, capacity)
+	if take_amount <= 0.0001:
+		return
+	camel_states[index]["water_carried"] = take_amount
+	camel_states[index]["source_swamp"] = last_scoop_swamp
+	water_carried -= take_amount
+	water_carried_changed.emit(water_carried, get_stat_value("carrying_capacity"))
+
+func camel_sell_water(index: int) -> float:
+	if index < 0 or index >= camel_states.size():
+		return 0.0
+	var carried: float = camel_states[index]["water_carried"]
+	if carried <= 0.0001:
+		return 0.0
+	var swamp_idx: int = camel_states[index]["source_swamp"]
+	var base_mpg: float = swamp_definitions[swamp_idx]["money_per_gallon"]
+	var mpg: float = base_mpg * get_money_multiplier()
+	var earned: float = carried * mpg
+	money += earned
+	camel_states[index]["water_carried"] = 0.0
+	money_changed.emit(money)
+	return earned
+
+func _init_camel_states() -> void:
+	camel_states.clear()
+	for i in range(camel_count):
+		camel_states.append({"state": "to_player", "x": 30.0, "water_carried": 0.0, "source_swamp": 0, "state_timer": 0.0})
+
 func reset_game() -> void:
 	money = 0.0
 	current_tool_id = "hands"
@@ -520,12 +634,17 @@ func reset_game() -> void:
 	}
 	current_stamina = get_max_stamina()
 	water_carried = 0.0
+	last_scoop_swamp = 0
 	hose_active = false
 	hose_timer = 0.0
 	hose_swamp_index = -1
 	pump_owned = false
 	pump_level = 0
 	pump_target_swamp = -1
+	camel_count = 0
+	camel_capacity_level = 0
+	camel_speed_level = 0
+	camel_states.clear()
 	current_day = 1
 	cycle_progress = 0.2
 	_init_swamp_states()
@@ -539,6 +658,7 @@ func reset_game() -> void:
 	hose_state_changed.emit(false, 0.0)
 	pump_changed.emit()
 	water_carried_changed.emit(0.0, get_stat_value("carrying_capacity"))
+	camel_changed.emit()
 	day_changed.emit(current_day)
 
 func regen_stamina(delta: float) -> void:
@@ -581,18 +701,22 @@ func get_save_data() -> Dictionary:
 	for state in swamp_states:
 		swamp_save.append({"gallons_drained": state["gallons_drained"], "completed": state["completed"]})
 	return {
-		"version": 5,
+		"version": 7,
 		"money": money,
 		"current_tool_id": current_tool_id,
 		"tools_owned": tools_owned.duplicate(true),
 		"stat_levels": stat_levels.duplicate(true),
 		"current_stamina": current_stamina,
 		"water_carried": water_carried,
+		"last_scoop_swamp": last_scoop_swamp,
 		"swamp_states": swamp_save,
 		"pump_owned": pump_owned,
 		"pump_level": pump_level,
 		"pump_target_swamp": pump_target_swamp,
-		"current_day": current_day
+		"current_day": current_day,
+		"camel_count": camel_count,
+		"camel_capacity_level": camel_capacity_level,
+		"camel_speed_level": camel_speed_level
 	}
 
 func load_save_data(data: Dictionary) -> void:
@@ -610,6 +734,7 @@ func load_save_data(data: Dictionary) -> void:
 				stat_levels[k] = data["stat_levels"][k]
 	current_stamina = data.get("current_stamina", get_max_stamina())
 	water_carried = data.get("water_carried", 0.0)
+	last_scoop_swamp = int(data.get("last_scoop_swamp", 0))
 
 	# Pump
 	pump_owned = data.get("pump_owned", false)
@@ -629,6 +754,12 @@ func load_save_data(data: Dictionary) -> void:
 		if swamp_states[0]["gallons_drained"] >= swamp_definitions[0]["total_gallons"]:
 			swamp_states[0]["completed"] = true
 
+	# Camels
+	camel_count = int(data.get("camel_count", 0))
+	camel_capacity_level = int(data.get("camel_capacity_level", 0))
+	camel_speed_level = int(data.get("camel_speed_level", 0))
+	_init_camel_states()
+
 	# Emit signals
 	money_changed.emit(money)
 	for i in range(swamp_definitions.size()):
@@ -637,3 +768,4 @@ func load_save_data(data: Dictionary) -> void:
 	tool_changed.emit(tool_definitions[current_tool_id])
 	pump_changed.emit()
 	water_carried_changed.emit(water_carried, get_stat_value("carrying_capacity"))
+	camel_changed.emit()

@@ -8,6 +8,7 @@ func _ready() -> void:
 	GameManager.money_changed.connect(func(_m: float) -> void: _refresh())
 	GameManager.tool_upgraded.connect(func(_t: String, _l: int) -> void: _refresh())
 	GameManager.tool_changed.connect(func(_d: Dictionary) -> void: _refresh())
+	GameManager.camel_changed.connect(func() -> void: _refresh())
 	visible = false
 
 func open() -> void:
@@ -128,6 +129,121 @@ func _refresh() -> void:
 
 		row_panel.add_child(entry)
 		tool_list.add_child(row_panel)
+
+	# --- Camel Section ---
+	var sep := HSeparator.new()
+	sep.add_theme_constant_override("separation", 8)
+	tool_list.add_child(sep)
+
+	var camel_header := Label.new()
+	camel_header.text = "-- Camels --"
+	camel_header.add_theme_font_size_override("font_size", 14)
+	camel_header.add_theme_color_override("font_color", Color(0.85, 0.7, 0.4))
+	camel_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tool_list.add_child(camel_header)
+
+	# Buy Camel button
+	var camel_buy_panel := PanelContainer.new()
+	var camel_buy_style := StyleBoxFlat.new()
+	camel_buy_style.bg_color = Color(0.16, 0.12, 0.06, 0.6)
+	camel_buy_style.corner_radius_top_left = 4
+	camel_buy_style.corner_radius_top_right = 4
+	camel_buy_style.corner_radius_bottom_left = 4
+	camel_buy_style.corner_radius_bottom_right = 4
+	camel_buy_style.content_margin_left = 8
+	camel_buy_style.content_margin_right = 8
+	camel_buy_style.content_margin_top = 4
+	camel_buy_style.content_margin_bottom = 4
+	camel_buy_panel.add_theme_stylebox_override("panel", camel_buy_style)
+
+	var camel_buy_row := HBoxContainer.new()
+	camel_buy_row.add_theme_constant_override("separation", 8)
+
+	var camel_info := Label.new()
+	camel_info.add_theme_font_size_override("font_size", 14)
+	camel_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	camel_info.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+	camel_info.add_theme_constant_override("shadow_offset_x", 2)
+	camel_info.add_theme_constant_override("shadow_offset_y", 2)
+	if GameManager.camel_count > 0:
+		camel_info.text = "Camels: %d (Cap: %.1fg, Spd: %.0f)" % [GameManager.camel_count, GameManager.get_camel_capacity(), GameManager.get_camel_speed()]
+		camel_info.add_theme_color_override("font_color", Color(0.85, 0.7, 0.4))
+	else:
+		camel_info.text = "Camel (auto-sell carrier)"
+		camel_info.add_theme_color_override("font_color", Color(0.6, 0.5, 0.35))
+	camel_buy_row.add_child(camel_info)
+
+	var buy_camel_btn := Button.new()
+	buy_camel_btn.add_theme_font_size_override("font_size", 14)
+	var camel_cost: float = GameManager.get_camel_cost()
+	if GameManager.camel_count == 0:
+		buy_camel_btn.text = "Buy %s" % Economy.format_money(camel_cost)
+	else:
+		buy_camel_btn.text = "+1 %s" % Economy.format_money(camel_cost)
+	buy_camel_btn.custom_minimum_size = Vector2(110, 0)
+	if GameManager.money < camel_cost:
+		buy_camel_btn.disabled = true
+	else:
+		buy_camel_btn.add_theme_color_override("font_color", Color(0.85, 0.7, 0.3))
+		buy_camel_btn.pressed.connect(func() -> void: GameManager.buy_camel())
+	_style_button(buy_camel_btn, Color(0.2, 0.15, 0.05))
+	camel_buy_row.add_child(buy_camel_btn)
+
+	camel_buy_panel.add_child(camel_buy_row)
+	tool_list.add_child(camel_buy_panel)
+
+	# Camel upgrades (only if camels owned)
+	if GameManager.camel_count > 0:
+		var upgrade_panel := PanelContainer.new()
+		var up_style := StyleBoxFlat.new()
+		up_style.bg_color = Color(0.14, 0.1, 0.05, 0.6)
+		up_style.corner_radius_top_left = 4
+		up_style.corner_radius_top_right = 4
+		up_style.corner_radius_bottom_left = 4
+		up_style.corner_radius_bottom_right = 4
+		up_style.content_margin_left = 8
+		up_style.content_margin_right = 8
+		up_style.content_margin_top = 4
+		up_style.content_margin_bottom = 4
+		upgrade_panel.add_theme_stylebox_override("panel", up_style)
+
+		var up_row := HBoxContainer.new()
+		up_row.add_theme_constant_override("separation", 8)
+
+		var up_spacer := Control.new()
+		up_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		up_row.add_child(up_spacer)
+
+		# Capacity upgrade
+		var cap_btn := Button.new()
+		cap_btn.add_theme_font_size_override("font_size", 14)
+		var cap_cost: float = GameManager.get_camel_capacity_upgrade_cost()
+		cap_btn.text = "Cap Lv%d %s" % [GameManager.camel_capacity_level + 1, Economy.format_money(cap_cost)]
+		cap_btn.custom_minimum_size = Vector2(130, 0)
+		if GameManager.money < cap_cost:
+			cap_btn.disabled = true
+		else:
+			cap_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
+			cap_btn.pressed.connect(func() -> void: GameManager.upgrade_camel_capacity())
+		_style_button(cap_btn, Color(0.1, 0.15, 0.2))
+		up_row.add_child(cap_btn)
+
+		# Speed upgrade
+		var spd_btn := Button.new()
+		spd_btn.add_theme_font_size_override("font_size", 14)
+		var spd_cost: float = GameManager.get_camel_speed_upgrade_cost()
+		spd_btn.text = "Spd Lv%d %s" % [GameManager.camel_speed_level + 1, Economy.format_money(spd_cost)]
+		spd_btn.custom_minimum_size = Vector2(130, 0)
+		if GameManager.money < spd_cost:
+			spd_btn.disabled = true
+		else:
+			spd_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
+			spd_btn.pressed.connect(func() -> void: GameManager.upgrade_camel_speed())
+		_style_button(spd_btn, Color(0.1, 0.15, 0.2))
+		up_row.add_child(spd_btn)
+
+		upgrade_panel.add_child(up_row)
+		tool_list.add_child(upgrade_panel)
 
 func _style_button(btn: Button, bg_color: Color) -> void:
 	var style := StyleBoxFlat.new()

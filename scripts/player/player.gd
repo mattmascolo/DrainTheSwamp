@@ -36,6 +36,7 @@ var dust_timer: float = 0.0
 var tool_visuals: Array[ColorRect] = []
 
 func _ready() -> void:
+	add_to_group("player")
 	GameManager.tool_changed.connect(func(_d: Dictionary) -> void: _update_tool_visual())
 	_update_tool_visual()
 

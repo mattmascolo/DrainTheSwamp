@@ -46,6 +46,7 @@ var shimmer_lines: Array[Line2D] = []
 var mud_patches: Array[Dictionary] = []
 var player_in_pump_area: bool = false
 var pump_player_ref: Node2D = null
+var camels: Array[Dictionary] = []
 
 # Second pass visuals
 var moon: Node2D = null
@@ -66,6 +67,15 @@ var sun_node: Node2D = null
 var fish: Array[Dictionary] = []
 var frogs: Array[Dictionary] = []
 var glow_plants: Array[Dictionary] = []
+var seaweed: Array[Dictionary] = []
+var ripples: Array[Dictionary] = []
+var ripple_timer: float = 0.0
+var butterflies: Array[Dictionary] = []
+var butterfly_timer: float = 0.0
+var shooting_stars: Array[Dictionary] = []
+var shooting_star_timer: float = 0.0
+var turtles: Array[Dictionary] = []
+var tadpoles: Array[Dictionary] = []
 
 # Colors
 const SKY_COLOR_TOP := Color(0.22, 0.38, 0.72)
@@ -116,9 +126,14 @@ func _ready() -> void:
 	_build_fish()
 	_build_frogs()
 	_build_glow_plants()
+	_build_seaweed()
+	_build_turtles()
+	_build_tadpoles()
 
 	GameManager.water_level_changed.connect(_on_water_level_changed)
 	GameManager.swamp_completed.connect(_on_swamp_completed)
+	GameManager.camel_changed.connect(_on_camel_changed)
+	_build_camels()
 
 # --- Sky & Atmosphere ---
 func _build_sky() -> void:
@@ -1070,6 +1085,126 @@ func _spawn_pollen() -> void:
 		"base_y": py,
 	})
 
+func _spawn_ripple(rx: float, ry: float) -> void:
+	var rp_line := Line2D.new()
+	rp_line.width = 1.5
+	rp_line.default_color = Color(0.6, 0.8, 0.7, 0.4)
+	rp_line.z_index = 4
+	add_child(rp_line)
+	ripples.append({
+		"node": rp_line,
+		"x": rx,
+		"y": ry,
+		"max_radius": randf_range(6, 14),
+		"lifetime": 0.0,
+		"max_life": randf_range(1.5, 3.0),
+	})
+
+func _spawn_butterfly() -> void:
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	var cam_x: float = cam.get_screen_center_position().x if cam else 320.0
+	var bf_node := Node2D.new()
+	bf_node.z_index = 6
+	add_child(bf_node)
+	# Body
+	var bf_body := ColorRect.new()
+	bf_body.size = Vector2(2, 4)
+	bf_body.position = Vector2(-1, -2)
+	bf_body.color = Color(0.15, 0.12, 0.08)
+	bf_node.add_child(bf_body)
+	# Wings - pick a random color scheme
+	var wing_colors: Array[Color] = [
+		Color(0.95, 0.6, 0.15, 0.9),   # Orange monarch
+		Color(0.3, 0.5, 0.95, 0.9),    # Blue morpho
+		Color(0.95, 0.95, 0.4, 0.9),   # Yellow swallowtail
+		Color(0.9, 0.3, 0.5, 0.9),     # Pink
+		Color(0.95, 0.4, 0.2, 0.9),    # Red admiral
+	]
+	var wing_color: Color = wing_colors[randi() % wing_colors.size()]
+	# Left wing
+	var wing_l := ColorRect.new()
+	wing_l.size = Vector2(5, 4)
+	wing_l.position = Vector2(-6, -3)
+	wing_l.color = wing_color
+	wing_l.pivot_offset = Vector2(5, 2)
+	bf_node.add_child(wing_l)
+	# Right wing
+	var wing_r := ColorRect.new()
+	wing_r.size = Vector2(5, 4)
+	wing_r.position = Vector2(1, -3)
+	wing_r.color = wing_color
+	wing_r.pivot_offset = Vector2(0, 2)
+	bf_node.add_child(wing_r)
+	# Wing spots
+	var spot_l := ColorRect.new()
+	spot_l.size = Vector2(2, 2)
+	spot_l.position = Vector2(-4, -2)
+	spot_l.color = wing_color.darkened(0.3)
+	bf_node.add_child(spot_l)
+	var spot_r := ColorRect.new()
+	spot_r.size = Vector2(2, 2)
+	spot_r.position = Vector2(2, -2)
+	spot_r.color = wing_color.darkened(0.3)
+	bf_node.add_child(spot_r)
+	# Antennae
+	var ant_l := ColorRect.new()
+	ant_l.size = Vector2(1, 3)
+	ant_l.position = Vector2(-2, -5)
+	ant_l.color = Color(0.2, 0.15, 0.1, 0.7)
+	bf_node.add_child(ant_l)
+	var ant_r := ColorRect.new()
+	ant_r.size = Vector2(1, 3)
+	ant_r.position = Vector2(1, -5)
+	ant_r.color = Color(0.2, 0.15, 0.1, 0.7)
+	bf_node.add_child(ant_r)
+
+	var bx: float = cam_x + randf_range(-350, 350)
+	var by: float = randf_range(20, 105)
+	bf_node.position = Vector2(bx, by)
+	butterflies.append({
+		"node": bf_node,
+		"wing_l": wing_l,
+		"wing_r": wing_r,
+		"phase": randf() * TAU,
+		"flutter_speed": randf_range(6.0, 10.0),
+		"drift_x": randf_range(-15, 15),
+		"bob_amp": randf_range(5, 12),
+		"base_y": by,
+		"lifetime": 0.0,
+		"max_life": randf_range(8, 18),
+	})
+
+func _spawn_shooting_star() -> void:
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	var cam_x: float = cam.get_screen_center_position().x if cam else 320.0
+	var ss_node := Node2D.new()
+	ss_node.z_index = -9
+	add_child(ss_node)
+	# Bright head
+	var ss_head := ColorRect.new()
+	ss_head.size = Vector2(3, 3)
+	ss_head.color = Color(1.0, 1.0, 0.9, 0.9)
+	ss_node.add_child(ss_head)
+	# Trail line
+	var ss_line := Line2D.new()
+	ss_line.width = 2.0
+	ss_line.default_color = Color(0.8, 0.85, 1.0, 0.6)
+	ss_node.add_child(ss_line)
+
+	var start_x: float = cam_x + randf_range(-300, 100)
+	var start_y: float = randf_range(-40, 30)
+	shooting_stars.append({
+		"node": ss_node,
+		"head": ss_head,
+		"line": ss_line,
+		"start_x": start_x,
+		"start_y": start_y,
+		"speed_x": randf_range(200, 400),
+		"speed_y": randf_range(30, 80),
+		"lifetime": 0.0,
+		"max_life": randf_range(0.6, 1.2),
+	})
+
 # --- Fish ---
 func _build_fish() -> void:
 	for i in range(SWAMP_COUNT):
@@ -1251,6 +1386,146 @@ func _build_glow_plants() -> void:
 				"glow_color": glow_color,
 				"phase": randf() * TAU,
 				"pulse_speed": randf_range(1.2, 2.5),
+			})
+
+# --- Underwater Seaweed ---
+func _build_seaweed() -> void:
+	for i in range(SWAMP_COUNT):
+		var geo: Dictionary = _get_swamp_geometry(i)
+		var basin_left: Vector2 = geo["basin_left"]
+		var basin_right: Vector2 = geo["basin_right"]
+		var basin_w: float = basin_right.x - basin_left.x
+		var count: int = clampi(int(basin_w / 20.0), 2, 8)
+		for j in range(count):
+			var sw_x: float = basin_left.x + randf_range(8, basin_w - 8)
+			var sw_height: float = randf_range(10, 28)
+			var segments: int = randi_range(3, 5)
+			var green_hue: float = randf_range(0.25, 0.38)
+			# Anchor node at basin floor so rotation pivots from base
+			var sw_node := Node2D.new()
+			sw_node.z_index = 2
+			sw_node.position = Vector2(sw_x, basin_left.y)
+			add_child(sw_node)
+			for s in range(segments):
+				var strand := ColorRect.new()
+				strand.size = Vector2(2, sw_height / segments + randf_range(-2, 2))
+				strand.position = Vector2(s * 2 - segments, -sw_height + s * (sw_height / segments))
+				strand.color = Color.from_hsv(green_hue, randf_range(0.5, 0.8), randf_range(0.3, 0.5), 0.7)
+				sw_node.add_child(strand)
+			# Tip accent
+			var tip := ColorRect.new()
+			tip.size = Vector2(3, 2)
+			tip.position = Vector2(-1, -sw_height - 1)
+			tip.color = Color.from_hsv(green_hue, 0.6, 0.55, 0.8)
+			sw_node.add_child(tip)
+			seaweed.append({
+				"node": sw_node,
+				"swamp": i,
+				"x": sw_x,
+				"height": sw_height,
+				"phase": randf() * TAU,
+				"sway_speed": randf_range(1.0, 2.0),
+			})
+
+# --- Turtles ---
+func _build_turtles() -> void:
+	for i in range(SWAMP_COUNT):
+		if randf() > 0.6:
+			continue
+		var geo: Dictionary = _get_swamp_geometry(i)
+		var entry_top: Vector2 = geo["entry_top"]
+		var exit_top: Vector2 = geo["exit_top"]
+		# Place turtle near a pool edge
+		var side: bool = randf() > 0.5
+		var tx: float
+		var ty: float
+		if side:
+			tx = entry_top.x + randf_range(2, 10)
+			ty = entry_top.y + randf_range(-2, 4)
+		else:
+			tx = exit_top.x + randf_range(-10, -2)
+			ty = exit_top.y + randf_range(-2, 4)
+		var turtle_node := Node2D.new()
+		turtle_node.z_index = 3
+		add_child(turtle_node)
+		# Shell
+		var shell := ColorRect.new()
+		shell.size = Vector2(8, 6)
+		shell.position = Vector2(tx - 4, ty - 6)
+		shell.color = Color(0.3, 0.4, 0.2, 0.95)
+		turtle_node.add_child(shell)
+		# Shell pattern
+		var pattern := ColorRect.new()
+		pattern.size = Vector2(6, 4)
+		pattern.position = Vector2(tx - 3, ty - 5)
+		pattern.color = Color(0.35, 0.48, 0.25, 0.7)
+		turtle_node.add_child(pattern)
+		# Shell highlight
+		var shell_hl := ColorRect.new()
+		shell_hl.size = Vector2(4, 1)
+		shell_hl.position = Vector2(tx - 2, ty - 6)
+		shell_hl.color = Color(0.45, 0.55, 0.3, 0.5)
+		turtle_node.add_child(shell_hl)
+		# Head
+		var head := ColorRect.new()
+		head.size = Vector2(3, 3)
+		head.position = Vector2(tx + 4, ty - 5)
+		head.color = Color(0.35, 0.45, 0.2, 0.95)
+		turtle_node.add_child(head)
+		# Eye
+		var eye := ColorRect.new()
+		eye.size = Vector2(1, 1)
+		eye.position = Vector2(tx + 6, ty - 5)
+		eye.color = Color(0.1, 0.1, 0.1)
+		turtle_node.add_child(eye)
+		# Legs
+		for lx in [-3, 3]:
+			var leg := ColorRect.new()
+			leg.size = Vector2(2, 2)
+			leg.position = Vector2(tx + lx - 1, ty - 1)
+			leg.color = Color(0.3, 0.42, 0.18, 0.9)
+			turtle_node.add_child(leg)
+		turtles.append({
+			"node": turtle_node,
+			"swamp": i,
+			"head_ref": head,
+			"phase": randf() * TAU,
+		})
+
+# --- Tadpoles ---
+func _build_tadpoles() -> void:
+	for i in range(SWAMP_COUNT):
+		var geo: Dictionary = _get_swamp_geometry(i)
+		var basin_left: Vector2 = geo["basin_left"]
+		var basin_right: Vector2 = geo["basin_right"]
+		var basin_w: float = basin_right.x - basin_left.x
+		var count: int = clampi(int(basin_w / 50.0), 1, 4)
+		for j in range(count):
+			var tp_node := Node2D.new()
+			tp_node.z_index = 3
+			add_child(tp_node)
+			# Tiny body
+			var body := ColorRect.new()
+			body.size = Vector2(3, 2)
+			body.position = Vector2(-1.5, -1)
+			body.color = Color(0.15, 0.15, 0.12, 0.85)
+			tp_node.add_child(body)
+			# Tail
+			var tail := ColorRect.new()
+			tail.size = Vector2(4, 1)
+			tail.position = Vector2(-5.5, -0.5)
+			tail.color = Color(0.2, 0.2, 0.15, 0.7)
+			tp_node.add_child(tail)
+
+			var tpx: float = basin_left.x + randf_range(8, basin_w - 8)
+			tadpoles.append({
+				"node": tp_node,
+				"swamp": i,
+				"x": tpx,
+				"swim_phase": randf() * TAU,
+				"swim_speed": randf_range(1.5, 3.0),
+				"swim_range": randf_range(10, 25),
+				"depth_offset": randf_range(0.5, 0.9),
 			})
 
 func _get_terrain_y_at(x: float) -> float:
@@ -1481,6 +1756,267 @@ func _on_swamp_body_exited(body: Node2D, swamp_index: int) -> void:
 	if body is CharacterBody2D and body.has_method("set_near_water"):
 		body.set_near_water(false, swamp_index)
 
+# --- Camels ---
+func _on_camel_changed() -> void:
+	_build_camels()
+
+func _build_camels() -> void:
+	# Remove existing camel nodes
+	for cd in camels:
+		if is_instance_valid(cd["node"]):
+			cd["node"].queue_free()
+	camels.clear()
+
+	for i in range(GameManager.camel_count):
+		var camel_node := Node2D.new()
+		camel_node.z_index = 5
+
+		# Ensure state exists
+		if i >= GameManager.camel_states.size():
+			GameManager.camel_states.append({"state": "to_player", "x": 30.0, "water_carried": 0.0, "source_swamp": 0, "state_timer": 0.0})
+		var start_x: float = GameManager.camel_states[i]["x"]
+		camel_node.position = Vector2(start_x, _get_terrain_y_at(start_x))
+
+		# Body (sandy brown)
+		var body := ColorRect.new()
+		body.size = Vector2(20, 12)
+		body.position = Vector2(-10, -20)
+		body.color = Color(0.76, 0.6, 0.38)
+		camel_node.add_child(body)
+
+		# Hump
+		var hump := ColorRect.new()
+		hump.size = Vector2(8, 6)
+		hump.position = Vector2(-2, -26)
+		hump.color = Color(0.72, 0.56, 0.34)
+		camel_node.add_child(hump)
+
+		# Neck
+		var neck := ColorRect.new()
+		neck.size = Vector2(4, 10)
+		neck.position = Vector2(8, -30)
+		neck.color = Color(0.74, 0.58, 0.36)
+		camel_node.add_child(neck)
+
+		# Head
+		var head := ColorRect.new()
+		head.size = Vector2(8, 6)
+		head.position = Vector2(6, -36)
+		head.color = Color(0.78, 0.62, 0.4)
+		camel_node.add_child(head)
+
+		# Eye
+		var eye := ColorRect.new()
+		eye.size = Vector2(2, 2)
+		eye.position = Vector2(12, -35)
+		eye.color = Color(0.15, 0.1, 0.05)
+		camel_node.add_child(eye)
+
+		# Front legs
+		var leg_fl := ColorRect.new()
+		leg_fl.size = Vector2(3, 10)
+		leg_fl.position = Vector2(5, -8)
+		leg_fl.color = Color(0.68, 0.52, 0.32)
+		camel_node.add_child(leg_fl)
+
+		var leg_fr := ColorRect.new()
+		leg_fr.size = Vector2(3, 10)
+		leg_fr.position = Vector2(8, -8)
+		leg_fr.color = Color(0.65, 0.5, 0.3)
+		camel_node.add_child(leg_fr)
+
+		# Back legs
+		var leg_bl := ColorRect.new()
+		leg_bl.size = Vector2(3, 10)
+		leg_bl.position = Vector2(-8, -8)
+		leg_bl.color = Color(0.68, 0.52, 0.32)
+		camel_node.add_child(leg_bl)
+
+		var leg_br := ColorRect.new()
+		leg_br.size = Vector2(3, 10)
+		leg_br.position = Vector2(-5, -8)
+		leg_br.color = Color(0.65, 0.5, 0.3)
+		camel_node.add_child(leg_br)
+
+		# Tail
+		var tail := ColorRect.new()
+		tail.size = Vector2(2, 8)
+		tail.position = Vector2(-12, -18)
+		tail.color = Color(0.62, 0.48, 0.28)
+		camel_node.add_child(tail)
+
+		# Saddlebag (shows water fill)
+		var bag := ColorRect.new()
+		bag.size = Vector2(10, 6)
+		bag.position = Vector2(-7, -18)
+		bag.color = Color(0.5, 0.38, 0.2)
+		camel_node.add_child(bag)
+
+		add_child(camel_node)
+		camels.append({
+			"node": camel_node,
+			"body": body,
+			"head": head,
+			"neck": neck,
+			"hump": hump,
+			"leg_fl": leg_fl,
+			"leg_fr": leg_fr,
+			"leg_bl": leg_bl,
+			"leg_br": leg_br,
+			"tail": tail,
+			"bag": bag,
+			"eye": eye,
+			"walk_time": 0.0,
+			"facing_right": true
+		})
+
+func _update_camels(delta: float) -> void:
+	var players: Array[Node] = get_tree().get_nodes_in_group("player")
+	var player_x: float = 80.0
+	if players.size() > 0 and is_instance_valid(players[0]):
+		player_x = players[0].global_position.x
+
+	var camel_speed: float = GameManager.get_camel_speed()
+	var camel_cap: float = GameManager.get_camel_capacity()
+
+	for i in range(GameManager.camel_states.size()):
+		if i >= camels.size():
+			break
+		var cs: Dictionary = GameManager.camel_states[i]
+		var cd: Dictionary = camels[i]
+		var node: Node2D = cd["node"]
+
+		match cs["state"]:
+			"to_player":
+				# Walk toward player
+				var dx: float = player_x - cs["x"]
+				if absf(dx) > 15.0:
+					var dir: float = signf(dx)
+					cs["x"] += dir * camel_speed * delta
+					cd["facing_right"] = dir > 0.0
+					cd["walk_time"] += delta * 6.0
+					_animate_camel_walk(cd)
+				else:
+					# Arrived at player
+					cs["state"] = "loading"
+					cs["state_timer"] = 0.0
+					_animate_camel_idle(cd)
+
+			"loading":
+				cs["state_timer"] += delta
+				_animate_camel_idle(cd)
+				# Chase if player moves away
+				var chase_dx: float = player_x - cs["x"]
+				if absf(chase_dx) > 30.0:
+					cs["state"] = "to_player"
+				elif cs["state_timer"] >= 0.5:
+					if GameManager.water_carried > 0.0001:
+						GameManager.camel_take_water(i)
+						cs["state"] = "to_pump"
+						cs["state_timer"] = 0.0
+					else:
+						# No water, retry
+						cs["state_timer"] = 0.0
+
+			"to_pump":
+				# Walk left to pump (x≈30)
+				var pump_x: float = 30.0
+				var dx2: float = pump_x - cs["x"]
+				if absf(dx2) > 5.0:
+					var dir2: float = signf(dx2)
+					cs["x"] += dir2 * camel_speed * delta
+					cd["facing_right"] = dir2 > 0.0
+					cd["walk_time"] += delta * 6.0
+					_animate_camel_walk(cd)
+				else:
+					cs["state"] = "unloading"
+					cs["state_timer"] = 0.0
+					_animate_camel_idle(cd)
+
+			"unloading":
+				cs["state_timer"] += delta
+				_animate_camel_idle(cd)
+				if cs["state_timer"] >= 0.5:
+					var earned: float = GameManager.camel_sell_water(i)
+					if earned > 0.01:
+						_spawn_camel_sell_text(cs["x"], _get_terrain_y_at(cs["x"]) - 40, earned)
+					cs["state"] = "to_player"
+					cs["state_timer"] = 0.0
+
+		# Update position on terrain
+		var terrain_y: float = _get_terrain_y_at(cs["x"])
+		if terrain_y > 0:
+			node.position = Vector2(cs["x"], terrain_y)
+		else:
+			node.position.x = cs["x"]
+
+		# Flip direction
+		node.scale.x = 1.0 if cd["facing_right"] else -1.0
+
+		# Update saddlebag color based on water fill
+		var bag: ColorRect = cd["bag"]
+		var fill_frac: float = 0.0
+		if camel_cap > 0.0:
+			fill_frac = clampf(cs["water_carried"] / camel_cap, 0.0, 1.0)
+		if fill_frac > 0.01:
+			bag.color = Color(0.5, 0.38, 0.2).lerp(Color(0.25, 0.45, 0.7), fill_frac)
+		else:
+			bag.color = Color(0.5, 0.38, 0.2)
+
+func _animate_camel_walk(cd: Dictionary) -> void:
+	var wt: float = cd["walk_time"]
+	var leg_offset: float = sin(wt) * 3.0
+	cd["leg_fl"].position.y = -8.0 + leg_offset
+	cd["leg_fr"].position.y = -8.0 - leg_offset
+	cd["leg_bl"].position.y = -8.0 - leg_offset
+	cd["leg_br"].position.y = -8.0 + leg_offset
+	# Body bob
+	var bob: float = sin(wt * 2.0) * 1.0
+	cd["body"].position.y = -20.0 + bob
+	cd["hump"].position.y = -26.0 + bob
+	cd["bag"].position.y = -18.0 + bob
+	# Head bob
+	var head_bob: float = sin(wt * 2.0 + 0.5) * 1.5
+	cd["head"].position.y = -36.0 + head_bob
+	cd["neck"].position.y = -30.0 + head_bob * 0.5
+	cd["eye"].position.y = -35.0 + head_bob
+	# Tail swing
+	var tail_swing: float = sin(wt * 1.5) * 2.0
+	cd["tail"].position.x = -12.0 + tail_swing
+
+func _animate_camel_idle(cd: Dictionary) -> void:
+	# Breathing motion
+	var breath: float = sin(Time.get_ticks_msec() * 0.002) * 0.5
+	cd["body"].position.y = -20.0 + breath
+	cd["hump"].position.y = -26.0 + breath
+	cd["bag"].position.y = -18.0 + breath
+	cd["head"].position.y = -36.0 + breath * 0.5
+	cd["neck"].position.y = -30.0 + breath * 0.3
+	cd["eye"].position.y = -35.0 + breath * 0.5
+	# Reset legs
+	cd["leg_fl"].position.y = -8.0
+	cd["leg_fr"].position.y = -8.0
+	cd["leg_bl"].position.y = -8.0
+	cd["leg_br"].position.y = -8.0
+	cd["tail"].position.x = -12.0
+
+func _spawn_camel_sell_text(x: float, y: float, earned: float) -> void:
+	var label := Label.new()
+	label.text = "+%s" % Economy.format_money(earned)
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.7))
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	label.position = Vector2(x - 20, y)
+	label.z_index = 10
+	add_child(label)
+
+	var tween := create_tween()
+	tween.tween_property(label, "position:y", label.position.y - 32, 0.8)
+	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.8)
+	tween.tween_callback(label.queue_free)
+
 func _on_water_level_changed(swamp_index: int, _percent: float) -> void:
 	if swamp_index >= 0 and swamp_index < SWAMP_COUNT:
 		_update_water_polygon(swamp_index)
@@ -1646,6 +2182,10 @@ func _process(delta: float) -> void:
 		var earned: float = GameManager.sell_water()
 		if earned > 0.01 and pump_player_ref.has_method("show_floating_text"):
 			pump_player_ref.show_floating_text("+%s" % Economy.format_money(earned), Color(1.0, 0.85, 0.2))
+
+	# Update camels
+	if GameManager.camel_count > 0:
+		_update_camels(delta)
 
 	cycle_time += delta
 	if cycle_time >= CYCLE_DURATION:
@@ -1968,31 +2508,33 @@ func _process(delta: float) -> void:
 		birds[idx]["node"].queue_free()
 		birds.remove_at(idx)
 
-	# Fish: swim in water, die when water drains
+	# Fish: swim in water, contained within pool slopes
 	for fd in fish:
 		var fnode: Node2D = fd["node"]
 		var swamp_i: int = fd["swamp"]
 		var fill: float = GameManager.get_swamp_fill_fraction(swamp_i)
+		var geo_f: Dictionary = _get_swamp_geometry(swamp_i)
+		var entry_top_f: Vector2 = geo_f["entry_top"]
+		var basin_left_f: Vector2 = geo_f["basin_left"]
+		var basin_right_f: Vector2 = geo_f["basin_right"]
+		var exit_top_f: Vector2 = geo_f["exit_top"]
+		var basin_y_f: float = basin_left_f.y
 
 		if fill < 0.02:
-			# Fish is dead on the ground
 			if fd["alive"]:
 				fd["alive"] = false
 				fd["death_timer"] = 0.0
 			fd["death_timer"] += delta
 			fnode.visible = true
-			var geo_f: Dictionary = _get_swamp_geometry(swamp_i)
-			fnode.position.y = geo_f["basin_left"].y - 2
-			# Flop animation for first 3 seconds, then go still
+			fnode.position.y = basin_y_f - 2
 			if fd["death_timer"] < 3.0:
 				fnode.rotation = sin(fd["death_timer"] * 12.0) * 0.8
 			else:
-				fnode.rotation = PI * 0.5  # Belly up
+				fnode.rotation = PI * 0.5
 				fnode.modulate.a = maxf(0.3, 1.0 - (fd["death_timer"] - 3.0) * 0.05)
 			continue
 
 		if fill < 0.15:
-			# Low water - fish panics, swims faster
 			fd["swim_speed"] = 2.5
 		elif not fd["alive"]:
 			fd["alive"] = true
@@ -2000,29 +2542,31 @@ func _process(delta: float) -> void:
 			fnode.rotation = 0.0
 
 		fnode.visible = true
-		var geo_f: Dictionary = _get_swamp_geometry(swamp_i)
-		var entry_top_f: Vector2 = geo_f["entry_top"]
-		var basin_left_f: Vector2 = geo_f["basin_left"]
-		var basin_right_f: Vector2 = geo_f["basin_right"]
-		var exit_top_f: Vector2 = geo_f["exit_top"]
-		var basin_y_f: float = basin_left_f.y
 		var overflow_y_f: float = maxf(entry_top_f.y, exit_top_f.y)
 		var water_y_f: float = basin_y_f - fill * (basin_y_f - overflow_y_f)
+		var surface_left_x: float = _lerp_x_at_y(entry_top_f, basin_left_f, water_y_f)
+		var surface_right_x: float = _lerp_x_at_y(basin_right_f, exit_top_f, water_y_f)
 
-		# Swim horizontally
-		fd["swim_phase"] += delta * fd["swim_speed"]
-		var swim_x: float = fd["x"] + sin(fd["swim_phase"]) * fd["swim_range"]
-		# Clamp to basin
-		swim_x = clampf(swim_x, basin_left_f.x + 6, basin_right_f.x - 6)
-		# Depth: between surface and bottom
+		# Depth position
 		var fish_y: float = lerpf(water_y_f + 4, basin_y_f - 4, fd["depth_offset"])
 		fish_y += sin(fd["swim_phase"] * 0.7) * 2.0
+		fish_y = clampf(fish_y, water_y_f + 2, basin_y_f - 2)
+
+		# Calculate valid x range at this depth (respects pool slopes)
+		var depth_frac: float = 0.0
+		if absf(basin_y_f - water_y_f) > 0.1:
+			depth_frac = clampf((fish_y - water_y_f) / (basin_y_f - water_y_f), 0.0, 1.0)
+		var bound_left: float = lerpf(surface_left_x, basin_left_f.x, depth_frac) + 6.0
+		var bound_right: float = lerpf(surface_right_x, basin_right_f.x, depth_frac) - 6.0
+
+		# Swim horizontally within bounds
+		fd["swim_phase"] += delta * fd["swim_speed"]
+		var swim_x: float = fd["x"] + sin(fd["swim_phase"]) * fd["swim_range"]
+		swim_x = clampf(swim_x, bound_left, bound_right)
 
 		fnode.position = Vector2(swim_x, fish_y)
-		# Face swim direction
 		var swim_dir: float = cos(fd["swim_phase"])
 		fnode.scale.x = 1.0 if swim_dir > 0 else -1.0
-		# Gentle body undulation
 		fnode.rotation = sin(fd["swim_phase"] * 2.0) * 0.1
 
 	# Frogs: occasional hop animation
@@ -2062,6 +2606,176 @@ func _process(delta: float) -> void:
 		var intensity: float = glow_alpha * lerpf(0.4, 1.0, pulse)
 		gp["bulb"].color = Color(gc.r, gc.g, gc.b, intensity)
 		gp["aura"].color = Color(gc.r, gc.g, gc.b, intensity * 0.25)
+
+	# Seaweed sway underwater
+	for sw in seaweed:
+		var sw_swamp: int = sw["swamp"]
+		var sw_fill: float = GameManager.get_swamp_fill_fraction(sw_swamp)
+		sw["node"].visible = sw_fill > 0.05
+		if sw["node"].visible:
+			var sway_angle: float = sin(wave_time * sw["sway_speed"] + sw["phase"]) * 0.12
+			sw["node"].rotation = sway_angle
+
+	# Tadpoles: tiny swimmers contained in pools
+	for tp in tadpoles:
+		var tp_node: Node2D = tp["node"]
+		var tp_swamp: int = tp["swamp"]
+		var tp_fill: float = GameManager.get_swamp_fill_fraction(tp_swamp)
+		if tp_fill < 0.05:
+			tp_node.visible = false
+			continue
+		tp_node.visible = true
+		var tp_geo: Dictionary = _get_swamp_geometry(tp_swamp)
+		var tp_entry: Vector2 = tp_geo["entry_top"]
+		var tp_bl: Vector2 = tp_geo["basin_left"]
+		var tp_br: Vector2 = tp_geo["basin_right"]
+		var tp_exit: Vector2 = tp_geo["exit_top"]
+		var tp_basin_y: float = tp_bl.y
+		var tp_overflow_y: float = maxf(tp_entry.y, tp_exit.y)
+		var tp_water_y: float = tp_basin_y - tp_fill * (tp_basin_y - tp_overflow_y)
+		var tp_y: float = lerpf(tp_water_y + 3, tp_basin_y - 2, tp["depth_offset"])
+		tp["swim_phase"] += delta * tp["swim_speed"]
+		var tp_depth_frac: float = 0.0
+		if absf(tp_basin_y - tp_water_y) > 0.1:
+			tp_depth_frac = clampf((tp_y - tp_water_y) / (tp_basin_y - tp_water_y), 0.0, 1.0)
+		var tp_slx: float = _lerp_x_at_y(tp_entry, tp_bl, tp_water_y)
+		var tp_srx: float = _lerp_x_at_y(tp_br, tp_exit, tp_water_y)
+		var tp_bound_l: float = lerpf(tp_slx, tp_bl.x, tp_depth_frac) + 4.0
+		var tp_bound_r: float = lerpf(tp_srx, tp_br.x, tp_depth_frac) - 4.0
+		var tp_x: float = tp["x"] + sin(tp["swim_phase"]) * tp["swim_range"]
+		tp_x = clampf(tp_x, tp_bound_l, tp_bound_r)
+		tp_node.position = Vector2(tp_x, tp_y)
+		tp_node.scale.x = 1.0 if cos(tp["swim_phase"]) > 0 else -1.0
+		tp_node.rotation = sin(tp["swim_phase"] * 3.0) * 0.2
+
+	# Water ripple rings
+	ripple_timer += delta
+	if ripple_timer >= 0.8:
+		ripple_timer = 0.0
+		var ri_swamp: int = randi() % SWAMP_COUNT
+		var ri_fill: float = GameManager.get_swamp_fill_fraction(ri_swamp)
+		if ri_fill > 0.05:
+			var ri_geo: Dictionary = _get_swamp_geometry(ri_swamp)
+			var ri_entry: Vector2 = ri_geo["entry_top"]
+			var ri_bl: Vector2 = ri_geo["basin_left"]
+			var ri_br: Vector2 = ri_geo["basin_right"]
+			var ri_exit: Vector2 = ri_geo["exit_top"]
+			var ri_basin_y: float = ri_bl.y
+			var ri_overflow_y: float = maxf(ri_entry.y, ri_exit.y)
+			var ri_water_y: float = ri_basin_y - ri_fill * (ri_basin_y - ri_overflow_y)
+			var ri_left_x: float = _lerp_x_at_y(ri_entry, ri_bl, ri_water_y)
+			var ri_right_x: float = _lerp_x_at_y(ri_br, ri_exit, ri_water_y)
+			var ri_x: float = randf_range(ri_left_x + 8, ri_right_x - 8)
+			_spawn_ripple(ri_x, ri_water_y)
+	var ripples_to_remove: Array[int] = []
+	for i in range(ripples.size()):
+		var rd: Dictionary = ripples[i]
+		rd["lifetime"] += delta
+		if rd["lifetime"] > rd["max_life"]:
+			ripples_to_remove.append(i)
+			continue
+		var rp_frac: float = rd["lifetime"] / rd["max_life"]
+		var rp_line: Line2D = rd["node"]
+		var rp_width: float = lerpf(2.0, rd["max_radius"], rp_frac)
+		rp_line.clear_points()
+		var rp_segs: int = 10
+		for s in range(rp_segs + 1):
+			var angle: float = float(s) / float(rp_segs) * PI
+			rp_line.add_point(Vector2(rd["x"] + cos(angle) * rp_width, rd["y"] + sin(angle) * rp_width * 0.3))
+		rp_line.default_color.a = (1.0 - rp_frac) * 0.4
+	for i in range(ripples_to_remove.size() - 1, -1, -1):
+		var idx: int = ripples_to_remove[i]
+		ripples[idx]["node"].queue_free()
+		ripples.remove_at(idx)
+
+	# Butterflies: daytime only
+	var bf_alpha: float = 0.0
+	if t > 0.2 and t < 0.55:
+		bf_alpha = 1.0
+	elif t >= 0.15 and t <= 0.2:
+		bf_alpha = (t - 0.15) / 0.05
+	elif t >= 0.55 and t <= 0.65:
+		bf_alpha = 1.0 - (t - 0.55) / 0.1
+	butterfly_timer += delta
+	if butterfly_timer >= 3.0 and bf_alpha > 0.1 and butterflies.size() < 6:
+		butterfly_timer = 0.0
+		_spawn_butterfly()
+	var bf_to_remove: Array[int] = []
+	for i in range(butterflies.size()):
+		var bd: Dictionary = butterflies[i]
+		bd["lifetime"] += delta
+		if bd["lifetime"] > bd["max_life"]:
+			bf_to_remove.append(i)
+			continue
+		var bf_node: Node2D = bd["node"]
+		bd["phase"] += delta * bd["flutter_speed"]
+		bf_node.position.x += bd["drift_x"] * delta
+		bf_node.position.y = minf(bd["base_y"] + sin(bd["phase"] * 0.4) * bd["bob_amp"], 120.0)
+		# Wing flap
+		var wing_scale: float = absf(sin(bd["phase"]))
+		bd["wing_l"].scale.x = wing_scale
+		bd["wing_r"].scale.x = wing_scale
+		var bf_life: float = bd["lifetime"] / bd["max_life"]
+		var bf_fade: float = 1.0
+		if bf_life < 0.1:
+			bf_fade = bf_life / 0.1
+		elif bf_life > 0.85:
+			bf_fade = (1.0 - bf_life) / 0.15
+		bf_node.modulate.a = bf_alpha * bf_fade
+	for i in range(bf_to_remove.size() - 1, -1, -1):
+		var idx: int = bf_to_remove[i]
+		butterflies[idx]["node"].queue_free()
+		butterflies.remove_at(idx)
+
+	# Shooting stars at night
+	var night_alpha: float = 0.0
+	if t > 0.7:
+		night_alpha = clampf((t - 0.7) / 0.05, 0.0, 1.0)
+	elif t < 0.12:
+		night_alpha = 1.0
+	elif t < 0.17:
+		night_alpha = clampf(1.0 - (t - 0.12) / 0.05, 0.0, 1.0)
+	shooting_star_timer += delta
+	if shooting_star_timer >= 6.0 and night_alpha > 0.5 and shooting_stars.size() < 2:
+		shooting_star_timer = 0.0
+		if randf() < 0.4:
+			_spawn_shooting_star()
+	var ss_to_remove: Array[int] = []
+	for i in range(shooting_stars.size()):
+		var sd: Dictionary = shooting_stars[i]
+		sd["lifetime"] += delta
+		if sd["lifetime"] > sd["max_life"]:
+			ss_to_remove.append(i)
+			continue
+		var ss_line: Line2D = sd["line"]
+		var ss_head: ColorRect = sd["head"]
+		var ss_frac: float = sd["lifetime"] / sd["max_life"]
+		var ss_x: float = sd["start_x"] + sd["speed_x"] * sd["lifetime"]
+		var ss_y: float = sd["start_y"] + sd["speed_y"] * sd["lifetime"]
+		ss_head.position = Vector2(ss_x, ss_y)
+		ss_line.clear_points()
+		var trail_len: int = 8
+		for s in range(trail_len):
+			var trail_t: float = float(s) / float(trail_len)
+			ss_line.add_point(Vector2(
+				ss_x - sd["speed_x"] * trail_t * 0.3,
+				ss_y - sd["speed_y"] * trail_t * 0.3
+			))
+		var ss_fade: float = 1.0
+		if ss_frac > 0.6:
+			ss_fade = (1.0 - ss_frac) / 0.4
+		ss_head.color.a = night_alpha * ss_fade
+		ss_line.default_color.a = night_alpha * ss_fade * 0.6
+	for i in range(ss_to_remove.size() - 1, -1, -1):
+		var idx: int = ss_to_remove[i]
+		shooting_stars[idx]["node"].queue_free()
+		shooting_stars.remove_at(idx)
+
+	# Turtle head bob
+	for tt in turtles:
+		var tt_head: ColorRect = tt["head_ref"]
+		var head_bob: float = sin(wave_time * 0.8 + tt["phase"]) * 0.5
+		tt_head.position.y += head_bob * 0.02
 
 	# Cattail wind sway
 	for ct in cattails:
