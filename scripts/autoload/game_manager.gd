@@ -18,11 +18,11 @@ signal upgrade_changed()
 
 # --- Swamp Definitions ---
 var swamp_definitions: Array = [
-	{"name": "Puddle", "total_gallons": 0.5, "money_per_gallon": 50.0, "reward": 15.0},
-	{"name": "Pond", "total_gallons": 10.0, "money_per_gallon": 50.0, "reward": 150.0},
-	{"name": "Marsh", "total_gallons": 100.0, "money_per_gallon": 75.0, "reward": 2500.0},
-	{"name": "Bog", "total_gallons": 800.0, "money_per_gallon": 125.0, "reward": 15000.0},
-	{"name": "Deep Swamp", "total_gallons": 5000.0, "money_per_gallon": 200.0, "reward": 100000.0}
+	{"name": "Puddle", "total_gallons": 0.5, "money_per_gallon": 50.0, "reward": 25.0},
+	{"name": "Pond", "total_gallons": 10.0, "money_per_gallon": 75.0, "reward": 300.0},
+	{"name": "Marsh", "total_gallons": 100.0, "money_per_gallon": 150.0, "reward": 5000.0},
+	{"name": "Bog", "total_gallons": 800.0, "money_per_gallon": 400.0, "reward": 50000.0},
+	{"name": "Deep Swamp", "total_gallons": 5000.0, "money_per_gallon": 1000.0, "reward": 500000.0}
 ]
 
 var swamp_states: Array = []
@@ -109,7 +109,8 @@ var stat_definitions: Dictionary = {
 	"movement_speed": {
 		"name": "Movement Speed",
 		"base_value": 1.0,
-		"per_level": 0.1,
+		"growth_rate": 1.12,
+		"scale": "exponential",
 		"base_cost": 8.0,
 		"cost_exponent": 1.12,
 		"format": "multiplier"
@@ -117,7 +118,8 @@ var stat_definitions: Dictionary = {
 	"stamina": {
 		"name": "Stamina",
 		"base_value": 5.0,
-		"per_level": 3.0,
+		"growth_rate": 1.15,
+		"scale": "exponential",
 		"base_cost": 5.0,
 		"cost_exponent": 1.12,
 		"format": "value"
@@ -125,7 +127,8 @@ var stat_definitions: Dictionary = {
 	"stamina_regen": {
 		"name": "Stamina Regen",
 		"base_value": 0.8,
-		"per_level": 0.5,
+		"growth_rate": 1.15,
+		"scale": "exponential",
 		"base_cost": 8.0,
 		"cost_exponent": 1.12,
 		"format": "per_sec"
@@ -134,36 +137,34 @@ var stat_definitions: Dictionary = {
 	"water_value": {
 		"name": "Water Value",
 		"base_value": 1.0,
-		"growth_rate": 1.08,
+		"growth_rate": 1.30,
 		"scale": "exponential",
 		"base_cost": 50.0,
-		"cost_exponent": 1.35,
+		"cost_exponent": 1.30,
 		"format": "multiplier"
 	},
 	"scoop_power": {
 		"name": "Scoop Power",
 		"base_value": 1.0,
-		"growth_rate": 1.10,
+		"growth_rate": 1.28,
 		"scale": "exponential",
 		"base_cost": 35.0,
-		"cost_exponent": 1.3,
+		"cost_exponent": 1.28,
 		"format": "multiplier"
 	},
 	"drain_mastery": {
 		"name": "Drain Mastery",
-		"base_value": 0.0,
-		"per_level": 0.05,
+		"base_value": 1.0,
+		"growth_rate": 1.30,
+		"scale": "exponential",
 		"base_cost": 50.0,
-		"cost_exponent": 1.35,
-		"format": "percent",
-		"max_value": 0.5
+		"cost_exponent": 1.30,
+		"format": "multiplier"
 	}
 }
 
 # --- Pump Definition ---
 const PUMP_COST: float = 100.0
-const PUMP_BASE_DRAIN: float = 0.001  # gal/sec
-const PUMP_DRAIN_PER_LEVEL: float = 0.0005  # additional gal/sec per level
 const PUMP_UPGRADE_BASE: float = 50.0
 const PUMP_SWAMP_EFFICIENCY: Array = [1.0, 0.5, 0.25, 0.1, 0.05]
 
@@ -211,11 +212,7 @@ var pump_level: int = 0
 
 # Camel constants
 const CAMEL_BASE_COST: float = 500.0
-const CAMEL_COST_EXPONENT: float = 2.5
-const CAMEL_BASE_CAPACITY: float = 1.0
-const CAMEL_CAPACITY_PER_LEVEL: float = 0.5
-const CAMEL_BASE_SPEED: float = 35.0
-const CAMEL_SPEED_PER_LEVEL: float = 5.0
+const CAMEL_COST_EXPONENT: float = 1.8
 const CAMEL_CAPACITY_UPGRADE_BASE: float = 50.0
 const CAMEL_SPEED_UPGRADE_BASE: float = 75.0
 const CAMEL_UPGRADE_EXPONENT: float = 1.25
@@ -240,7 +237,7 @@ var upgrade_definitions: Dictionary = {
 		"name": "Splash Guard",
 		"description": "Stamina efficiency",
 		"cost": 2000.0,
-		"cost_exponent": 1.35,
+		"cost_exponent": 1.20,
 		"max_level": -1,
 		"order": 1
 	},
@@ -256,7 +253,7 @@ var upgrade_definitions: Dictionary = {
 		"name": "Lucky Charm",
 		"description": "Bonus money chance",
 		"cost": 3000.0,
-		"cost_exponent": 1.4,
+		"cost_exponent": 1.35,
 		"max_level": -1,
 		"order": 3
 	},
@@ -264,9 +261,17 @@ var upgrade_definitions: Dictionary = {
 		"name": "Auto-Scooper",
 		"description": "Auto scoop near water",
 		"cost": 500.0,
-		"cost_exponent": 1.8,
+		"cost_exponent": 1.25,
 		"max_level": -1,
 		"order": 4
+	},
+	"lantern": {
+		"name": "Lantern",
+		"description": "Light in the dark",
+		"cost": 50.0,
+		"cost_exponent": 1.40,
+		"max_level": -1,
+		"order": 5
 	}
 }
 
@@ -276,7 +281,8 @@ var upgrades_owned: Dictionary = {
 	"splash_guard": 0,
 	"auto_seller": 0,
 	"lucky_charm": 0,
-	"auto_scooper": 0
+	"auto_scooper": 0,
+	"lantern": 0
 }
 
 # Day tracking
@@ -321,7 +327,7 @@ func get_total_water_percent() -> float:
 func get_tool_output(tool_id: String) -> float:
 	var base: float = tool_definitions[tool_id]["base_output"]
 	var level: int = tools_owned[tool_id]["level"]
-	var raw: float = base * (1.0 + level * 0.2)
+	var raw: float = base * pow(1.30, level)
 	# Apply scoop power multiplier for manual tools
 	if tool_definitions[tool_id]["type"] == "manual":
 		raw *= get_stat_value("scoop_power")
@@ -356,7 +362,7 @@ func get_money_multiplier() -> float:
 	return get_stat_value("water_value")
 
 func get_stamina_cost() -> float:
-	var base: float = maxf(2.0 - get_stat_value("drain_mastery"), 0.5)
+	var base: float = maxf(2.0 / get_stat_value("drain_mastery"), 0.2)
 	return base * get_splash_guard_multiplier()
 
 func get_max_stamina() -> float:
@@ -384,7 +390,7 @@ func get_stat_upgrade_cost(stat_id: String) -> float:
 
 # --- Pump computed ---
 func get_pump_drain_rate() -> float:
-	return PUMP_BASE_DRAIN + PUMP_DRAIN_PER_LEVEL * pump_level
+	return 0.001 * pow(1.15, pump_level)
 
 func get_pump_income_rate() -> float:
 	var total_income: float = 0.0
@@ -538,7 +544,7 @@ func upgrade_stat(stat_id: String) -> bool:
 	money_changed.emit(money)
 	stat_upgraded.emit(stat_id, stat_levels[stat_id])
 	if stat_id == "stamina":
-		current_stamina = minf(current_stamina + 3.0, get_max_stamina())
+		current_stamina = get_max_stamina()
 		stamina_changed.emit(current_stamina, get_max_stamina())
 	return true
 
@@ -570,10 +576,10 @@ func get_camel_cost() -> float:
 	return CAMEL_BASE_COST * pow(CAMEL_COST_EXPONENT, camel_count)
 
 func get_camel_capacity() -> float:
-	return CAMEL_BASE_CAPACITY + CAMEL_CAPACITY_PER_LEVEL * camel_capacity_level
+	return 1.0 * pow(1.25, camel_capacity_level)
 
 func get_camel_speed() -> float:
-	return CAMEL_BASE_SPEED + CAMEL_SPEED_PER_LEVEL * camel_speed_level
+	return 35.0 * pow(1.20, camel_speed_level)
 
 func get_camel_capacity_upgrade_cost() -> float:
 	return CAMEL_CAPACITY_UPGRADE_BASE * pow(CAMEL_UPGRADE_EXPONENT, camel_capacity_level)
@@ -591,19 +597,19 @@ func get_rain_collector_rate() -> float:
 	var level: int = upgrades_owned["rain_collector"]
 	if level <= 0:
 		return 0.0
-	return 0.50 + 0.30 * (level - 1)
+	return 0.50 * pow(1.30, level - 1)
 
 func get_splash_guard_multiplier() -> float:
 	var level: int = upgrades_owned["splash_guard"]
 	if level <= 0:
 		return 1.0
-	return pow(0.85, 1) * pow(0.95, level - 1)
+	return pow(0.82, level)
 
 func get_lucky_charm_chance() -> float:
 	var level: int = upgrades_owned["lucky_charm"]
 	if level <= 0:
 		return 0.0
-	return 0.05 + 0.03 * (level - 1)
+	return minf(0.05 * pow(1.35, level - 1), 0.80)
 
 func has_auto_seller() -> bool:
 	return upgrades_owned["auto_seller"] > 0
@@ -612,6 +618,33 @@ func get_auto_scoop_interval() -> float:
 	var level: int = upgrades_owned["auto_scooper"]
 	# Always active: base 2.5s, each upgrade level reduces by ~12%, min 0.1s
 	return maxf(2.5 * pow(0.88, level), 0.1)
+
+func get_lantern_radius() -> float:
+	var level: int = upgrades_owned["lantern"]
+	if level <= 0:
+		return 0.0
+	return 48.0 * pow(1.20, level - 1)
+
+func get_lantern_energy() -> float:
+	var level: int = upgrades_owned["lantern"]
+	if level <= 0:
+		return 0.0
+	return minf(2.4 * pow(1.12, level - 1), 8.0)
+
+func get_darkness_factor() -> float:
+	var t: float = cycle_progress
+	# Mirror _get_cycle_color breakpoints: full day 0.22-0.55, full night 0.75-1.0/0.0-0.1
+	# Darkness = how far from noon brightness (1.0 = full night, 0.0 = full day)
+	if t < 0.1:
+		return 1.0
+	elif t < 0.22:
+		return lerpf(1.0, 0.0, (t - 0.1) / 0.12)
+	elif t < 0.55:
+		return 0.0
+	elif t < 0.68:
+		return lerpf(0.0, 1.0, (t - 0.55) / 0.13)
+	else:
+		return 1.0
 
 func is_upgrade_maxed(upgrade_id: String) -> bool:
 	var defn: Dictionary = upgrade_definitions[upgrade_id]
@@ -740,7 +773,8 @@ func reset_game() -> void:
 		"splash_guard": 0,
 		"auto_seller": 0,
 		"lucky_charm": 0,
-		"auto_scooper": 0
+		"auto_scooper": 0,
+		"lantern": 0
 	}
 	current_day = 1
 	cycle_progress = 0.2
@@ -812,7 +846,7 @@ func get_save_data() -> Dictionary:
 	for state in swamp_states:
 		swamp_save.append({"gallons_drained": state["gallons_drained"], "completed": state["completed"]})
 	return {
-		"version": 9,
+		"version": 10,
 		"money": money,
 		"current_tool_id": current_tool_id,
 		"tools_owned": tools_owned.duplicate(true),

@@ -28,6 +28,14 @@ var drip_timer: float = 0.0
 # Phase 16: Speed lines
 var speed_line_timer: float = 0.0
 
+# Lantern system
+var lantern_light: PointLight2D = null
+var lantern_node: Node2D = null
+var lantern_glass: ColorRect = null
+var lantern_flame: ColorRect = null
+var lantern_active: bool = false
+var lantern_flicker_time: float = 0.0
+
 @onready var visual: Node2D = $Visual
 @onready var tool_sprite: Node2D = $Visual/ToolSprite
 @onready var boot_left: ColorRect = $Visual/BootLeft
@@ -50,6 +58,7 @@ func _ready() -> void:
 	add_to_group("player")
 	GameManager.tool_changed.connect(func(_d: Dictionary) -> void: _update_tool_visual())
 	_update_tool_visual()
+	_setup_lantern()
 
 func _unhandled_input(event: InputEvent) -> void:
 	# Dev mode: F1 = +$1k, F2 = +$10k, F3 = +$100k
@@ -216,6 +225,9 @@ func _physics_process(delta: float) -> void:
 			_spawn_speed_line()
 	else:
 		speed_line_timer = 0.0
+
+	# Lantern update
+	_update_lantern(delta)
 
 	# Scoop cooldown
 	if scoop_cooldown_timer > 0.0:
@@ -596,6 +608,122 @@ func set_near_water(value: bool, swamp_index: int = -1) -> void:
 		if swamp_index == near_swamp_index:
 			near_water = false
 			near_swamp_index = -1
+
+func _setup_lantern() -> void:
+	# PointLight2D for warm glow
+	lantern_light = PointLight2D.new()
+	lantern_light.color = Color(1.0, 0.85, 0.5)
+	lantern_light.blend_mode = PointLight2D.BLEND_MODE_ADD
+	lantern_light.shadow_enabled = false
+	lantern_light.position = Vector2(0, -20)
+	lantern_light.enabled = false
+
+	# Create 256x256 radial gradient texture programmatically
+	var gradient := GradientTexture2D.new()
+	gradient.width = 256
+	gradient.height = 256
+	gradient.fill = GradientTexture2D.FILL_RADIAL
+	gradient.fill_from = Vector2(0.5, 0.5)
+	gradient.fill_to = Vector2(0.5, 0.0)
+	var grad := Gradient.new()
+	grad.set_offset(0, 0.0)
+	grad.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
+	grad.add_point(0.4, Color(0.6, 0.6, 0.6, 0.6))
+	grad.set_offset(1, 1.0)
+	grad.set_color(1, Color(0.0, 0.0, 0.0, 0.0))
+	gradient.gradient = grad
+	lantern_light.texture = gradient
+	add_child(lantern_light)
+
+	# Lantern sprite node (child of Visual so it flips with facing)
+	lantern_node = Node2D.new()
+	lantern_node.z_index = 9
+	lantern_node.position = Vector2(-10, -14)
+	lantern_node.visible = false
+	visual.add_child(lantern_node)
+
+	# Handle wire
+	var wire := ColorRect.new()
+	wire.size = Vector2(1, 4)
+	wire.position = Vector2(1, -4)
+	wire.color = Color(0.6, 0.5, 0.3)
+	lantern_node.add_child(wire)
+
+	# Top cap
+	var cap := ColorRect.new()
+	cap.size = Vector2(4, 2)
+	cap.position = Vector2(0, 0)
+	cap.color = Color(0.45, 0.38, 0.2)
+	lantern_node.add_child(cap)
+
+	# Glass body
+	lantern_glass = ColorRect.new()
+	lantern_glass.size = Vector2(4, 5)
+	lantern_glass.position = Vector2(0, 2)
+	lantern_glass.color = Color(1.0, 0.85, 0.5, 0.7)
+	lantern_node.add_child(lantern_glass)
+
+	# Base
+	var base := ColorRect.new()
+	base.size = Vector2(6, 2)
+	base.position = Vector2(-1, 7)
+	base.color = Color(0.45, 0.38, 0.2)
+	lantern_node.add_child(base)
+
+	# Flame core
+	lantern_flame = ColorRect.new()
+	lantern_flame.size = Vector2(2, 3)
+	lantern_flame.position = Vector2(1, 3)
+	lantern_flame.color = Color(1.0, 0.95, 0.4)
+	lantern_node.add_child(lantern_flame)
+
+func _update_lantern(delta: float) -> void:
+	var lantern_level: int = GameManager.upgrades_owned["lantern"]
+	var darkness: float = GameManager.get_darkness_factor()
+	var should_be_active: bool = lantern_level > 0 and darkness > 0.05
+
+	if should_be_active != lantern_active:
+		lantern_active = should_be_active
+		lantern_node.visible = lantern_active
+		lantern_light.enabled = lantern_active
+
+	if not lantern_active:
+		return
+
+	lantern_flicker_time += delta
+
+	# Flame flicker: three incommensurate sinusoids for natural feel
+	var flicker: float = 1.0 + sin(lantern_flicker_time * 12.0) * 0.08 + sin(lantern_flicker_time * 7.3) * 0.05 + sin(lantern_flicker_time * 19.7) * 0.03
+
+	# Scale energy by darkness factor (gentle at dusk, full at night)
+	var base_energy: float = GameManager.get_lantern_energy()
+	lantern_light.energy = base_energy * darkness * flicker
+
+	# Texture scale: radius to texture mapping
+	var radius: float = GameManager.get_lantern_radius()
+	lantern_light.texture_scale = (radius * 2.0) / 256.0
+
+	# Animate flame color and size
+	var flame_brightness: float = 0.85 + flicker * 0.15
+	lantern_flame.color = Color(1.0, 0.95 * flame_brightness, 0.4 * flame_brightness)
+	lantern_flame.size.y = 3.0 + sin(lantern_flicker_time * 12.0) * 0.5
+
+	# Animate glass glow intensity
+	var glass_alpha: float = 0.5 + darkness * 0.3 * flicker
+	lantern_glass.color = Color(1.0, 0.85, 0.5, glass_alpha)
+
+	# Slight position wobble for organic feel
+	lantern_light.position.x = sin(lantern_flicker_time * 3.1) * 0.5
+	lantern_light.position.y = -20.0 + sin(lantern_flicker_time * 2.7) * 0.3
+
+	# Walk animation integration: sway with arm
+	if is_walking:
+		var arm_offset: float = sin(walk_time) * 2.5
+		lantern_node.position.y = -14.0 + arm_offset
+		lantern_node.rotation = sin(walk_time) * 0.12
+	else:
+		lantern_node.position.y = -14.0
+		lantern_node.rotation = 0.0
 
 func _spawn_dust_puff(foot_x: float) -> void:
 	var sizes: Array[Vector2] = [Vector2(6, 5), Vector2(5, 5), Vector2(7, 4)]

@@ -266,8 +266,8 @@ func _refresh() -> void:
 		cap_btn.text = "Cap Lv%d %s" % [GameManager.camel_capacity_level + 1, Economy.format_money(cap_cost)]
 		cap_btn.custom_minimum_size = Vector2(130, 0)
 		var cur_cap: float = GameManager.get_camel_capacity()
-		var next_cap: float = GameManager.CAMEL_BASE_CAPACITY + GameManager.CAMEL_CAPACITY_PER_LEVEL * (GameManager.camel_capacity_level + 1)
-		cap_btn.tooltip_text = "Camel Capacity Lv%d\nCurrent: %.1f gal\nNext: %.1f gal (+%.1f)\nCost: %s" % [GameManager.camel_capacity_level, cur_cap, next_cap, next_cap - cur_cap, Economy.format_money(cap_cost)]
+		var next_cap: float = 1.0 * pow(1.25, GameManager.camel_capacity_level + 1)
+		cap_btn.tooltip_text = "Camel Capacity Lv%d\nCurrent: %.1f gal\nNext: %.1f gal (+25%%)\nCost: %s" % [GameManager.camel_capacity_level, cur_cap, next_cap, Economy.format_money(cap_cost)]
 		if GameManager.money < cap_cost:
 			cap_btn.disabled = true
 		else:
@@ -283,8 +283,8 @@ func _refresh() -> void:
 		spd_btn.text = "Spd Lv%d %s" % [GameManager.camel_speed_level + 1, Economy.format_money(spd_cost)]
 		spd_btn.custom_minimum_size = Vector2(130, 0)
 		var cur_spd: float = GameManager.get_camel_speed()
-		var next_spd: float = GameManager.CAMEL_BASE_SPEED + GameManager.CAMEL_SPEED_PER_LEVEL * (GameManager.camel_speed_level + 1)
-		spd_btn.tooltip_text = "Camel Speed Lv%d\nCurrent: %.0f px/s\nNext: %.0f px/s (+%.0f)\nCost: %s" % [GameManager.camel_speed_level, cur_spd, next_spd, next_spd - cur_spd, Economy.format_money(spd_cost)]
+		var next_spd: float = 35.0 * pow(1.20, GameManager.camel_speed_level + 1)
+		spd_btn.tooltip_text = "Camel Speed Lv%d\nCurrent: %.0f px/s\nNext: %.0f px/s (+20%%)\nCost: %s" % [GameManager.camel_speed_level, cur_spd, next_spd, Economy.format_money(spd_cost)]
 		if GameManager.money < spd_cost:
 			spd_btn.disabled = true
 		else:
@@ -385,17 +385,17 @@ func _get_upgrade_tooltip(uid: String, defn: Dictionary, level: int) -> String:
 		"rain_collector":
 			if level > 0:
 				tip += "\nCurrent: $%.2f/s" % GameManager.get_rain_collector_rate()
-				var next_rate: float = 0.50 + 0.30 * level
-				tip += "\nNext: $%.2f/s (+$0.30/s)" % next_rate
+				var next_rate: float = 0.50 * pow(1.30, level)
+				tip += "\nNext: $%.2f/s (+30%%)" % next_rate
 			else:
-				tip += "\nBase: $0.50/s, +$0.30/s per level"
+				tip += "\nBase: $0.50/s, +30% per level"
 		"splash_guard":
 			if level > 0:
 				tip += "\nStamina cost: %.0f%%" % (GameManager.get_splash_guard_multiplier() * 100.0)
-				var next_mult: float = pow(0.85, 1) * pow(0.95, level)
-				tip += "\nNext: %.0f%% (-5%%)" % (next_mult * 100.0)
+				var next_mult: float = pow(0.82, level + 1)
+				tip += "\nNext: %.0f%% (-18%%)" % (next_mult * 100.0)
 			else:
-				tip += "\nBase: -15% stamina cost, -5% per level"
+				tip += "\nBase: -18% stamina cost per level"
 		"auto_seller":
 			if level > 0:
 				tip += "\nActive! Auto-sells when inventory full."
@@ -404,15 +404,23 @@ func _get_upgrade_tooltip(uid: String, defn: Dictionary, level: int) -> String:
 		"lucky_charm":
 			if level > 0:
 				tip += "\n2x money chance: %.0f%%" % (GameManager.get_lucky_charm_chance() * 100.0)
-				var next_chance: float = 0.05 + 0.03 * level
-				tip += "\nNext: %.0f%% (+3%%)" % (next_chance * 100.0)
+				var next_chance: float = minf(0.05 * pow(1.35, level), 0.80)
+				tip += "\nNext: %.0f%% (+35%%)" % (next_chance * 100.0)
 			else:
-				tip += "\nBase: 5% chance for 2x money, +3% per level"
+				tip += "\nBase: 5% chance for 2x money, x1.35 per level"
 		"auto_scooper":
 			var cur_interval: float = GameManager.get_auto_scoop_interval()
 			tip += "\nScoop every %.2fs" % cur_interval
 			var next_interval: float = maxf(2.5 * pow(0.88, level + 1), 0.1)
 			tip += "\nNext: %.2fs (-12%%)" % next_interval
+		"lantern":
+			if level > 0:
+				tip += "\nRadius: %.0fpx, Brightness: %.2f" % [GameManager.get_lantern_radius(), GameManager.get_lantern_energy()]
+				var next_radius: float = 48.0 * pow(1.20, level)
+				var next_energy: float = minf(2.4 * pow(1.12, level), 8.0)
+				tip += "\nNext: %.0fpx radius, %.2f brightness" % [next_radius, next_energy]
+			else:
+				tip += "\nAutomatic light during night\nBase 48px radius"
 	if not GameManager.is_upgrade_maxed(uid):
 		tip += "\nCost: %s" % Economy.format_money(GameManager.get_upgrade_cost(uid))
 	return tip
@@ -432,7 +440,7 @@ func _get_tool_tooltip(tid: String, defn: Dictionary, owned_data: Dictionary) ->
 		else:
 			tip += "\nOutput: %.4f gal/scoop" % cur_output
 
-		var next_output: float = defn["base_output"] * (1.0 + (level + 1) * 0.2)
+		var next_output: float = defn["base_output"] * pow(1.30, level + 1)
 		if defn["type"] == "manual":
 			next_output *= GameManager.get_stat_value("scoop_power")
 		var gain_pct: float = (next_output / cur_output - 1.0) * 100.0
