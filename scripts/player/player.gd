@@ -18,6 +18,7 @@ var tool_tween: Tween = null
 var walk_time: float = 0.0
 var is_walking: bool = false
 var dust_timer: float = 0.0
+var auto_scoop_timer: float = 0.0
 
 @onready var visual: Node2D = $Visual
 @onready var tool_sprite: Node2D = $Visual/ToolSprite
@@ -125,9 +126,21 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_pressed("scoop") and scoop_cooldown_timer <= 0.0:
 		_handle_scoop()
 
+	# Auto-Scooper upgrade: auto-scoop on timer when near water
+	var auto_interval: float = GameManager.get_auto_scoop_interval()
+	if auto_interval > 0.0 and near_water and near_swamp_index >= 0:
+		auto_scoop_timer += delta
+		if auto_scoop_timer >= auto_interval:
+			auto_scoop_timer -= auto_interval
+			if scoop_cooldown_timer <= 0.0:
+				_handle_scoop()
+	else:
+		auto_scoop_timer = 0.0
+
 func _handle_scoop() -> void:
 	if near_pump:
 		pump_requested.emit()
+		scoop_cooldown_timer = SCOOP_COOLDOWN
 		return
 	if GameManager.current_tool_id == "hose":
 		if near_water and near_swamp_index >= 0:

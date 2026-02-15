@@ -173,6 +173,7 @@ const PUMP_COST: float = 100.0
 const PUMP_BASE_DRAIN: float = 0.001  # gal/sec
 const PUMP_DRAIN_PER_LEVEL: float = 0.0005  # additional gal/sec per level
 const PUMP_UPGRADE_BASE: float = 50.0
+const PUMP_SWAMP_EFFICIENCY: Array = [1.0, 0.5, 0.25, 0.1, 0.05]
 
 # --- Game State ---
 var money: float = 0.0
@@ -216,7 +217,6 @@ const HOSE_DURATION: float = 20.0
 # Pump state
 var pump_owned: bool = false
 var pump_level: int = 0
-var pump_target_swamp: int = -1
 
 # Camel constants
 const CAMEL_BASE_COST: float = 500.0
@@ -268,6 +268,14 @@ var upgrade_definitions: Dictionary = {
 		"cost_exponent": 1.4,
 		"max_level": -1,
 		"order": 3
+	},
+	"auto_scooper": {
+		"name": "Auto-Scooper",
+		"description": "Auto scoop near water",
+		"cost": 15000.0,
+		"cost_exponent": 1.45,
+		"max_level": -1,
+		"order": 4
 	}
 }
 
@@ -276,7 +284,8 @@ var upgrades_owned: Dictionary = {
 	"rain_collector": 0,
 	"splash_guard": 0,
 	"auto_seller": 0,
-	"lucky_charm": 0
+	"lucky_charm": 0,
+	"auto_scooper": 0
 }
 
 # Day tracking
@@ -390,26 +399,17 @@ func get_pump_drain_rate() -> float:
 	return PUMP_BASE_DRAIN + PUMP_DRAIN_PER_LEVEL * pump_level
 
 func get_pump_income_rate() -> float:
-	var target: int = _get_pump_target_swamp()
-	if target < 0:
-		return 0.0
-	return get_pump_drain_rate() * swamp_definitions[target]["money_per_gallon"]
+	var total_income: float = 0.0
+	var base_rate: float = get_pump_drain_rate()
+	for i in range(swamp_definitions.size()):
+		if swamp_states[i]["completed"]:
+			continue
+		var eff: float = PUMP_SWAMP_EFFICIENCY[i] if i < PUMP_SWAMP_EFFICIENCY.size() else 0.05
+		total_income += base_rate * eff * swamp_definitions[i]["money_per_gallon"] * get_money_multiplier()
+	return total_income
 
 func get_pump_upgrade_cost() -> float:
 	return PUMP_UPGRADE_BASE * pow(1.15, pump_level)
-
-func set_pump_target(swamp_index: int) -> void:
-	if swamp_index < 0 or swamp_index >= swamp_definitions.size():
-		pump_target_swamp = -1
-	else:
-		pump_target_swamp = swamp_index
-	pump_changed.emit()
-
-func _get_pump_target_swamp() -> int:
-	if pump_target_swamp >= 0 and pump_target_swamp < swamp_definitions.size():
-		if not swamp_states[pump_target_swamp]["completed"]:
-			return pump_target_swamp
-	return -1
 
 # --- Internal: drain swamp without earning money ---
 func _drain_swamp(swamp_index: int, gallons: float) -> float:
@@ -627,6 +627,13 @@ func get_lucky_charm_chance() -> float:
 func has_auto_seller() -> bool:
 	return upgrades_owned["auto_seller"] > 0
 
+func get_auto_scoop_interval() -> float:
+	var level: int = upgrades_owned["auto_scooper"]
+	if level <= 0:
+		return 0.0
+	# Level 1: 0.5s, each level reduces by ~8%, min 0.08s
+	return maxf(0.5 * pow(0.92, level - 1), 0.08)
+
 func is_upgrade_maxed(upgrade_id: String) -> bool:
 	var defn: Dictionary = upgrade_definitions[upgrade_id]
 	if defn["max_level"] < 0:
@@ -746,7 +753,6 @@ func reset_game() -> void:
 	hose_swamp_index = -1
 	pump_owned = false
 	pump_level = 0
-	pump_target_swamp = -1
 	camel_count = 0
 	camel_capacity_level = 0
 	camel_speed_level = 0
@@ -755,7 +761,8 @@ func reset_game() -> void:
 		"rain_collector": 0,
 		"splash_guard": 0,
 		"auto_seller": 0,
-		"lucky_charm": 0
+		"lucky_charm": 0,
+		"auto_scooper": 0
 	}
 	current_day = 1
 	cycle_progress = 0.2
@@ -802,12 +809,15 @@ func _process(delta: float) -> void:
 					drain_water(hose_swamp_index, gallons)
 					hose_state_changed.emit(true, hose_timer)
 
-	# Pump passive drain (earns money directly)
+	# Pump passive drain (earns money directly, drains all pools)
 	if pump_owned:
-		var target: int = _get_pump_target_swamp()
-		if target >= 0:
-			var gallons: float = get_pump_drain_rate() * delta
-			drain_water(target, gallons)
+		var base_rate: float = get_pump_drain_rate()
+		for i in range(swamp_definitions.size()):
+			if swamp_states[i]["completed"]:
+				continue
+			var eff: float = PUMP_SWAMP_EFFICIENCY[i] if i < PUMP_SWAMP_EFFICIENCY.size() else 0.05
+			var gallons: float = base_rate * eff * delta
+			drain_water(i, gallons)
 
 	# Rain Collector passive income
 	var rain_rate: float = get_rain_collector_rate()
@@ -824,7 +834,7 @@ func get_save_data() -> Dictionary:
 	for state in swamp_states:
 		swamp_save.append({"gallons_drained": state["gallons_drained"], "completed": state["completed"]})
 	return {
-		"version": 8,
+		"version": 9,
 		"money": money,
 		"current_tool_id": current_tool_id,
 		"tools_owned": tools_owned.duplicate(true),
@@ -835,7 +845,6 @@ func get_save_data() -> Dictionary:
 		"swamp_states": swamp_save,
 		"pump_owned": pump_owned,
 		"pump_level": pump_level,
-		"pump_target_swamp": pump_target_swamp,
 		"current_day": current_day,
 		"camel_count": camel_count,
 		"camel_capacity_level": camel_capacity_level,
@@ -863,7 +872,6 @@ func load_save_data(data: Dictionary) -> void:
 	# Pump
 	pump_owned = data.get("pump_owned", false)
 	pump_level = data.get("pump_level", 0)
-	pump_target_swamp = data.get("pump_target_swamp", -1)
 	current_day = int(data.get("current_day", 1))
 
 	# Load swamp states
