@@ -59,19 +59,19 @@ offset_right = 5.0
 offset_bottom = -5.0
 color = Color(0.38, 0.28, 0.16, 1)
 
-[node name="Pants" type="ColorRect" parent="Visual"]
+[node name="PantsLeft" type="ColorRect" parent="Visual"]
 offset_left = -6.0
 offset_top = -14.0
-offset_right = 6.0
+offset_right = -1.0
 offset_bottom = -8.0
 color = Color(0.3, 0.25, 0.18, 1)
 
-[node name="PantsSeam" type="ColorRect" parent="Visual"]
-offset_left = -0.5
+[node name="PantsRight" type="ColorRect" parent="Visual"]
+offset_left = 1.0
 offset_top = -14.0
-offset_right = 0.5
+offset_right = 6.0
 offset_bottom = -8.0
-color = Color(0.25, 0.2, 0.14, 1)
+color = Color(0.28, 0.23, 0.16, 1)
 
 [node name="Belt" type="ColorRect" parent="Visual"]
 offset_left = -6.0

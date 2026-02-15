@@ -36,6 +36,8 @@ var speed_line_timer: float = 0.0
 @onready var boot_sole_right: ColorRect = $Visual/BootSoleRight
 @onready var boot_lace_left: ColorRect = $Visual/BootLaceLeft
 @onready var boot_lace_right: ColorRect = $Visual/BootLaceRight
+@onready var pants_left: ColorRect = $Visual/PantsLeft
+@onready var pants_right: ColorRect = $Visual/PantsRight
 @onready var arm_right: ColorRect = $Visual/ArmRight
 @onready var hand_right: ColorRect = $Visual/HandRight
 @onready var arm_left: ColorRect = $Visual/ArmLeft
@@ -112,6 +114,10 @@ func _physics_process(delta: float) -> void:
 		boot_lace_left.position.x = leg_x
 		boot_lace_right.position.y = -6.0 - leg_y
 		boot_lace_right.position.x = -leg_x
+		pants_left.position.y = -14.0 + leg_y * 0.5
+		pants_left.position.x = leg_x * 0.5
+		pants_right.position.y = -14.0 - leg_y * 0.5
+		pants_right.position.x = -leg_x * 0.5
 
 		# Both arms swing (opposite to their respective legs)
 		var arm_left_offset: float = sin(walk_time) * 2.5
@@ -145,6 +151,8 @@ func _physics_process(delta: float) -> void:
 		boot_sole_right.position = Vector2(0.0, -2.0)
 		boot_lace_left.position = Vector2(0.0, -6.0)
 		boot_lace_right.position = Vector2(0.0, -6.0)
+		pants_left.position = Vector2(0.0, -14.0)
+		pants_right.position = Vector2(0.0, -14.0)
 		arm_left.position.y = -24.0
 		hand_left.position.y = -13.0
 		arm_right.position.y = -24.0

@@ -37,7 +37,7 @@ var water_detect_areas: Array[Area2D] = []
 var water_walls: Array = []
 var swamp_labels: Array[Label] = []
 var swamp_percent_labels: Array[Label] = []
-var clouds: Array[ColorRect] = []
+var clouds: Array[Node2D] = []
 var cattails: Array[Node2D] = []
 var stars: Array[ColorRect] = []
 var fireflies: Array[Dictionary] = []
@@ -336,37 +336,37 @@ func _build_clouds() -> void:
 	for cd in cloud_data:
 		var cloud_group := Node2D.new()
 		cloud_group.z_index = -8
+		cloud_group.position = Vector2(cd["x"], cd["y"])
 		add_child(cloud_group)
 
-		# Main cloud body
+		# Main cloud body (local coords relative to group)
 		var main := ColorRect.new()
-		main.position = Vector2(cd["x"], cd["y"])
 		main.size = Vector2(cd["w"], cd["h"])
 		main.color = Color(0.92, 0.94, 0.98, 0.7)
 		cloud_group.add_child(main)
 
 		# Cloud puff left
 		var puff_l := ColorRect.new()
-		puff_l.position = Vector2(cd["x"] - 8, cd["y"] + 4)
+		puff_l.position = Vector2(-8, 4)
 		puff_l.size = Vector2(16, cd["h"] - 4)
 		puff_l.color = Color(0.88, 0.92, 0.96, 0.5)
 		cloud_group.add_child(puff_l)
 
 		# Cloud puff right
 		var puff_r := ColorRect.new()
-		puff_r.position = Vector2(cd["x"] + cd["w"] - 8, cd["y"] + 4)
+		puff_r.position = Vector2(cd["w"] - 8, 4)
 		puff_r.size = Vector2(16, cd["h"] - 4)
 		puff_r.color = Color(0.88, 0.92, 0.96, 0.5)
 		cloud_group.add_child(puff_r)
 
 		# Cloud highlight top
 		var highlight := ColorRect.new()
-		highlight.position = Vector2(cd["x"] + 6, cd["y"] - 4)
+		highlight.position = Vector2(6, -4)
 		highlight.size = Vector2(cd["w"] - 12, 6)
 		highlight.color = Color(0.96, 0.97, 1.0, 0.5)
 		cloud_group.add_child(highlight)
 
-		clouds.append(main)
+		clouds.append(cloud_group)
 
 func _build_distant_hills() -> void:
 	# Far hills silhouette
@@ -677,8 +677,8 @@ func _get_zone_index(x: float) -> int:
 	return 4
 
 func _build_terrain_zones() -> void:
-	# Instead of hard-edged zone polygons, scatter many small tinted patches
-	# that get denser near zone centers, creating a smooth gradient across the world.
+	# Zone tinting via small patches buried well below terrain surface
+	# to avoid peeking above slopes into the sky
 	var zone_centers: Array[float] = [135.0, 400.0, 755.0, 1130.0, 1575.0]
 	var zone_radii: Array[float] = [180.0, 200.0, 220.0, 250.0, 280.0]
 
@@ -686,23 +686,22 @@ func _build_terrain_zones() -> void:
 		var center_x: float = zone_centers[zi]
 		var radius: float = zone_radii[zi]
 		var col: Color = ZONE_TINT_COLORS[zi]
-		# Scatter tinted patches across the zone's influence area
-		var patch_count: int = 18
-		for _j in range(patch_count):
+		# Scatter small tinted patches well below terrain surface
+		for _j in range(25):
 			var px: float = center_x + randf_range(-radius, radius)
 			px = clampf(px, 0.0, 1920.0)
 			var py: float = _get_terrain_y_at(px)
 			if py < 0:
 				continue
-			# Fade alpha based on distance from zone center
 			var dist_frac: float = absf(px - center_x) / radius
 			var alpha: float = col.a * (1.0 - dist_frac * dist_frac)
 			if alpha < 0.02:
 				continue
 			var patch := ColorRect.new()
-			var pw: float = randf_range(24, 60)
-			var ph: float = randf_range(20, 50)
-			patch.position = Vector2(px - pw * 0.5, py + randf_range(0, 6))
+			var pw: float = randf_range(12, 30)
+			var ph: float = randf_range(8, 20)
+			# Push patches well below surface so they never peek above on slopes
+			patch.position = Vector2(px - pw * 0.5, py + randf_range(10, 25))
 			patch.size = Vector2(pw, ph)
 			patch.color = Color(col.r, col.g, col.b, alpha)
 			patch.z_index = 0
@@ -966,7 +965,7 @@ func _build_tree_trunks() -> void:
 		trunk.add_point(Vector2(tx, top_y))
 		trunk.add_point(Vector2(tx + randf_range(-1, 1), 160))
 		trunk.z_index = -5
-		add_child(trunk)
+		treeline_layer.add_child(trunk)
 
 # --- Lily Pads ---
 func _build_lily_pads() -> void:
@@ -3540,11 +3539,6 @@ func _process(delta: float) -> void:
 		clouds[ci].position.x += delta * (3.0 + ci * 0.5)
 		if clouds[ci].position.x > 1960:
 			clouds[ci].position.x = -80
-			# Also move parent cloud group's other children
-			var parent_node: Node2D = clouds[ci].get_parent()
-			for child in parent_node.get_children():
-				if child != clouds[ci]:
-					child.position.x -= 2040
 
 	# Stars: visible at night, twinkle
 	var star_alpha: float = 0.0
