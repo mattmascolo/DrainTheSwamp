@@ -4,20 +4,26 @@ extends PanelContainer
 @onready var close_button: Button = $MarginContainer/VBoxContainer/TopBar/CloseButton
 
 var _dirty: bool = false
+var _refresh_cooldown: float = 0.0
+const REFRESH_INTERVAL: float = 0.3
 
 func _ready() -> void:
 	close_button.pressed.connect(func() -> void: visible = false)
 	GameManager.money_changed.connect(func(_m: float) -> void: _dirty = true)
-	GameManager.pump_changed.connect(func() -> void: _dirty = true)
+	GameManager.pump_changed.connect(func() -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	visible = false
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _dirty and visible:
-		_dirty = false
-		_refresh()
+		_refresh_cooldown -= delta
+		if _refresh_cooldown <= 0.0:
+			_dirty = false
+			_refresh_cooldown = REFRESH_INTERVAL
+			_refresh()
 
 func open() -> void:
 	visible = true
+	_refresh_cooldown = 0.0
 	_refresh()
 
 func _refresh() -> void:

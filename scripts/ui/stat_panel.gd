@@ -4,20 +4,26 @@ extends PanelContainer
 @onready var close_button: Button = $MarginContainer/VBoxContainer/TopBar/CloseButton
 
 var _dirty: bool = false
+var _refresh_cooldown: float = 0.0
+const REFRESH_INTERVAL: float = 0.3
 
 func _ready() -> void:
 	close_button.pressed.connect(func() -> void: visible = false)
 	GameManager.money_changed.connect(func(_m: float) -> void: _dirty = true)
-	GameManager.stat_upgraded.connect(func(_s: String, _l: int) -> void: _dirty = true)
+	GameManager.stat_upgraded.connect(func(_s: String, _l: int) -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	visible = false
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _dirty and visible:
-		_dirty = false
-		_refresh()
+		_refresh_cooldown -= delta
+		if _refresh_cooldown <= 0.0:
+			_dirty = false
+			_refresh_cooldown = REFRESH_INTERVAL
+			_refresh()
 
 func open() -> void:
 	visible = true
+	_refresh_cooldown = 0.0
 	_refresh()
 
 func _refresh() -> void:
@@ -95,8 +101,56 @@ func _refresh() -> void:
 		_style_button(upgrade_btn, Color(0.1, 0.18, 0.3))
 		entry.add_child(upgrade_btn)
 
+		# Tooltip
+		row_panel.tooltip_text = _get_stat_tooltip(sid, defn, level, value, cost)
+		row_panel.mouse_filter = Control.MOUSE_FILTER_PASS
+
 		row_panel.add_child(entry)
 		stat_list.add_child(row_panel)
+
+func _get_stat_tooltip(sid: String, defn: Dictionary, level: int, value: float, cost: float) -> String:
+	var tip: String = defn["name"]
+	var fmt: String = defn.get("format", "value")
+
+	# Current value
+	tip += "\nCurrent (Lv%d): %s" % [level, _format_stat_value(fmt, value)]
+
+	# Next level
+	var next_val: float = GameManager.get_stat_value_at_level(sid, level + 1)
+	tip += "\nNext (Lv%d): %s" % [level + 1, _format_stat_value(fmt, next_val)]
+
+	# Delta
+	if defn.get("scale", "linear") == "exponential":
+		var pct: float = (next_val / maxf(value, 0.001) - 1.0) * 100.0
+		tip += " (+%.1f%%)" % pct
+	else:
+		var delta: float = next_val - value
+		tip += " (+%s)" % _format_stat_value(fmt, delta)
+
+	tip += "\nUpgrade: %s" % Economy.format_money(cost)
+
+	# Preview Lv+5
+	var lv5: int = level + 5
+	var val5: float = GameManager.get_stat_value_at_level(sid, lv5)
+	tip += "\nLv%d: %s" % [lv5, _format_stat_value(fmt, val5)]
+
+	if defn.has("max_value"):
+		tip += "\nMax: %s" % _format_stat_value(fmt, defn["max_value"])
+
+	return tip
+
+func _format_stat_value(fmt: String, value: float) -> String:
+	match fmt:
+		"gal":
+			return "%.1f gal" % value
+		"multiplier":
+			return "%.2fx" % value
+		"per_sec":
+			return "%.1f/s" % value
+		"percent":
+			return "%.0f%%" % (value * 100.0)
+		_:
+			return "%.0f" % value
 
 func _style_button(btn: Button, bg_color: Color) -> void:
 	var style := StyleBoxFlat.new()

@@ -3,8 +3,7 @@ extends CharacterBody2D
 const BASE_SPEED: float = 120.0
 const GRAVITY: float = 800.0
 const SCOOP_COOLDOWN: float = 0.3
-const STAMINA_REGEN_DELAY: float = 1.0
-const STAMINA_REGEN_DELAY_TIME: float = 1.0
+const STAMINA_REGEN_DELAY_TIME: float = 0.0
 
 signal pump_requested()
 
@@ -13,7 +12,6 @@ var near_swamp_index: int = -1
 var near_pump: bool = false
 var scoop_cooldown_timer: float = 0.0
 var stamina_idle_timer: float = 0.0
-var scoop_requested: bool = false
 var facing_right: bool = true
 var flash_tween: Tween = null
 var tool_tween: Tween = null
@@ -41,8 +39,6 @@ func _ready() -> void:
 	_update_tool_visual()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("scoop"):
-		scoop_requested = true
 	# Dev mode: F1 = +$1k, F2 = +$10k, F3 = +$100k
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
@@ -125,11 +121,9 @@ func _physics_process(delta: float) -> void:
 	if stamina_idle_timer >= STAMINA_REGEN_DELAY_TIME:
 		GameManager.regen_stamina(delta)
 
-	# Handle scoop request
-	if scoop_requested:
-		scoop_requested = false
-		if scoop_cooldown_timer <= 0.0:
-			_handle_scoop()
+	# Hold-to-scoop: auto-scoop while space held
+	if Input.is_action_pressed("scoop") and scoop_cooldown_timer <= 0.0:
+		_handle_scoop()
 
 func _handle_scoop() -> void:
 	if near_pump:

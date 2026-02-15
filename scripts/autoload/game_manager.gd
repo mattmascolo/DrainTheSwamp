@@ -14,6 +14,7 @@ signal pump_changed()
 signal water_carried_changed(current: float, capacity: float)
 signal day_changed(day: int)
 signal camel_changed()
+signal upgrade_changed()
 
 # --- Swamp Definitions ---
 var swamp_definitions: Array = [
@@ -222,8 +223,8 @@ const CAMEL_BASE_COST: float = 500.0
 const CAMEL_COST_EXPONENT: float = 2.5
 const CAMEL_BASE_CAPACITY: float = 1.0
 const CAMEL_CAPACITY_PER_LEVEL: float = 0.5
-const CAMEL_BASE_SPEED: float = 60.0
-const CAMEL_SPEED_PER_LEVEL: float = 8.0
+const CAMEL_BASE_SPEED: float = 35.0
+const CAMEL_SPEED_PER_LEVEL: float = 5.0
 const CAMEL_CAPACITY_UPGRADE_BASE: float = 50.0
 const CAMEL_SPEED_UPGRADE_BASE: float = 75.0
 const CAMEL_UPGRADE_EXPONENT: float = 1.25
@@ -233,6 +234,50 @@ var camel_count: int = 0
 var camel_capacity_level: int = 0
 var camel_speed_level: int = 0
 var camel_states: Array = []  # [{state, x, water_carried, source_swamp, state_timer}]
+
+# Upgrade definitions
+var upgrade_definitions: Dictionary = {
+	"rain_collector": {
+		"name": "Rain Collector",
+		"description": "Passive income",
+		"cost": 5000.0,
+		"cost_exponent": 1.3,
+		"max_level": -1,
+		"order": 0
+	},
+	"splash_guard": {
+		"name": "Splash Guard",
+		"description": "Stamina efficiency",
+		"cost": 2000.0,
+		"cost_exponent": 1.35,
+		"max_level": -1,
+		"order": 1
+	},
+	"auto_seller": {
+		"name": "Auto-Seller",
+		"description": "Auto-sell when full",
+		"cost": 10000.0,
+		"cost_exponent": 1.0,
+		"max_level": 1,
+		"order": 2
+	},
+	"lucky_charm": {
+		"name": "Lucky Charm",
+		"description": "Bonus money chance",
+		"cost": 3000.0,
+		"cost_exponent": 1.4,
+		"max_level": -1,
+		"order": 3
+	}
+}
+
+# Upgrade state
+var upgrades_owned: Dictionary = {
+	"rain_collector": 0,
+	"splash_guard": 0,
+	"auto_seller": 0,
+	"lucky_charm": 0
+}
 
 # Day tracking
 var current_day: int = 1
@@ -296,6 +341,17 @@ func get_stat_value(stat_id: String) -> float:
 		value = minf(value, defn["max_value"])
 	return value
 
+func get_stat_value_at_level(stat_id: String, level: int) -> float:
+	var defn: Dictionary = stat_definitions[stat_id]
+	var value: float
+	if defn.get("scale", "linear") == "exponential":
+		value = defn["base_value"] * pow(defn["growth_rate"], level)
+	else:
+		value = defn["base_value"] + defn["per_level"] * level
+	if defn.has("max_value"):
+		value = minf(value, defn["max_value"])
+	return value
+
 func get_money_multiplier() -> float:
 	return get_stat_value("water_value")
 
@@ -303,7 +359,8 @@ func get_lucky_scoop_chance() -> float:
 	return get_stat_value("lucky_scoop")
 
 func get_stamina_cost() -> float:
-	return maxf(1.0 - get_stat_value("drain_mastery"), 0.5)
+	var base: float = maxf(1.0 - get_stat_value("drain_mastery"), 0.5)
+	return base * get_splash_guard_multiplier()
 
 func get_max_stamina() -> float:
 	return get_stat_value("stamina")
@@ -433,6 +490,9 @@ func sell_water() -> float:
 	var base_mpg: float = swamp_definitions[last_scoop_swamp]["money_per_gallon"]
 	var mpg: float = base_mpg * get_money_multiplier()
 	var earned: float = water_carried * mpg
+	# Lucky Charm: chance for 2x money on sale
+	if get_lucky_charm_chance() > 0.0 and randf() < get_lucky_charm_chance():
+		earned *= 2.0
 	money += earned
 	water_carried = 0.0
 	money_changed.emit(money)
@@ -540,6 +600,52 @@ func get_camel_capacity_upgrade_cost() -> float:
 func get_camel_speed_upgrade_cost() -> float:
 	return CAMEL_SPEED_UPGRADE_BASE * pow(CAMEL_UPGRADE_EXPONENT, camel_speed_level)
 
+# --- Upgrade computed ---
+func get_upgrade_cost(upgrade_id: String) -> float:
+	var defn: Dictionary = upgrade_definitions[upgrade_id]
+	var level: int = upgrades_owned[upgrade_id]
+	return defn["cost"] * pow(defn["cost_exponent"], level)
+
+func get_rain_collector_rate() -> float:
+	var level: int = upgrades_owned["rain_collector"]
+	if level <= 0:
+		return 0.0
+	return 0.50 + 0.30 * (level - 1)
+
+func get_splash_guard_multiplier() -> float:
+	var level: int = upgrades_owned["splash_guard"]
+	if level <= 0:
+		return 1.0
+	return pow(0.85, 1) * pow(0.95, level - 1)
+
+func get_lucky_charm_chance() -> float:
+	var level: int = upgrades_owned["lucky_charm"]
+	if level <= 0:
+		return 0.0
+	return 0.05 + 0.03 * (level - 1)
+
+func has_auto_seller() -> bool:
+	return upgrades_owned["auto_seller"] > 0
+
+func is_upgrade_maxed(upgrade_id: String) -> bool:
+	var defn: Dictionary = upgrade_definitions[upgrade_id]
+	if defn["max_level"] < 0:
+		return false
+	return upgrades_owned[upgrade_id] >= defn["max_level"]
+
+# --- Upgrade actions ---
+func buy_upgrade(upgrade_id: String) -> bool:
+	if is_upgrade_maxed(upgrade_id):
+		return false
+	var cost: float = get_upgrade_cost(upgrade_id)
+	if money < cost:
+		return false
+	money -= cost
+	upgrades_owned[upgrade_id] += 1
+	money_changed.emit(money)
+	upgrade_changed.emit()
+	return true
+
 # --- Camel actions ---
 func buy_camel() -> bool:
 	var cost: float = get_camel_cost()
@@ -645,6 +751,12 @@ func reset_game() -> void:
 	camel_capacity_level = 0
 	camel_speed_level = 0
 	camel_states.clear()
+	upgrades_owned = {
+		"rain_collector": 0,
+		"splash_guard": 0,
+		"auto_seller": 0,
+		"lucky_charm": 0
+	}
 	current_day = 1
 	cycle_progress = 0.2
 	_init_swamp_states()
@@ -659,6 +771,7 @@ func reset_game() -> void:
 	pump_changed.emit()
 	water_carried_changed.emit(0.0, get_stat_value("carrying_capacity"))
 	camel_changed.emit()
+	upgrade_changed.emit()
 	day_changed.emit(current_day)
 
 func regen_stamina(delta: float) -> void:
@@ -696,12 +809,22 @@ func _process(delta: float) -> void:
 			var gallons: float = get_pump_drain_rate() * delta
 			drain_water(target, gallons)
 
+	# Rain Collector passive income
+	var rain_rate: float = get_rain_collector_rate()
+	if rain_rate > 0.0:
+		money += rain_rate * delta
+		money_changed.emit(money)
+
+	# Auto-Seller: sell when inventory full
+	if has_auto_seller() and is_inventory_full():
+		sell_water()
+
 func get_save_data() -> Dictionary:
 	var swamp_save: Array = []
 	for state in swamp_states:
 		swamp_save.append({"gallons_drained": state["gallons_drained"], "completed": state["completed"]})
 	return {
-		"version": 7,
+		"version": 8,
 		"money": money,
 		"current_tool_id": current_tool_id,
 		"tools_owned": tools_owned.duplicate(true),
@@ -716,7 +839,8 @@ func get_save_data() -> Dictionary:
 		"current_day": current_day,
 		"camel_count": camel_count,
 		"camel_capacity_level": camel_capacity_level,
-		"camel_speed_level": camel_speed_level
+		"camel_speed_level": camel_speed_level,
+		"upgrades_owned": upgrades_owned.duplicate(true)
 	}
 
 func load_save_data(data: Dictionary) -> void:
@@ -760,6 +884,13 @@ func load_save_data(data: Dictionary) -> void:
 	camel_speed_level = int(data.get("camel_speed_level", 0))
 	_init_camel_states()
 
+	# Upgrades
+	if data.has("upgrades_owned"):
+		for key in data["upgrades_owned"]:
+			var k: String = key
+			if upgrades_owned.has(k):
+				upgrades_owned[k] = int(data["upgrades_owned"][k])
+
 	# Emit signals
 	money_changed.emit(money)
 	for i in range(swamp_definitions.size()):
@@ -769,3 +900,4 @@ func load_save_data(data: Dictionary) -> void:
 	pump_changed.emit()
 	water_carried_changed.emit(water_carried, get_stat_value("carrying_capacity"))
 	camel_changed.emit()
+	upgrade_changed.emit()

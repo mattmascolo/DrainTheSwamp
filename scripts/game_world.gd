@@ -10,17 +10,17 @@ var cycle_time: float = 0.0
 # Pattern per swamp: entry_slope_top, basin_left, basin_right, exit_slope_top
 # Plus initial left shore and final right shore
 var terrain_points: Array[Vector2] = [
-	Vector2(0, 136), Vector2(80, 136),            # Left shore (high, pump here)
-	Vector2(120, 160), Vector2(170, 160),          # Puddle basin (shallow, depth 24)
-	Vector2(210, 144), Vector2(270, 148),          # Ridge 1 (slopes down)
-	Vector2(350, 200), Vector2(450, 200),          # Pond basin (depth 52)
-	Vector2(520, 164), Vector2(590, 172),          # Ridge 2 (slopes down)
-	Vector2(690, 240), Vector2(810, 240),          # Marsh basin (depth 68)
-	Vector2(890, 196), Vector2(960, 204),          # Ridge 3 (slopes down)
-	Vector2(1060, 284), Vector2(1200, 284),        # Bog basin (depth 80)
-	Vector2(1290, 230), Vector2(1360, 240),        # Ridge 4 (slopes down)
-	Vector2(1480, 330), Vector2(1660, 330),        # Deep Swamp basin (depth 90)
-	Vector2(1760, 280), Vector2(1920, 290),        # Right shore (lowest)
+	Vector2(0, 136), Vector2(80, 136),              # Left shore (pump area)
+	Vector2(108, 158), Vector2(178, 162),            # Puddle: gentle entry, tilted floor (+4)
+	Vector2(214, 140), Vector2(278, 150),            # Ridge 1
+	Vector2(338, 198), Vector2(462, 203),            # Pond: wide, slight tilt (+5)
+	Vector2(538, 160), Vector2(598, 174),            # Ridge 2
+	Vector2(682, 236), Vector2(828, 243),            # Marsh: wide, tilt (+7)
+	Vector2(908, 192), Vector2(958, 208),            # Ridge 3
+	Vector2(1048, 280), Vector2(1215, 289),          # Bog: wide, tilt (+9)
+	Vector2(1308, 226), Vector2(1358, 244),          # Ridge 4
+	Vector2(1468, 326), Vector2(1685, 336),          # Deep Swamp: very wide, tilt (+10)
+	Vector2(1775, 276), Vector2(1920, 290),          # Right shore
 ]
 
 # Swamp geometry indices: swamp i -> terrain_points indices
@@ -129,6 +129,7 @@ func _ready() -> void:
 	_build_seaweed()
 	_build_turtles()
 	_build_tadpoles()
+	_build_right_boundary()
 
 	GameManager.water_level_changed.connect(_on_water_level_changed)
 	GameManager.swamp_completed.connect(_on_swamp_completed)
@@ -387,17 +388,17 @@ func _build_terrain_details() -> void:
 	# Rocks scattered on ridges and shores
 	var rock_positions: Array[Vector2] = [
 		Vector2(30, 134), Vector2(64, 134),
-		Vector2(220, 142), Vector2(240, 142),
-		Vector2(530, 162), Vector2(570, 170),
-		Vector2(910, 194), Vector2(940, 202),
-		Vector2(1310, 228), Vector2(1350, 238),
-		Vector2(1790, 278), Vector2(1880, 288),
+		Vector2(220, 138), Vector2(245, 148),
+		Vector2(545, 162), Vector2(580, 170),
+		Vector2(912, 190), Vector2(948, 206),
+		Vector2(1316, 224), Vector2(1348, 242),
+		Vector2(1790, 274), Vector2(1880, 288),
 	]
 	for rp in rock_positions:
 		_place_rock(rp, randf_range(4, 10), randf_range(4, 8))
 
 	# Dirt specks on terrain surface
-	for i in range(40):
+	for i in range(60):
 		var rx: float = randf_range(0, 1920)
 		var ry: float = _get_terrain_y_at(rx)
 		if ry > 0:
@@ -408,6 +409,88 @@ func _build_terrain_details() -> void:
 			speck.color.a = randf_range(0.3, 0.6)
 			speck.z_index = 0
 			add_child(speck)
+
+	# Soil strata lines - horizontal bands of slightly different color
+	for i in range(25):
+		var rx: float = randf_range(0, 1800)
+		var ry: float = _get_terrain_y_at(rx)
+		if ry > 0:
+			var stratum := ColorRect.new()
+			var depth: float = randf_range(14, 50)
+			stratum.position = Vector2(rx, ry + depth)
+			stratum.size = Vector2(randf_range(20, 80), randf_range(1, 3))
+			var shade: float = randf_range(0.0, 0.3)
+			stratum.color = Color(0.35 + shade * 0.1, 0.22 + shade * 0.1, 0.08 + shade * 0.06, randf_range(0.2, 0.4))
+			stratum.z_index = 0
+			add_child(stratum)
+
+	# Small pebbles embedded in dirt
+	for i in range(35):
+		var rx: float = randf_range(0, 1920)
+		var ry: float = _get_terrain_y_at(rx)
+		if ry > 0:
+			var pebble := ColorRect.new()
+			pebble.position = Vector2(rx, ry + randf_range(1, 8))
+			var sz: float = randf_range(2, 4)
+			pebble.size = Vector2(sz, sz * randf_range(0.6, 1.0))
+			pebble.color = ROCK_COLOR.lerp(ROCK_DARK_COLOR, randf())
+			pebble.color.a = randf_range(0.5, 0.8)
+			pebble.z_index = 0
+			add_child(pebble)
+
+	# Root-like dark lines near surface
+	for i in range(18):
+		var rx: float = randf_range(0, 1900)
+		var ry: float = _get_terrain_y_at(rx)
+		if ry > 0:
+			var root := Line2D.new()
+			root.width = randf_range(1.0, 2.0)
+			root.default_color = Color(0.22, 0.14, 0.06, randf_range(0.25, 0.5))
+			root.z_index = 0
+			var segments: int = randi_range(3, 6)
+			var px: float = rx
+			var py: float = ry + randf_range(4, 16)
+			for j in range(segments):
+				root.add_point(Vector2(px, py))
+				px += randf_range(6, 18)
+				py += randf_range(-3, 5)
+			add_child(root)
+
+	# Dark dirt patches (clay/humus areas)
+	for i in range(12):
+		var rx: float = randf_range(0, 1900)
+		var ry: float = _get_terrain_y_at(rx)
+		if ry > 0:
+			var patch := ColorRect.new()
+			patch.position = Vector2(rx, ry + randf_range(6, 30))
+			patch.size = Vector2(randf_range(12, 40), randf_range(6, 16))
+			patch.color = Color(0.3, 0.18, 0.06, randf_range(0.15, 0.3))
+			patch.z_index = 0
+			add_child(patch)
+
+	# Sandy/lighter patches on ridges
+	for i in range(10):
+		var rx: float = randf_range(0, 1900)
+		var ry: float = _get_terrain_y_at(rx)
+		if ry > 0:
+			var sandy := ColorRect.new()
+			sandy.position = Vector2(rx, ry + randf_range(1, 6))
+			sandy.size = Vector2(randf_range(8, 24), randf_range(3, 8))
+			sandy.color = Color(0.55, 0.42, 0.25, randf_range(0.15, 0.3))
+			sandy.z_index = 0
+			add_child(sandy)
+
+	# Small worm holes / burrows
+	for i in range(8):
+		var rx: float = randf_range(50, 1880)
+		var ry: float = _get_terrain_y_at(rx)
+		if ry > 0:
+			var hole := ColorRect.new()
+			hole.position = Vector2(rx, ry + randf_range(1, 4))
+			hole.size = Vector2(3, 3)
+			hole.color = Color(0.15, 0.08, 0.02, 0.5)
+			hole.z_index = 0
+			add_child(hole)
 
 func _place_rock(pos: Vector2, w: float, h: float) -> void:
 	var rock := Polygon2D.new()
@@ -650,7 +733,7 @@ func _update_depth_gradient(swamp_index: int) -> void:
 	var basin_left: Vector2 = geo["basin_left"]
 	var basin_right: Vector2 = geo["basin_right"]
 	var exit_top: Vector2 = geo["exit_top"]
-	var basin_y: float = basin_left.y
+	var basin_y: float = maxf(basin_left.y, basin_right.y)
 	var overflow_y: float = maxf(entry_top.y, exit_top.y)
 	var water_y: float = basin_y - fill * (basin_y - overflow_y)
 	# Depth zone covers bottom 60% of water
@@ -659,8 +742,8 @@ func _update_depth_gradient(swamp_index: int) -> void:
 	var right_x: float = _lerp_x_at_y(basin_right, exit_top, depth_y)
 	depth_polygons[swamp_index].polygon = PackedVector2Array([
 		Vector2(left_x, depth_y),
-		Vector2(basin_left.x, basin_y),
-		Vector2(basin_right.x, basin_y),
+		Vector2(basin_left.x, basin_left.y),
+		Vector2(basin_right.x, basin_right.y),
 		Vector2(right_x, depth_y),
 	])
 
@@ -1579,7 +1662,8 @@ func _update_water_polygon(swamp_index: int) -> void:
 		water_surface_lines[swamp_index].clear_points()
 		return
 
-	var basin_y: float = basin_left.y
+	# Use the deeper basin point as reference for water level
+	var basin_y: float = maxf(basin_left.y, basin_right.y)
 	var overflow_y: float = maxf(entry_top.y, exit_top.y)
 	var water_y: float = basin_y - fill * (basin_y - overflow_y)
 
@@ -1588,8 +1672,8 @@ func _update_water_polygon(swamp_index: int) -> void:
 
 	var points := PackedVector2Array()
 	points.append(Vector2(left_x, water_y))
-	points.append(Vector2(basin_left.x, basin_y))
-	points.append(Vector2(basin_right.x, basin_y))
+	points.append(Vector2(basin_left.x, basin_left.y))
+	points.append(Vector2(basin_right.x, basin_right.y))
 	points.append(Vector2(right_x, water_y))
 
 	water_polygons[swamp_index].polygon = points
@@ -1668,7 +1752,7 @@ func _update_water_walls(swamp_index: int) -> void:
 	var basin_right: Vector2 = geo["basin_right"]
 	var exit_top: Vector2 = geo["exit_top"]
 
-	var basin_y: float = basin_left.y
+	var basin_y: float = maxf(basin_left.y, basin_right.y)
 	var overflow_y: float = maxf(entry_top.y, exit_top.y)
 	var water_y: float = basin_y - fill * (basin_y - overflow_y)
 
@@ -1677,6 +1761,18 @@ func _update_water_walls(swamp_index: int) -> void:
 
 	left_body.position = Vector2(left_x, water_y - 28)
 	right_body.position = Vector2(right_x, water_y - 28)
+
+# --- Right Boundary Wall ---
+func _build_right_boundary() -> void:
+	var last_point: Vector2 = terrain_points[terrain_points.size() - 1]
+	var wall_body := StaticBody2D.new()
+	wall_body.position = Vector2(last_point.x + 4, last_point.y - 60)
+	var col := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(8, 200)
+	col.shape = rect
+	wall_body.add_child(col)
+	add_child(wall_body)
 
 # --- Water Detection ---
 func _build_water_detect_areas() -> void:
