@@ -807,24 +807,32 @@ func _build_vegetation() -> void:
 		# Place cattails near entry slope
 		for j in range(randi_range(2, 4)):
 			var cx: float = entry_top.x + randf_range(-10, 16)
-			var cy: float = entry_top.y + randf_range(-4, 6)
+			var cy: float = _get_terrain_y_at(cx) + randf_range(0, 3)
 			_place_cattail(Vector2(cx, cy))
 
 		# Place cattails near exit slope
 		for j in range(randi_range(1, 3)):
 			var cx: float = exit_top.x + randf_range(-16, 10)
-			var cy: float = exit_top.y + randf_range(-4, 6)
+			var cy: float = _get_terrain_y_at(cx) + randf_range(0, 3)
 			_place_cattail(Vector2(cx, cy))
 
-	# Grass tufts on ridges
+	# Grass tufts on ridges (skip basin floors)
 	for i in range(terrain_points.size()):
+		# Basin floor indices: 4*s+2, 4*s+3 for each swamp
+		var is_basin: bool = false
+		for s in range(SWAMP_COUNT):
+			if i == 4 * s + 2 or i == 4 * s + 3:
+				is_basin = true
+				break
+		if is_basin:
+			continue
 		var pt: Vector2 = terrain_points[i]
 		# Only on relatively flat areas (ridges, shores)
 		if i > 0 and i < terrain_points.size() - 1:
 			var dy: float = absf(terrain_points[i + 1].y - pt.y) / absf(terrain_points[i + 1].x - pt.x + 0.01)
 			if dy < 0.3:  # Mostly flat
 				for j in range(randi_range(2, 5)):
-					var gx: float = pt.x + randf_range(-20, 20)
+					var gx: float = pt.x + randf_range(-15, 15)
 					_place_grass_tuft(Vector2(gx, _get_terrain_y_at(gx)))
 
 	# Flowers scattered on shore and ridges
@@ -836,19 +844,20 @@ func _build_vegetation() -> void:
 		var fx: float = randf_range(10, 1900)
 		var fy: float = _get_terrain_y_at(fx)
 		if fy > 0:
+			var stem_h: float = randf_range(4, 7)
+			var stem := ColorRect.new()
+			stem.position = Vector2(fx + 1.0, fy - stem_h)
+			stem.size = Vector2(2, stem_h)
+			stem.color = Color(0.2, 0.4, 0.15)
+			stem.z_index = 1
+			add_child(stem)
+
 			var flower := ColorRect.new()
-			flower.position = Vector2(fx, fy - randf_range(4, 8))
+			flower.position = Vector2(fx, fy - stem_h - 3)
 			flower.size = Vector2(4, 4)
 			flower.color = flower_colors[randi() % flower_colors.size()]
 			flower.z_index = 1
 			add_child(flower)
-
-			var stem := ColorRect.new()
-			stem.position = Vector2(fx + 1.0, fy - 2)
-			stem.size = Vector2(2, 4)
-			stem.color = Color(0.2, 0.4, 0.15)
-			stem.z_index = 1
-			add_child(stem)
 
 func _place_cattail(pos: Vector2) -> void:
 	var cattail := Node2D.new()
@@ -1175,13 +1184,16 @@ func _build_ferns() -> void:
 		var exit_top: Vector2 = geo["exit_top"]
 		# Near entry
 		for j in range(randi_range(1, 2)):
-			_place_fern(Vector2(entry_top.x + randf_range(-16, 8), entry_top.y))
+			var fx: float = entry_top.x + randf_range(-16, 8)
+			_place_fern(Vector2(fx, _get_terrain_y_at(fx)))
 		# Near exit
 		for j in range(randi_range(1, 2)):
-			_place_fern(Vector2(exit_top.x + randf_range(-8, 16), exit_top.y))
+			var fx: float = exit_top.x + randf_range(-8, 16)
+			_place_fern(Vector2(fx, _get_terrain_y_at(fx)))
 
 func _place_fern(pos: Vector2) -> void:
 	var fern := Node2D.new()
+	fern.position = pos
 	fern.z_index = 1
 	add_child(fern)
 	ferns_list.append(fern)
@@ -1193,11 +1205,11 @@ func _place_fern(pos: Vector2) -> void:
 		frond.default_color = Color(0.15, green_val, 0.1, 0.8)
 		var angle: float = randf_range(-1.2, 1.2)
 		var length: float = randf_range(6, 14)
-		var mid_x: float = pos.x + sin(angle) * length * 0.5
-		var mid_y: float = pos.y - length * 0.5
-		var tip_x: float = pos.x + sin(angle) * length
-		var tip_y: float = pos.y - length * 0.3
-		frond.add_point(pos)
+		var mid_x: float = sin(angle) * length * 0.5
+		var mid_y: float = -length * 0.5
+		var tip_x: float = sin(angle) * length
+		var tip_y: float = -length * 0.3
+		frond.add_point(Vector2.ZERO)
 		frond.add_point(Vector2(mid_x, mid_y))
 		frond.add_point(Vector2(tip_x, tip_y))
 		fern.add_child(frond)
@@ -1213,7 +1225,7 @@ func _spawn_leaf() -> void:
 		leaf.color = Color(0.5, 0.35, 0.15, 0.7)
 	else:
 		leaf.color = Color(0.25, 0.45, 0.15, 0.7)
-	var start_y: float = randf_range(60, 200)
+	var start_y: float = randf_range(40, 110)
 	leaf.position = Vector2(-10, start_y)
 	leaf.z_index = 5
 	add_child(leaf)
@@ -1221,7 +1233,7 @@ func _spawn_leaf() -> void:
 		"node": leaf,
 		"speed": randf_range(15, 35),
 		"wobble_phase": randf() * TAU,
-		"wobble_amp": randf_range(8, 20),
+		"wobble_amp": randf_range(6, 14),
 		"lifetime": 0.0,
 		"max_life": randf_range(12, 25),
 		"base_y": start_y,
@@ -3236,7 +3248,7 @@ func _init_drain_thresholds() -> void:
 func _spawn_drain_plant(sx: float, sy: float) -> void:
 	var plant := Node2D.new()
 	plant.position = Vector2(sx, sy)
-	plant.z_index = 2
+	plant.z_index = 1
 	plant.scale = Vector2(0.0, 0.0)
 	add_child(plant)
 
@@ -3421,10 +3433,8 @@ func _process(delta: float) -> void:
 		if fill_now < fill_prev - 0.05:
 			last_drain_thresholds[i] = fill_now
 			var geo: Dictionary = _get_swamp_geometry(i)
-			var bx: float = randf_range(geo["basin_left"].x - 15, geo["basin_right"].x + 15)
+			var bx: float = randf_range(geo["basin_left"].x, geo["basin_right"].x)
 			var by: float = _get_terrain_y_at(bx)
-			if by < 0:
-				by = geo["basin_left"].y
 			if grown_plants.size() < 80:
 				_spawn_drain_plant(bx, by)
 
@@ -3593,7 +3603,7 @@ func _process(delta: float) -> void:
 		var node: ColorRect = ld["node"]
 		node.position.x += ld["speed"] * delta
 		var leaf_y: float = ld["base_y"] + sin(wave_time * 1.2 + ld["wobble_phase"]) * ld["wobble_amp"]
-		node.position.y = minf(leaf_y, _get_terrain_y_at(node.position.x) - 10.0)
+		node.position.y = minf(leaf_y, _get_terrain_y_at(node.position.x) - 25.0)
 		node.rotation += delta * 0.8
 		# Fade near end of life
 		var life_frac: float = ld["lifetime"] / ld["max_life"]
