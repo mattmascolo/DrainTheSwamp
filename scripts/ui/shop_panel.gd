@@ -394,13 +394,10 @@ func _get_upgrade_tooltip(uid: String, defn: Dictionary, level: int) -> String:
 			else:
 				tip += "\nBase: 5% chance for 2x money, +3% per level"
 		"auto_scooper":
-			if level > 0:
-				var cur_interval: float = GameManager.get_auto_scoop_interval()
-				tip += "\nScoop every %.2fs" % cur_interval
-				var next_interval: float = maxf(0.5 * pow(0.92, level), 0.1)
-				tip += "\nNext: %.2fs (-8%%)" % next_interval
-			else:
-				tip += "\nAuto-scoop when near water\nBase: every 0.50s, -8% per level"
+			var cur_interval: float = GameManager.get_auto_scoop_interval()
+			tip += "\nScoop every %.2fs" % cur_interval
+			var next_interval: float = maxf(2.5 * pow(0.88, level + 1), 0.1)
+			tip += "\nNext: %.2fs (-12%%)" % next_interval
 	if not GameManager.is_upgrade_maxed(uid):
 		tip += "\nCost: %s" % Economy.format_money(GameManager.get_upgrade_cost(uid))
 	return tip

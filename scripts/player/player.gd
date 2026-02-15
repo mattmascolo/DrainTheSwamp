@@ -126,9 +126,9 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_pressed("scoop") and scoop_cooldown_timer <= 0.0:
 		_handle_scoop()
 
-	# Auto-Scooper upgrade: auto-scoop on timer when near water
+	# Auto-scoop on timer when near water (always active, upgrades speed it up)
 	var auto_interval: float = GameManager.get_auto_scoop_interval()
-	if auto_interval > 0.0 and near_water and near_swamp_index >= 0:
+	if near_water and near_swamp_index >= 0:
 		auto_scoop_timer += delta
 		if auto_scoop_timer >= auto_interval:
 			auto_scoop_timer -= auto_interval

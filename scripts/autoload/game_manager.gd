@@ -629,10 +629,8 @@ func has_auto_seller() -> bool:
 
 func get_auto_scoop_interval() -> float:
 	var level: int = upgrades_owned["auto_scooper"]
-	if level <= 0:
-		return 0.0
-	# Level 1: 0.5s, each level reduces by ~8%, min 0.1s
-	return maxf(0.5 * pow(0.92, level - 1), 0.1)
+	# Always active: base 2.5s, each upgrade level reduces by ~12%, min 0.1s
+	return maxf(2.5 * pow(0.88, level), 0.1)
 
 func is_upgrade_maxed(upgrade_id: String) -> bool:
 	var defn: Dictionary = upgrade_definitions[upgrade_id]
