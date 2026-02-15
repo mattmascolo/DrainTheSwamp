@@ -17,7 +17,7 @@ var flash_tween: Tween = null
 var tool_tween: Tween = null
 var walk_time: float = 0.0
 var is_walking: bool = false
-var dust_timer: float = 0.0
+var prev_walk_sin: float = 0.0
 var auto_scoop_timer: float = 0.0
 
 @onready var visual: Node2D = $Visual
@@ -30,6 +30,8 @@ var auto_scoop_timer: float = 0.0
 @onready var boot_lace_right: ColorRect = $Visual/BootLaceRight
 @onready var arm_right: ColorRect = $Visual/ArmRight
 @onready var hand_right: ColorRect = $Visual/HandRight
+@onready var arm_left: ColorRect = $Visual/ArmLeft
+@onready var hand_left: ColorRect = $Visual/HandLeft
 
 # Tool visual elements (built dynamically)
 var tool_visuals: Array[ColorRect] = []
@@ -77,41 +79,69 @@ func _physics_process(delta: float) -> void:
 	# Walk animation
 	if is_walking:
 		walk_time += delta * 8.0
-		var bob: float = sin(walk_time) * 1.6
+		var walk_sin: float = sin(walk_time)
+
+		# Body bob + squash/stretch
+		var bob: float = walk_sin * 2.0
 		visual.position.y = bob
-		# Leg animation
-		var leg_offset: float = sin(walk_time) * 3.0
-		boot_left.position.y = -8.0 + leg_offset
-		boot_right.position.y = -8.0 - leg_offset
-		boot_sole_left.position.y = -2.0 + leg_offset
-		boot_sole_right.position.y = -2.0 - leg_offset
-		boot_lace_left.position.y = -6.0 + leg_offset
-		boot_lace_right.position.y = -6.0 - leg_offset
-		# Arm swing
-		var arm_offset: float = sin(walk_time + PI) * 2.0
-		arm_right.position.y = -24.0 + arm_offset
-		hand_right.position.y = -13.0 + arm_offset
-		# Tool swings with the arm
-		tool_sprite.rotation = sin(walk_time + PI) * 0.15
-		# Dust particles
-		dust_timer += delta
-		if dust_timer >= 0.25:
-			dust_timer = 0.0
-			_spawn_dust()
+		visual.scale.y = 1.0 + cos(walk_time * 2.0) * 0.03
+
+		# Body lean into movement direction
+		visual.rotation = direction * 0.03
+
+		# Leg animation with forward/back stride
+		var leg_y: float = walk_sin * 3.5
+		var leg_x: float = walk_sin * 2.0
+		boot_left.position.y = -8.0 + leg_y
+		boot_left.position.x = leg_x
+		boot_right.position.y = -8.0 - leg_y
+		boot_right.position.x = -leg_x
+		boot_sole_left.position.y = -2.0 + leg_y
+		boot_sole_left.position.x = leg_x
+		boot_sole_right.position.y = -2.0 - leg_y
+		boot_sole_right.position.x = -leg_x
+		boot_lace_left.position.y = -6.0 + leg_y
+		boot_lace_left.position.x = leg_x
+		boot_lace_right.position.y = -6.0 - leg_y
+		boot_lace_right.position.x = -leg_x
+
+		# Both arms swing (opposite to their respective legs)
+		var arm_left_offset: float = sin(walk_time) * 2.5
+		var arm_right_offset: float = sin(walk_time + PI) * 2.5
+		arm_left.position.y = -24.0 + arm_left_offset
+		hand_left.position.y = -13.0 + arm_left_offset
+		arm_right.position.y = -24.0 + arm_right_offset
+		hand_right.position.y = -13.0 + arm_right_offset
+
+		# Tool swings with the right arm
+		tool_sprite.rotation = sin(walk_time + PI) * 0.2
+
+		# Footstep dust: detect zero-crossings of walk_sin
+		if prev_walk_sin > 0.0 and walk_sin <= 0.0:
+			# Left foot lands
+			_spawn_dust_puff(boot_left.position.x)
+		elif prev_walk_sin < 0.0 and walk_sin >= 0.0:
+			# Right foot lands
+			_spawn_dust_puff(boot_right.position.x)
+		prev_walk_sin = walk_sin
 	else:
 		walk_time = 0.0
+		prev_walk_sin = 0.0
 		var breath: float = sin(Time.get_ticks_msec() * 0.003) * 0.6
 		visual.position.y = breath
-		boot_left.position.y = -8.0
-		boot_right.position.y = -8.0
-		boot_sole_left.position.y = -2.0
-		boot_sole_right.position.y = -2.0
-		boot_lace_left.position.y = -6.0
-		boot_lace_right.position.y = -6.0
+		visual.scale.y = 1.0
+		visual.rotation = 0.0
+		boot_left.position = Vector2(0.0, -8.0)
+		boot_right.position = Vector2(0.0, -8.0)
+		boot_sole_left.position = Vector2(0.0, -2.0)
+		boot_sole_right.position = Vector2(0.0, -2.0)
+		boot_lace_left.position = Vector2(0.0, -6.0)
+		boot_lace_right.position = Vector2(0.0, -6.0)
+		arm_left.position.y = -24.0
+		hand_left.position.y = -13.0
 		arm_right.position.y = -24.0
 		hand_right.position.y = -13.0
 		tool_sprite.rotation = 0.0
-		dust_timer = 0.0
 
 	# Scoop cooldown
 	if scoop_cooldown_timer > 0.0:
@@ -389,15 +419,21 @@ func set_near_water(value: bool, swamp_index: int = -1) -> void:
 			near_water = false
 			near_swamp_index = -1
 
-func _spawn_dust() -> void:
-	for i in range(2):
-		var dot := ColorRect.new()
-		dot.size = Vector2(3, 2)
-		dot.color = Color(0.45, 0.35, 0.2, 0.6)
-		dot.position = Vector2(randf_range(-6, 6), -2)
-		dot.z_index = -1
-		add_child(dot)
+func _spawn_dust_puff(foot_x: float) -> void:
+	var sizes: Array[Vector2] = [Vector2(4, 3), Vector2(3, 3), Vector2(5, 3)]
+	for i in range(3):
+		var puff := ColorRect.new()
+		puff.size = sizes[i]
+		var r_var: float = randf_range(-0.05, 0.05)
+		puff.color = Color(0.55 + r_var, 0.45 + r_var, 0.3 + r_var, 0.5)
+		puff.position = Vector2(foot_x + randf_range(-2, 2), -2 + randf_range(-1, 1))
+		puff.z_index = -1
+		add_child(puff)
+
 		var tw := create_tween()
-		tw.tween_property(dot, "position", dot.position + Vector2(randf_range(-8, 8), randf_range(-6, -2)), 0.5)
-		tw.parallel().tween_property(dot, "modulate:a", 0.0, 0.5)
-		tw.tween_callback(dot.queue_free)
+		tw.set_parallel(true)
+		tw.tween_property(puff, "size", puff.size + Vector2(2, 2), 0.5)
+		tw.tween_property(puff, "position", puff.position + Vector2(randf_range(-4, 4), randf_range(-8, -4)), 0.6)
+		tw.tween_property(puff, "modulate:a", 0.0, 0.6)
+		tw.set_parallel(false)
+		tw.tween_callback(puff.queue_free)
