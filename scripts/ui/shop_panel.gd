@@ -397,7 +397,7 @@ func _get_upgrade_tooltip(uid: String, defn: Dictionary, level: int) -> String:
 			if level > 0:
 				var cur_interval: float = GameManager.get_auto_scoop_interval()
 				tip += "\nScoop every %.2fs" % cur_interval
-				var next_interval: float = maxf(0.5 * pow(0.92, level), 0.08)
+				var next_interval: float = maxf(0.5 * pow(0.92, level), 0.1)
 				tip += "\nNext: %.2fs (-8%%)" % next_interval
 			else:
 				tip += "\nAuto-scoop when near water\nBase: every 0.50s, -8% per level"

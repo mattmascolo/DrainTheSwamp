@@ -272,8 +272,8 @@ var upgrade_definitions: Dictionary = {
 	"auto_scooper": {
 		"name": "Auto-Scooper",
 		"description": "Auto scoop near water",
-		"cost": 15000.0,
-		"cost_exponent": 1.45,
+		"cost": 500.0,
+		"cost_exponent": 1.8,
 		"max_level": -1,
 		"order": 4
 	}
@@ -631,8 +631,8 @@ func get_auto_scoop_interval() -> float:
 	var level: int = upgrades_owned["auto_scooper"]
 	if level <= 0:
 		return 0.0
-	# Level 1: 0.5s, each level reduces by ~8%, min 0.08s
-	return maxf(0.5 * pow(0.92, level - 1), 0.08)
+	# Level 1: 0.5s, each level reduces by ~8%, min 0.1s
+	return maxf(0.5 * pow(0.92, level - 1), 0.1)
 
 func is_upgrade_maxed(upgrade_id: String) -> bool:
 	var defn: Dictionary = upgrade_definitions[upgrade_id]
