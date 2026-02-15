@@ -39,7 +39,7 @@ func _on_reset_confirmed() -> void:
 	_close_all_panels()
 	GameManager.reset_game()
 	SaveManager.save_game()
-	player.position = Vector2(20, 63)
+	player.position = Vector2(40, 126)
 	player.velocity = Vector2.ZERO
 	player.near_water = false
 	player.near_swamp_index = -1

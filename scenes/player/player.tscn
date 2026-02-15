@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_script"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
-size = Vector2(8, 16)
+size = Vector2(16, 32)
 
 [node name="Player" type="CharacterBody2D"]
 script = ExtResource("1_script")
@@ -11,134 +11,134 @@ script = ExtResource("1_script")
 [node name="Visual" type="Node2D" parent="."]
 
 [node name="Shadow" type="ColorRect" parent="Visual"]
-offset_left = -4.0
-offset_top = -2.0
-offset_right = 4.0
+offset_left = -8.0
+offset_top = -4.0
+offset_right = 8.0
 offset_bottom = 0.0
 color = Color(0, 0, 0, 0.25)
 
 [node name="BootLeft" type="ColorRect" parent="Visual"]
-offset_left = -3.0
-offset_top = -4.0
-offset_right = -0.5
+offset_left = -6.0
+offset_top = -8.0
+offset_right = -1.0
 offset_bottom = 0.0
 color = Color(0.25, 0.15, 0.08, 1)
 
 [node name="BootRight" type="ColorRect" parent="Visual"]
-offset_left = 0.5
-offset_top = -4.0
-offset_right = 3.0
+offset_left = 1.0
+offset_top = -8.0
+offset_right = 6.0
 offset_bottom = 0.0
 color = Color(0.22, 0.12, 0.06, 1)
 
 [node name="Pants" type="ColorRect" parent="Visual"]
-offset_left = -3.0
-offset_top = -7.0
-offset_right = 3.0
-offset_bottom = -4.0
+offset_left = -6.0
+offset_top = -14.0
+offset_right = 6.0
+offset_bottom = -8.0
 color = Color(0.3, 0.25, 0.18, 1)
 
 [node name="Belt" type="ColorRect" parent="Visual"]
-offset_left = -3.0
-offset_top = -8.0
-offset_right = 3.0
-offset_bottom = -7.0
+offset_left = -6.0
+offset_top = -16.0
+offset_right = 6.0
+offset_bottom = -14.0
 color = Color(0.35, 0.2, 0.1, 1)
 
 [node name="Shirt" type="ColorRect" parent="Visual"]
-offset_left = -3.0
-offset_top = -12.0
-offset_right = 3.0
-offset_bottom = -8.0
+offset_left = -6.0
+offset_top = -24.0
+offset_right = 6.0
+offset_bottom = -16.0
 color = Color(0.2, 0.4, 0.65, 1)
 
 [node name="ShirtStripe" type="ColorRect" parent="Visual"]
-offset_left = -1.0
-offset_top = -11.0
-offset_right = 1.0
-offset_bottom = -9.0
+offset_left = -2.0
+offset_top = -22.0
+offset_right = 2.0
+offset_bottom = -18.0
 color = Color(0.25, 0.48, 0.75, 1)
 
 [node name="ArmLeft" type="ColorRect" parent="Visual"]
-offset_left = -4.0
-offset_top = -12.0
-offset_right = -3.0
-offset_bottom = -6.0
-color = Color(0.82, 0.62, 0.42, 1)
-
-[node name="ArmRight" type="ColorRect" parent="Visual"]
-offset_left = 3.0
-offset_top = -12.0
-offset_right = 4.0
-offset_bottom = -6.0
-color = Color(0.78, 0.58, 0.38, 1)
-
-[node name="Neck" type="ColorRect" parent="Visual"]
-offset_left = -1.0
-offset_top = -13.0
-offset_right = 1.0
+offset_left = -8.0
+offset_top = -24.0
+offset_right = -6.0
 offset_bottom = -12.0
 color = Color(0.82, 0.62, 0.42, 1)
 
+[node name="ArmRight" type="ColorRect" parent="Visual"]
+offset_left = 6.0
+offset_top = -24.0
+offset_right = 8.0
+offset_bottom = -12.0
+color = Color(0.78, 0.58, 0.38, 1)
+
+[node name="Neck" type="ColorRect" parent="Visual"]
+offset_left = -2.0
+offset_top = -26.0
+offset_right = 2.0
+offset_bottom = -24.0
+color = Color(0.82, 0.62, 0.42, 1)
+
 [node name="Head" type="ColorRect" parent="Visual"]
-offset_left = -3.0
-offset_top = -17.0
-offset_right = 3.0
-offset_bottom = -13.0
+offset_left = -6.0
+offset_top = -34.0
+offset_right = 6.0
+offset_bottom = -26.0
 color = Color(0.85, 0.65, 0.45, 1)
 
 [node name="EyeLeft" type="ColorRect" parent="Visual"]
-offset_left = -2.0
-offset_top = -16.0
-offset_right = -1.0
-offset_bottom = -15.0
+offset_left = -4.0
+offset_top = -32.0
+offset_right = -2.0
+offset_bottom = -30.0
 color = Color(0.15, 0.15, 0.2, 1)
 
 [node name="EyeRight" type="ColorRect" parent="Visual"]
-offset_left = 1.0
-offset_top = -16.0
-offset_right = 2.0
-offset_bottom = -15.0
+offset_left = 2.0
+offset_top = -32.0
+offset_right = 4.0
+offset_bottom = -30.0
 color = Color(0.15, 0.15, 0.2, 1)
 
 [node name="Hair" type="ColorRect" parent="Visual"]
-offset_left = -3.0
-offset_top = -18.0
-offset_right = 3.0
-offset_bottom = -17.0
+offset_left = -6.0
+offset_top = -36.0
+offset_right = 6.0
+offset_bottom = -34.0
 color = Color(0.35, 0.2, 0.1, 1)
 
 [node name="HatBrim" type="ColorRect" parent="Visual"]
-offset_left = -4.0
-offset_top = -19.0
-offset_right = 4.0
-offset_bottom = -18.0
+offset_left = -8.0
+offset_top = -38.0
+offset_right = 8.0
+offset_bottom = -36.0
 color = Color(0.22, 0.42, 0.15, 1)
 
 [node name="HatTop" type="ColorRect" parent="Visual"]
-offset_left = -3.0
-offset_top = -21.0
-offset_right = 3.0
-offset_bottom = -19.0
+offset_left = -6.0
+offset_top = -42.0
+offset_right = 6.0
+offset_bottom = -38.0
 color = Color(0.28, 0.5, 0.2, 1)
 
 [node name="HatBand" type="ColorRect" parent="Visual"]
-offset_left = -3.0
-offset_top = -19.5
-offset_right = 3.0
-offset_bottom = -19.0
+offset_left = -6.0
+offset_top = -39.0
+offset_right = 6.0
+offset_bottom = -38.0
 color = Color(0.6, 0.4, 0.15, 1)
 
 [node name="ToolSprite" type="Node2D" parent="Visual"]
-position = Vector2(4, -8)
+position = Vector2(8, -16)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(0, -10)
+position = Vector2(0, -20)
 shape = SubResource("RectangleShape2D_body")
 
 [node name="Camera2D" type="Camera2D" parent="."]
-offset = Vector2(0, -10)
-limit_left = -10
-limit_top = -30
-limit_right = 970
-limit_bottom = 220
+offset = Vector2(0, -20)
+limit_left = -20
+limit_top = -60
+limit_right = 1940
+limit_bottom = 440

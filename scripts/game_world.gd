@@ -10,17 +10,17 @@ var cycle_time: float = 0.0
 # Pattern per swamp: entry_slope_top, basin_left, basin_right, exit_slope_top
 # Plus initial left shore and final right shore
 var terrain_points: Array[Vector2] = [
-	Vector2(0, 68), Vector2(40, 68),            # Left shore (high, pump here)
-	Vector2(60, 80), Vector2(85, 80),           # Puddle basin (shallow, depth 12)
-	Vector2(105, 72), Vector2(135, 74),         # Ridge 1 (slopes down)
-	Vector2(175, 100), Vector2(225, 100),       # Pond basin (depth 26)
-	Vector2(260, 82), Vector2(295, 86),         # Ridge 2 (slopes down)
-	Vector2(345, 120), Vector2(405, 120),       # Marsh basin (depth 34)
-	Vector2(445, 98), Vector2(480, 102),        # Ridge 3 (slopes down)
-	Vector2(530, 142), Vector2(600, 142),       # Bog basin (depth 40)
-	Vector2(645, 115), Vector2(680, 120),       # Ridge 4 (slopes down)
-	Vector2(740, 165), Vector2(830, 165),       # Deep Swamp basin (depth 45)
-	Vector2(880, 140), Vector2(960, 145),       # Right shore (lowest)
+	Vector2(0, 136), Vector2(80, 136),            # Left shore (high, pump here)
+	Vector2(120, 160), Vector2(170, 160),          # Puddle basin (shallow, depth 24)
+	Vector2(210, 144), Vector2(270, 148),          # Ridge 1 (slopes down)
+	Vector2(350, 200), Vector2(450, 200),          # Pond basin (depth 52)
+	Vector2(520, 164), Vector2(590, 172),          # Ridge 2 (slopes down)
+	Vector2(690, 240), Vector2(810, 240),          # Marsh basin (depth 68)
+	Vector2(890, 196), Vector2(960, 204),          # Ridge 3 (slopes down)
+	Vector2(1060, 284), Vector2(1200, 284),        # Bog basin (depth 80)
+	Vector2(1290, 230), Vector2(1360, 240),        # Ridge 4 (slopes down)
+	Vector2(1480, 330), Vector2(1660, 330),        # Deep Swamp basin (depth 90)
+	Vector2(1760, 280), Vector2(1920, 290),        # Right shore (lowest)
 ]
 
 # Swamp geometry indices: swamp i -> terrain_points indices
@@ -76,56 +76,56 @@ func _ready() -> void:
 func _build_sky() -> void:
 	# Three-band sky gradient
 	var sky_top := ColorRect.new()
-	sky_top.position = Vector2(-50, -40)
-	sky_top.size = Vector2(1060, 50)
+	sky_top.position = Vector2(-100, -80)
+	sky_top.size = Vector2(2120, 100)
 	sky_top.color = SKY_COLOR_TOP
 	sky_top.z_index = -12
 	add_child(sky_top)
 
 	var sky_mid := ColorRect.new()
-	sky_mid.position = Vector2(-50, 10)
-	sky_mid.size = Vector2(1060, 40)
+	sky_mid.position = Vector2(-100, 20)
+	sky_mid.size = Vector2(2120, 80)
 	sky_mid.color = SKY_COLOR_MID
 	sky_mid.z_index = -12
 	add_child(sky_mid)
 
 	var sky_bot := ColorRect.new()
-	sky_bot.position = Vector2(-50, 48)
-	sky_bot.size = Vector2(1060, 50)
+	sky_bot.position = Vector2(-100, 96)
+	sky_bot.size = Vector2(2120, 100)
 	sky_bot.color = SKY_COLOR_BOTTOM
 	sky_bot.z_index = -12
 	add_child(sky_bot)
 
 	# Sun with glow
 	var sun_glow := ColorRect.new()
-	sun_glow.position = Vector2(194, 8)
-	sun_glow.size = Vector2(24, 24)
+	sun_glow.position = Vector2(388, 16)
+	sun_glow.size = Vector2(48, 48)
 	sun_glow.color = Color(1, 0.95, 0.6, 0.15)
 	sun_glow.z_index = -11
 	add_child(sun_glow)
 
 	var sun := ColorRect.new()
-	sun.position = Vector2(200, 14)
-	sun.size = Vector2(12, 12)
+	sun.position = Vector2(400, 28)
+	sun.size = Vector2(24, 24)
 	sun.color = Color(1, 0.95, 0.55)
 	sun.z_index = -10
 	add_child(sun)
 
 	var sun_core := ColorRect.new()
-	sun_core.position = Vector2(203, 17)
-	sun_core.size = Vector2(6, 6)
+	sun_core.position = Vector2(406, 34)
+	sun_core.size = Vector2(12, 12)
 	sun_core.color = Color(1, 1, 0.85)
 	sun_core.z_index = -9
 	add_child(sun_core)
 
 func _build_clouds() -> void:
 	var cloud_data: Array = [
-		{"x": 50, "y": 5, "w": 28, "h": 8},
-		{"x": 180, "y": 18, "w": 20, "h": 6},
-		{"x": 350, "y": 2, "w": 35, "h": 9},
-		{"x": 520, "y": 12, "w": 24, "h": 7},
-		{"x": 700, "y": 6, "w": 30, "h": 8},
-		{"x": 850, "y": 15, "w": 22, "h": 6},
+		{"x": 100, "y": 10, "w": 56, "h": 16},
+		{"x": 360, "y": 36, "w": 40, "h": 12},
+		{"x": 700, "y": 4, "w": 70, "h": 18},
+		{"x": 1040, "y": 24, "w": 48, "h": 14},
+		{"x": 1400, "y": 12, "w": 60, "h": 16},
+		{"x": 1700, "y": 30, "w": 44, "h": 12},
 	]
 	for cd in cloud_data:
 		var cloud_group := Node2D.new()
@@ -141,22 +141,22 @@ func _build_clouds() -> void:
 
 		# Cloud puff left
 		var puff_l := ColorRect.new()
-		puff_l.position = Vector2(cd["x"] - 4, cd["y"] + 2)
-		puff_l.size = Vector2(8, cd["h"] - 2)
+		puff_l.position = Vector2(cd["x"] - 8, cd["y"] + 4)
+		puff_l.size = Vector2(16, cd["h"] - 4)
 		puff_l.color = Color(0.88, 0.92, 0.96, 0.5)
 		cloud_group.add_child(puff_l)
 
 		# Cloud puff right
 		var puff_r := ColorRect.new()
-		puff_r.position = Vector2(cd["x"] + cd["w"] - 4, cd["y"] + 2)
-		puff_r.size = Vector2(8, cd["h"] - 2)
+		puff_r.position = Vector2(cd["x"] + cd["w"] - 8, cd["y"] + 4)
+		puff_r.size = Vector2(16, cd["h"] - 4)
 		puff_r.color = Color(0.88, 0.92, 0.96, 0.5)
 		cloud_group.add_child(puff_r)
 
 		# Cloud highlight top
 		var highlight := ColorRect.new()
-		highlight.position = Vector2(cd["x"] + 3, cd["y"] - 2)
-		highlight.size = Vector2(cd["w"] - 6, 3)
+		highlight.position = Vector2(cd["x"] + 6, cd["y"] - 4)
+		highlight.size = Vector2(cd["w"] - 12, 6)
 		highlight.color = Color(0.96, 0.97, 1.0, 0.5)
 		cloud_group.add_child(highlight)
 
@@ -166,10 +166,10 @@ func _build_distant_hills() -> void:
 	# Far hills silhouette
 	var hills := Polygon2D.new()
 	hills.polygon = PackedVector2Array([
-		Vector2(-50, 62), Vector2(60, 50), Vector2(150, 55),
-		Vector2(250, 45), Vector2(380, 52), Vector2(500, 48),
-		Vector2(620, 55), Vector2(750, 42), Vector2(880, 50),
-		Vector2(960, 58), Vector2(960, 75), Vector2(-50, 75)
+		Vector2(-100, 124), Vector2(120, 100), Vector2(300, 110),
+		Vector2(500, 90), Vector2(760, 104), Vector2(1000, 96),
+		Vector2(1240, 110), Vector2(1500, 84), Vector2(1760, 100),
+		Vector2(1920, 116), Vector2(1920, 150), Vector2(-100, 150)
 	])
 	hills.color = Color(0.12, 0.28, 0.12, 0.6)
 	hills.z_index = -7
@@ -178,10 +178,10 @@ func _build_distant_hills() -> void:
 	# Mid hills
 	var hills2 := Polygon2D.new()
 	hills2.polygon = PackedVector2Array([
-		Vector2(-50, 65), Vector2(100, 55), Vector2(200, 60),
-		Vector2(320, 52), Vector2(450, 58), Vector2(580, 53),
-		Vector2(700, 60), Vector2(830, 54), Vector2(960, 62),
-		Vector2(960, 78), Vector2(-50, 78)
+		Vector2(-100, 130), Vector2(200, 110), Vector2(400, 120),
+		Vector2(640, 104), Vector2(900, 116), Vector2(1160, 106),
+		Vector2(1400, 120), Vector2(1660, 108), Vector2(1920, 124),
+		Vector2(1920, 156), Vector2(-100, 156)
 	])
 	hills2.color = Color(0.08, 0.22, 0.08, 0.7)
 	hills2.z_index = -6
@@ -190,15 +190,15 @@ func _build_distant_hills() -> void:
 func _build_treeline() -> void:
 	# Dense treeline - jagged top edge for tree canopy look
 	var tree_points := PackedVector2Array()
-	var x: float = -50.0
-	while x < 1010.0:
-		var tree_h: float = randf_range(6, 14)
-		tree_points.append(Vector2(x, 68 - tree_h))
-		tree_points.append(Vector2(x + randf_range(3, 8), 68 - tree_h + randf_range(2, 5)))
-		x += randf_range(5, 12)
-	tree_points.append(Vector2(1010, 68))
-	tree_points.append(Vector2(1010, 82))
-	tree_points.append(Vector2(-50, 82))
+	var x: float = -100.0
+	while x < 2020.0:
+		var tree_h: float = randf_range(12, 28)
+		tree_points.append(Vector2(x, 136 - tree_h))
+		tree_points.append(Vector2(x + randf_range(6, 16), 136 - tree_h + randf_range(4, 10)))
+		x += randf_range(10, 24)
+	tree_points.append(Vector2(2020, 136))
+	tree_points.append(Vector2(2020, 164))
+	tree_points.append(Vector2(-100, 164))
 
 	var treeline := Polygon2D.new()
 	treeline.polygon = tree_points
@@ -208,15 +208,15 @@ func _build_treeline() -> void:
 
 	# Lighter highlight trees in front
 	var tree_points2 := PackedVector2Array()
-	x = -50.0
-	while x < 1010.0:
-		var tree_h: float = randf_range(4, 10)
-		tree_points2.append(Vector2(x, 70 - tree_h))
-		tree_points2.append(Vector2(x + randf_range(3, 6), 70 - tree_h + randf_range(2, 4)))
-		x += randf_range(6, 14)
-	tree_points2.append(Vector2(1010, 70))
-	tree_points2.append(Vector2(1010, 82))
-	tree_points2.append(Vector2(-50, 82))
+	x = -100.0
+	while x < 2020.0:
+		var tree_h: float = randf_range(8, 20)
+		tree_points2.append(Vector2(x, 140 - tree_h))
+		tree_points2.append(Vector2(x + randf_range(6, 12), 140 - tree_h + randf_range(4, 8)))
+		x += randf_range(12, 28)
+	tree_points2.append(Vector2(2020, 140))
+	tree_points2.append(Vector2(2020, 164))
+	tree_points2.append(Vector2(-100, 164))
 
 	var treeline2 := Polygon2D.new()
 	treeline2.polygon = tree_points2
@@ -230,8 +230,8 @@ func _build_terrain() -> void:
 	var ground_points: PackedVector2Array = PackedVector2Array()
 	for pt in terrain_points:
 		ground_points.append(pt)
-	ground_points.append(Vector2(terrain_points[-1].x, 240))
-	ground_points.append(Vector2(terrain_points[0].x, 240))
+	ground_points.append(Vector2(terrain_points[-1].x, 480))
+	ground_points.append(Vector2(terrain_points[0].x, 480))
 	terrain_polygon.polygon = ground_points
 	terrain_polygon.color = GROUND_COLOR
 	terrain_polygon.z_index = 0
@@ -241,9 +241,9 @@ func _build_terrain() -> void:
 	var midsoil := Polygon2D.new()
 	var mid_points: PackedVector2Array = PackedVector2Array()
 	for pt in terrain_points:
-		mid_points.append(Vector2(pt.x, pt.y + 5))
-	mid_points.append(Vector2(terrain_points[-1].x, 240))
-	mid_points.append(Vector2(terrain_points[0].x, 240))
+		mid_points.append(Vector2(pt.x, pt.y + 10))
+	mid_points.append(Vector2(terrain_points[-1].x, 480))
+	mid_points.append(Vector2(terrain_points[0].x, 480))
 	midsoil.polygon = mid_points
 	midsoil.color = GROUND_MID_COLOR
 	midsoil.z_index = -1
@@ -253,9 +253,9 @@ func _build_terrain() -> void:
 	var subsoil := Polygon2D.new()
 	var sub_points: PackedVector2Array = PackedVector2Array()
 	for pt in terrain_points:
-		sub_points.append(Vector2(pt.x, pt.y + 12))
-	sub_points.append(Vector2(terrain_points[-1].x, 240))
-	sub_points.append(Vector2(terrain_points[0].x, 240))
+		sub_points.append(Vector2(pt.x, pt.y + 24))
+	sub_points.append(Vector2(terrain_points[-1].x, 480))
+	sub_points.append(Vector2(terrain_points[0].x, 480))
 	subsoil.polygon = sub_points
 	subsoil.color = GROUND_DARK_COLOR
 	subsoil.z_index = -2
@@ -263,7 +263,7 @@ func _build_terrain() -> void:
 
 	# Grass strip on top of terrain - two layers for depth
 	var grass_dark := Line2D.new()
-	grass_dark.width = 3.0
+	grass_dark.width = 6.0
 	grass_dark.default_color = GRASS_COLOR
 	for pt in terrain_points:
 		grass_dark.add_point(pt)
@@ -271,10 +271,10 @@ func _build_terrain() -> void:
 	add_child(grass_dark)
 
 	var grass_light := Line2D.new()
-	grass_light.width = 1.5
+	grass_light.width = 3.0
 	grass_light.default_color = GRASS_LIGHT_COLOR
 	for pt in terrain_points:
-		grass_light.add_point(Vector2(pt.x, pt.y - 0.5))
+		grass_light.add_point(Vector2(pt.x, pt.y - 1.0))
 	grass_light.z_index = 1
 	add_child(grass_light)
 
@@ -293,40 +293,40 @@ func _build_terrain() -> void:
 	# Left wall
 	var left_wall := CollisionShape2D.new()
 	var lw_shape := SegmentShape2D.new()
-	lw_shape.a = Vector2(-10, -50)
-	lw_shape.b = Vector2(-10, 240)
+	lw_shape.a = Vector2(-20, -100)
+	lw_shape.b = Vector2(-20, 480)
 	left_wall.shape = lw_shape
 	terrain_body.add_child(left_wall)
 
 	# Right wall
 	var right_wall := CollisionShape2D.new()
 	var rw_shape := SegmentShape2D.new()
-	rw_shape.a = Vector2(970, -50)
-	rw_shape.b = Vector2(970, 240)
+	rw_shape.a = Vector2(1940, -100)
+	rw_shape.b = Vector2(1940, 480)
 	right_wall.shape = rw_shape
 	terrain_body.add_child(right_wall)
 
 func _build_terrain_details() -> void:
 	# Rocks scattered on ridges and shores
 	var rock_positions: Array[Vector2] = [
-		Vector2(15, 67), Vector2(32, 67),
-		Vector2(110, 71), Vector2(120, 71),
-		Vector2(265, 81), Vector2(285, 85),
-		Vector2(455, 97), Vector2(470, 101),
-		Vector2(655, 114), Vector2(675, 119),
-		Vector2(895, 139), Vector2(940, 144),
+		Vector2(30, 134), Vector2(64, 134),
+		Vector2(220, 142), Vector2(240, 142),
+		Vector2(530, 162), Vector2(570, 170),
+		Vector2(910, 194), Vector2(940, 202),
+		Vector2(1310, 228), Vector2(1350, 238),
+		Vector2(1790, 278), Vector2(1880, 288),
 	]
 	for rp in rock_positions:
-		_place_rock(rp, randf_range(2, 5), randf_range(2, 4))
+		_place_rock(rp, randf_range(4, 10), randf_range(4, 8))
 
 	# Dirt specks on terrain surface
 	for i in range(40):
-		var rx: float = randf_range(0, 960)
+		var rx: float = randf_range(0, 1920)
 		var ry: float = _get_terrain_y_at(rx)
 		if ry > 0:
 			var speck := ColorRect.new()
-			speck.position = Vector2(rx, ry + randf_range(1, 6))
-			speck.size = Vector2(randf_range(1, 3), randf_range(1, 2))
+			speck.position = Vector2(rx, ry + randf_range(2, 12))
+			speck.size = Vector2(randf_range(2, 6), randf_range(2, 4))
 			speck.color = GROUND_DARK_COLOR.lerp(GROUND_COLOR, randf_range(0, 1))
 			speck.color.a = randf_range(0.3, 0.6)
 			speck.z_index = 0
@@ -335,11 +335,11 @@ func _build_terrain_details() -> void:
 func _place_rock(pos: Vector2, w: float, h: float) -> void:
 	var rock := Polygon2D.new()
 	rock.polygon = PackedVector2Array([
-		Vector2(pos.x + 1, pos.y),
-		Vector2(pos.x + w - 1, pos.y),
+		Vector2(pos.x + 2, pos.y),
+		Vector2(pos.x + w - 2, pos.y),
 		Vector2(pos.x + w, pos.y + h * 0.4),
-		Vector2(pos.x + w - 0.5, pos.y + h),
-		Vector2(pos.x + 0.5, pos.y + h),
+		Vector2(pos.x + w - 1.0, pos.y + h),
+		Vector2(pos.x + 1.0, pos.y + h),
 		Vector2(pos.x, pos.y + h * 0.4),
 	])
 	rock.color = ROCK_COLOR
@@ -348,8 +348,8 @@ func _place_rock(pos: Vector2, w: float, h: float) -> void:
 
 	# Rock highlight
 	var hl := ColorRect.new()
-	hl.position = Vector2(pos.x + 1, pos.y + 0.5)
-	hl.size = Vector2(w - 2, 1)
+	hl.position = Vector2(pos.x + 2, pos.y + 1.0)
+	hl.size = Vector2(w - 4, 2)
 	hl.color = Color(0.55, 0.53, 0.5, 0.5)
 	hl.z_index = 1
 	add_child(hl)
@@ -363,14 +363,14 @@ func _build_vegetation() -> void:
 
 		# Place cattails near entry slope
 		for j in range(randi_range(2, 4)):
-			var cx: float = entry_top.x + randf_range(-5, 8)
-			var cy: float = entry_top.y + randf_range(-2, 3)
+			var cx: float = entry_top.x + randf_range(-10, 16)
+			var cy: float = entry_top.y + randf_range(-4, 6)
 			_place_cattail(Vector2(cx, cy))
 
 		# Place cattails near exit slope
 		for j in range(randi_range(1, 3)):
-			var cx: float = exit_top.x + randf_range(-8, 5)
-			var cy: float = exit_top.y + randf_range(-2, 3)
+			var cx: float = exit_top.x + randf_range(-16, 10)
+			var cy: float = exit_top.y + randf_range(-4, 6)
 			_place_cattail(Vector2(cx, cy))
 
 	# Grass tufts on ridges
@@ -381,7 +381,7 @@ func _build_vegetation() -> void:
 			var dy: float = absf(terrain_points[i + 1].y - pt.y) / absf(terrain_points[i + 1].x - pt.x + 0.01)
 			if dy < 0.3:  # Mostly flat
 				for j in range(randi_range(2, 5)):
-					var gx: float = pt.x + randf_range(-10, 10)
+					var gx: float = pt.x + randf_range(-20, 20)
 					_place_grass_tuft(Vector2(gx, _get_terrain_y_at(gx)))
 
 	# Flowers scattered on shore and ridges
@@ -390,19 +390,19 @@ func _build_vegetation() -> void:
 		Color(0.8, 0.4, 0.7), Color(0.95, 0.95, 0.9)
 	]
 	for i in range(12):
-		var fx: float = randf_range(5, 950)
+		var fx: float = randf_range(10, 1900)
 		var fy: float = _get_terrain_y_at(fx)
 		if fy > 0:
 			var flower := ColorRect.new()
-			flower.position = Vector2(fx, fy - randf_range(2, 4))
-			flower.size = Vector2(2, 2)
+			flower.position = Vector2(fx, fy - randf_range(4, 8))
+			flower.size = Vector2(4, 4)
 			flower.color = flower_colors[randi() % flower_colors.size()]
 			flower.z_index = 1
 			add_child(flower)
 
 			var stem := ColorRect.new()
-			stem.position = Vector2(fx + 0.5, fy - 1)
-			stem.size = Vector2(1, 2)
+			stem.position = Vector2(fx + 1.0, fy - 2)
+			stem.size = Vector2(2, 4)
 			stem.color = Color(0.2, 0.4, 0.15)
 			stem.z_index = 1
 			add_child(stem)
@@ -413,27 +413,27 @@ func _place_cattail(pos: Vector2) -> void:
 	add_child(cattail)
 
 	# Stem
-	var stem_h: float = randf_range(8, 14)
+	var stem_h: float = randf_range(16, 28)
 	var stem := Line2D.new()
-	stem.width = 1.0
+	stem.width = 2.0
 	stem.default_color = Color(0.3, 0.45, 0.2)
 	stem.add_point(Vector2(pos.x, pos.y))
-	stem.add_point(Vector2(pos.x + randf_range(-1, 1), pos.y - stem_h))
+	stem.add_point(Vector2(pos.x + randf_range(-2, 2), pos.y - stem_h))
 	cattail.add_child(stem)
 
 	# Cattail head (brown oval)
 	var head := ColorRect.new()
-	head.position = Vector2(pos.x - 1, pos.y - stem_h - 3)
-	head.size = Vector2(2, 4)
+	head.position = Vector2(pos.x - 2, pos.y - stem_h - 6)
+	head.size = Vector2(4, 8)
 	head.color = Color(0.45, 0.3, 0.15)
 	cattail.add_child(head)
 
 	# Leaf
 	var leaf := Line2D.new()
-	leaf.width = 1.0
+	leaf.width = 2.0
 	leaf.default_color = Color(0.25, 0.4, 0.18, 0.8)
 	leaf.add_point(Vector2(pos.x, pos.y - stem_h * 0.4))
-	leaf.add_point(Vector2(pos.x + randf_range(3, 6), pos.y - stem_h * 0.6))
+	leaf.add_point(Vector2(pos.x + randf_range(6, 12), pos.y - stem_h * 0.6))
 	cattail.add_child(leaf)
 
 	cattails.append(cattail)
@@ -441,11 +441,11 @@ func _place_cattail(pos: Vector2) -> void:
 func _place_grass_tuft(pos: Vector2) -> void:
 	for k in range(randi_range(2, 4)):
 		var blade := Line2D.new()
-		blade.width = 0.8
+		blade.width = 1.6
 		blade.default_color = GRASS_COLOR.lerp(GRASS_LIGHT_COLOR, randf())
 		blade.default_color.a = randf_range(0.6, 1.0)
-		var blade_h: float = randf_range(3, 6)
-		var blade_lean: float = randf_range(-2, 2)
+		var blade_h: float = randf_range(6, 12)
+		var blade_lean: float = randf_range(-4, 4)
 		blade.add_point(pos)
 		blade.add_point(Vector2(pos.x + blade_lean, pos.y - blade_h))
 		blade.z_index = 1
@@ -481,7 +481,7 @@ func _build_water() -> void:
 
 		# Water surface shine line
 		var wl := Line2D.new()
-		wl.width = 1.5
+		wl.width = 3.0
 		wl.default_color = WATER_SURFACE_COLOR
 		wl.z_index = 3
 		add_child(wl)
@@ -527,12 +527,12 @@ func _update_water_polygon(swamp_index: int) -> void:
 func _update_water_surface_line(swamp_index: int, left_x: float, right_x: float, water_y: float) -> void:
 	var line: Line2D = water_surface_lines[swamp_index]
 	line.clear_points()
-	var segments: int = int((right_x - left_x) / 3.0)
+	var segments: int = int((right_x - left_x) / 6.0)
 	segments = maxi(segments, 4)
 	for i in range(segments + 1):
 		var t: float = float(i) / float(segments)
 		var px: float = lerpf(left_x, right_x, t)
-		var wave_offset: float = sin(wave_time * 2.0 + px * 0.15) * 0.8
+		var wave_offset: float = sin(wave_time * 2.0 + px * 0.15) * 1.6
 		line.add_point(Vector2(px, water_y + wave_offset))
 
 func _lerp_x_at_y(p1: Vector2, p2: Vector2, target_y: float) -> float:
@@ -549,7 +549,7 @@ func _build_water_walls() -> void:
 		var left_body := StaticBody2D.new()
 		var left_col := CollisionShape2D.new()
 		var left_rect := RectangleShape2D.new()
-		left_rect.size = Vector2(4, 28)
+		left_rect.size = Vector2(8, 56)
 		left_col.shape = left_rect
 		left_body.add_child(left_col)
 		add_child(left_body)
@@ -557,7 +557,7 @@ func _build_water_walls() -> void:
 		var right_body := StaticBody2D.new()
 		var right_col := CollisionShape2D.new()
 		var right_rect := RectangleShape2D.new()
-		right_rect.size = Vector2(4, 28)
+		right_rect.size = Vector2(8, 56)
 		right_col.shape = right_rect
 		right_body.add_child(right_col)
 		add_child(right_body)
@@ -598,8 +598,8 @@ func _update_water_walls(swamp_index: int) -> void:
 	var left_x: float = _lerp_x_at_y(entry_top, basin_left, water_y)
 	var right_x: float = _lerp_x_at_y(basin_right, exit_top, water_y)
 
-	left_body.position = Vector2(left_x, water_y - 14)
-	right_body.position = Vector2(right_x, water_y - 14)
+	left_body.position = Vector2(left_x, water_y - 28)
+	right_body.position = Vector2(right_x, water_y - 28)
 
 # --- Water Detection ---
 func _build_water_detect_areas() -> void:
@@ -621,9 +621,9 @@ func _build_water_detect_areas() -> void:
 		var entry_mid: Vector2 = (entry_top + basin_left) * 0.5
 		var entry_shape := CollisionShape2D.new()
 		var entry_rect := RectangleShape2D.new()
-		entry_rect.size = Vector2((basin_left - entry_top).length(), 20)
+		entry_rect.size = Vector2((basin_left - entry_top).length(), 40)
 		entry_shape.shape = entry_rect
-		entry_shape.position = entry_mid + Vector2(0, -5)
+		entry_shape.position = entry_mid + Vector2(0, -10)
 		entry_shape.rotation = atan2(basin_left.y - entry_top.y, basin_left.x - entry_top.x)
 		area.add_child(entry_shape)
 
@@ -631,18 +631,18 @@ func _build_water_detect_areas() -> void:
 		var basin_mid: Vector2 = (basin_left + basin_right) * 0.5
 		var basin_shape := CollisionShape2D.new()
 		var basin_rect := RectangleShape2D.new()
-		basin_rect.size = Vector2(basin_right.x - basin_left.x, 16)
+		basin_rect.size = Vector2(basin_right.x - basin_left.x, 32)
 		basin_shape.shape = basin_rect
-		basin_shape.position = basin_mid + Vector2(0, -6)
+		basin_shape.position = basin_mid + Vector2(0, -12)
 		area.add_child(basin_shape)
 
 		# Exit slope detection
 		var exit_mid: Vector2 = (basin_right + exit_top) * 0.5
 		var exit_shape := CollisionShape2D.new()
 		var exit_rect := RectangleShape2D.new()
-		exit_rect.size = Vector2((exit_top - basin_right).length(), 20)
+		exit_rect.size = Vector2((exit_top - basin_right).length(), 40)
 		exit_shape.shape = exit_rect
-		exit_shape.position = exit_mid + Vector2(0, -5)
+		exit_shape.position = exit_mid + Vector2(0, -10)
 		exit_shape.rotation = atan2(exit_top.y - basin_right.y, exit_top.x - basin_right.x)
 		area.add_child(exit_shape)
 
@@ -656,16 +656,16 @@ func _build_swamp_labels() -> void:
 	for i in range(SWAMP_COUNT):
 		var geo: Dictionary = _get_swamp_geometry(i)
 		var basin_mid_x: float = (geo["basin_left"].x + geo["basin_right"].x) * 0.5
-		var label_y: float = geo["entry_top"].y - 12
+		var label_y: float = geo["entry_top"].y - 24
 
 		var label := Label.new()
 		label.text = GameManager.swamp_definitions[i]["name"]
-		label.add_theme_font_size_override("font_size", 6)
+		label.add_theme_font_size_override("font_size", 12)
 		label.add_theme_color_override("font_color", Color(0.8, 0.85, 0.9, 0.7))
 		label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 		label.add_theme_constant_override("shadow_offset_x", 1)
 		label.add_theme_constant_override("shadow_offset_y", 1)
-		label.position = Vector2(basin_mid_x - 15, label_y)
+		label.position = Vector2(basin_mid_x - 30, label_y)
 		label.z_index = 5
 		add_child(label)
 		swamp_labels.append(label)
@@ -693,70 +693,70 @@ func _on_swamp_completed(swamp_index: int, _reward: float) -> void:
 func _build_pump_station() -> void:
 	# Platform/base
 	var platform := ColorRect.new()
-	platform.position = Vector2(3, 65)
-	platform.size = Vector2(22, 3)
+	platform.position = Vector2(6, 130)
+	platform.size = Vector2(44, 6)
 	platform.color = Color(0.4, 0.38, 0.36)
 	platform.z_index = 2
 	add_child(platform)
 
 	# Pump body - main housing
 	var pump_body := ColorRect.new()
-	pump_body.position = Vector2(6, 50)
-	pump_body.size = Vector2(14, 15)
+	pump_body.position = Vector2(12, 100)
+	pump_body.size = Vector2(28, 30)
 	pump_body.color = Color(0.5, 0.5, 0.55)
 	pump_body.z_index = 3
 	add_child(pump_body)
 
 	# Pump body highlight
 	var pump_hl := ColorRect.new()
-	pump_hl.position = Vector2(7, 51)
-	pump_hl.size = Vector2(4, 13)
+	pump_hl.position = Vector2(14, 102)
+	pump_hl.size = Vector2(8, 26)
 	pump_hl.color = Color(0.58, 0.58, 0.62)
 	pump_hl.z_index = 3
 	add_child(pump_hl)
 
 	# Pump top cap
 	var pump_cap := ColorRect.new()
-	pump_cap.position = Vector2(5, 48)
-	pump_cap.size = Vector2(16, 3)
+	pump_cap.position = Vector2(10, 96)
+	pump_cap.size = Vector2(32, 6)
 	pump_cap.color = Color(0.42, 0.42, 0.46)
 	pump_cap.z_index = 3
 	add_child(pump_cap)
 
 	# Pipe extending right
 	var pump_pipe := ColorRect.new()
-	pump_pipe.position = Vector2(20, 56)
-	pump_pipe.size = Vector2(10, 3)
+	pump_pipe.position = Vector2(40, 112)
+	pump_pipe.size = Vector2(20, 6)
 	pump_pipe.color = Color(0.4, 0.4, 0.45)
 	pump_pipe.z_index = 3
 	add_child(pump_pipe)
 
 	# Pipe joint
 	var pipe_joint := ColorRect.new()
-	pipe_joint.position = Vector2(19, 55)
-	pipe_joint.size = Vector2(3, 5)
+	pipe_joint.position = Vector2(38, 110)
+	pipe_joint.size = Vector2(6, 10)
 	pipe_joint.color = Color(0.45, 0.45, 0.5)
 	pipe_joint.z_index = 3
 	add_child(pipe_joint)
 
 	# Indicator light
 	var pump_light := ColorRect.new()
-	pump_light.position = Vector2(10, 52)
-	pump_light.size = Vector2(3, 3)
+	pump_light.position = Vector2(20, 104)
+	pump_light.size = Vector2(6, 6)
 	pump_light.color = Color(0.2, 0.85, 0.3)
 	pump_light.z_index = 4
 	add_child(pump_light)
 
 	# Gauge (small circle-ish)
 	var gauge := ColorRect.new()
-	gauge.position = Vector2(14, 55)
-	gauge.size = Vector2(4, 4)
+	gauge.position = Vector2(28, 110)
+	gauge.size = Vector2(8, 8)
 	gauge.color = Color(0.15, 0.15, 0.2)
 	gauge.z_index = 4
 	add_child(gauge)
 	var gauge_needle := ColorRect.new()
-	gauge_needle.position = Vector2(15, 55.5)
-	gauge_needle.size = Vector2(2, 1)
+	gauge_needle.position = Vector2(30, 111.0)
+	gauge_needle.size = Vector2(4, 2)
 	gauge_needle.color = Color(0.9, 0.3, 0.2)
 	gauge_needle.z_index = 4
 	add_child(gauge_needle)
@@ -764,24 +764,24 @@ func _build_pump_station() -> void:
 	# Label
 	var pump_lbl := Label.new()
 	pump_lbl.text = "PUMP"
-	pump_lbl.add_theme_font_size_override("font_size", 5)
+	pump_lbl.add_theme_font_size_override("font_size", 10)
 	pump_lbl.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95, 0.8))
 	pump_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 	pump_lbl.add_theme_constant_override("shadow_offset_x", 1)
 	pump_lbl.add_theme_constant_override("shadow_offset_y", 1)
-	pump_lbl.position = Vector2(5, 40)
+	pump_lbl.position = Vector2(10, 80)
 	pump_lbl.z_index = 5
 	add_child(pump_lbl)
 
 	# "SELL" indicator
 	var sell_lbl := Label.new()
 	sell_lbl.text = "SELL"
-	sell_lbl.add_theme_font_size_override("font_size", 5)
+	sell_lbl.add_theme_font_size_override("font_size", 10)
 	sell_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 0.7))
 	sell_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 	sell_lbl.add_theme_constant_override("shadow_offset_x", 1)
 	sell_lbl.add_theme_constant_override("shadow_offset_y", 1)
-	sell_lbl.position = Vector2(7, 46)
+	sell_lbl.position = Vector2(14, 92)
 	sell_lbl.z_index = 5
 	add_child(sell_lbl)
 
@@ -791,9 +791,9 @@ func _build_pump_station() -> void:
 	pump_area.collision_mask = 1
 	var shape := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()
-	rect.size = Vector2(30, 26)
+	rect.size = Vector2(60, 52)
 	shape.shape = rect
-	shape.position = Vector2(15, 56)
+	shape.position = Vector2(30, 112)
 	pump_area.add_child(shape)
 	add_child(pump_area)
 
@@ -841,13 +841,13 @@ func _process(delta: float) -> void:
 	# Drift clouds slowly
 	for ci in range(clouds.size()):
 		clouds[ci].position.x += delta * (3.0 + ci * 0.5)
-		if clouds[ci].position.x > 980:
-			clouds[ci].position.x = -40
+		if clouds[ci].position.x > 1960:
+			clouds[ci].position.x = -80
 			# Also move parent cloud group's other children
 			var parent_node: Node2D = clouds[ci].get_parent()
 			for child in parent_node.get_children():
 				if child != clouds[ci]:
-					child.position.x -= 1020
+					child.position.x -= 2040
 
 func _get_cycle_color(t: float) -> Color:
 	var dawn := Color(1.0, 0.82, 0.65)

@@ -19,22 +19,22 @@ func _refresh() -> void:
 
 	if not GameManager.pump_owned:
 		var info := Label.new()
-		info.add_theme_font_size_override("font_size", 7)
+		info.add_theme_font_size_override("font_size", 14)
 		info.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
 		info.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-		info.add_theme_constant_override("shadow_offset_x", 1)
-		info.add_theme_constant_override("shadow_offset_y", 1)
+		info.add_theme_constant_override("shadow_offset_x", 2)
+		info.add_theme_constant_override("shadow_offset_y", 2)
 		info.text = "Water Pump"
 		content.add_child(info)
 
 		var desc := Label.new()
-		desc.add_theme_font_size_override("font_size", 6)
+		desc.add_theme_font_size_override("font_size", 12)
 		desc.text = "Drains water automatically\nfrom a connected swamp."
 		desc.add_theme_color_override("font_color", Color(0.6, 0.62, 0.7))
 		content.add_child(desc)
 
 		var buy_btn := Button.new()
-		buy_btn.add_theme_font_size_override("font_size", 7)
+		buy_btn.add_theme_font_size_override("font_size", 14)
 		buy_btn.text = "Buy Pump %s" % Economy.format_money(GameManager.PUMP_COST)
 		if GameManager.money < GameManager.PUMP_COST:
 			buy_btn.disabled = true
@@ -48,10 +48,10 @@ func _refresh() -> void:
 		var income: float = GameManager.get_pump_income_rate()
 
 		var status := Label.new()
-		status.add_theme_font_size_override("font_size", 7)
+		status.add_theme_font_size_override("font_size", 14)
 		status.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-		status.add_theme_constant_override("shadow_offset_x", 1)
-		status.add_theme_constant_override("shadow_offset_y", 1)
+		status.add_theme_constant_override("shadow_offset_x", 2)
+		status.add_theme_constant_override("shadow_offset_y", 2)
 		status.text = "Pump Lv%d (%.4f g/s)" % [GameManager.pump_level, drain_rate]
 		if income > 0:
 			status.text += "\nEarning: %s/s" % Economy.format_money(income)
@@ -64,7 +64,7 @@ func _refresh() -> void:
 		# Upgrade button
 		var upgrade_cost: float = GameManager.get_pump_upgrade_cost()
 		var up_btn := Button.new()
-		up_btn.add_theme_font_size_override("font_size", 7)
+		up_btn.add_theme_font_size_override("font_size", 14)
 		up_btn.text = "Upgrade %s" % Economy.format_money(upgrade_cost)
 		if GameManager.money < upgrade_cost:
 			up_btn.disabled = true
@@ -79,19 +79,19 @@ func _refresh() -> void:
 		content.add_child(sep)
 
 		var target_header := Label.new()
-		target_header.add_theme_font_size_override("font_size", 7)
+		target_header.add_theme_font_size_override("font_size", 14)
 		target_header.text = "Connect to:"
 		target_header.add_theme_color_override("font_color", Color(0.4, 0.85, 1))
 		target_header.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-		target_header.add_theme_constant_override("shadow_offset_x", 1)
-		target_header.add_theme_constant_override("shadow_offset_y", 1)
+		target_header.add_theme_constant_override("shadow_offset_x", 2)
+		target_header.add_theme_constant_override("shadow_offset_y", 2)
 		content.add_child(target_header)
 
 		for i in range(GameManager.get_swamp_count()):
 			var idx: int = i
 			var defn: Dictionary = GameManager.swamp_definitions[i]
 			var btn := Button.new()
-			btn.add_theme_font_size_override("font_size", 7)
+			btn.add_theme_font_size_override("font_size", 14)
 
 			if GameManager.is_swamp_completed(i):
 				btn.text = "%s [DONE]" % defn["name"]
@@ -112,19 +112,19 @@ func _refresh() -> void:
 func _style_button(btn: Button, bg_color: Color) -> void:
 	var style := StyleBoxFlat.new()
 	style.bg_color = bg_color
-	style.border_width_left = 1
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 1
+	style.border_width_left = 2
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
 	style.border_color = bg_color.lightened(0.4)
-	style.corner_radius_top_left = 2
-	style.corner_radius_top_right = 2
-	style.corner_radius_bottom_left = 2
-	style.corner_radius_bottom_right = 2
-	style.content_margin_left = 3
-	style.content_margin_right = 3
-	style.content_margin_top = 1
-	style.content_margin_bottom = 1
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	style.content_margin_left = 6
+	style.content_margin_right = 6
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
 	btn.add_theme_stylebox_override("normal", style)
 
 	var hover_style := style.duplicate()

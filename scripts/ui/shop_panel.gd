@@ -29,28 +29,28 @@ func _refresh() -> void:
 		var row_panel := PanelContainer.new()
 		var row_style := StyleBoxFlat.new()
 		row_style.bg_color = Color(0.12, 0.12, 0.16, 0.6)
-		row_style.corner_radius_top_left = 2
-		row_style.corner_radius_top_right = 2
-		row_style.corner_radius_bottom_left = 2
-		row_style.corner_radius_bottom_right = 2
-		row_style.content_margin_left = 4
-		row_style.content_margin_right = 4
-		row_style.content_margin_top = 2
-		row_style.content_margin_bottom = 2
+		row_style.corner_radius_top_left = 4
+		row_style.corner_radius_top_right = 4
+		row_style.corner_radius_bottom_left = 4
+		row_style.corner_radius_bottom_right = 4
+		row_style.content_margin_left = 8
+		row_style.content_margin_right = 8
+		row_style.content_margin_top = 4
+		row_style.content_margin_bottom = 4
 		if GameManager.current_tool_id == tid:
-			row_style.border_width_left = 1
+			row_style.border_width_left = 2
 			row_style.border_color = Color(0.3, 0.9, 0.4, 0.5)
 		row_panel.add_theme_stylebox_override("panel", row_style)
 
 		var entry := HBoxContainer.new()
-		entry.add_theme_constant_override("separation", 4)
+		entry.add_theme_constant_override("separation", 8)
 
 		var info_label := Label.new()
-		info_label.add_theme_font_size_override("font_size", 7)
+		info_label.add_theme_font_size_override("font_size", 14)
 		info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-		info_label.add_theme_constant_override("shadow_offset_x", 1)
-		info_label.add_theme_constant_override("shadow_offset_y", 1)
+		info_label.add_theme_constant_override("shadow_offset_x", 2)
+		info_label.add_theme_constant_override("shadow_offset_y", 2)
 
 		if owned_data["owned"]:
 			var output: float = GameManager.get_tool_output(tid)
@@ -71,8 +71,8 @@ func _refresh() -> void:
 		if owned_data["owned"]:
 			# Equip button (gold)
 			var equip_btn := Button.new()
-			equip_btn.add_theme_font_size_override("font_size", 7)
-			equip_btn.custom_minimum_size = Vector2(32, 0)
+			equip_btn.add_theme_font_size_override("font_size", 14)
+			equip_btn.custom_minimum_size = Vector2(64, 0)
 			if GameManager.current_tool_id == tid:
 				equip_btn.text = "[ON]"
 				equip_btn.disabled = true
@@ -86,10 +86,10 @@ func _refresh() -> void:
 
 			# Upgrade button (blue)
 			var upgrade_btn := Button.new()
-			upgrade_btn.add_theme_font_size_override("font_size", 7)
+			upgrade_btn.add_theme_font_size_override("font_size", 14)
 			var cost: float = GameManager.get_tool_upgrade_cost(tid)
 			upgrade_btn.text = "Up %s" % Economy.format_money(cost)
-			upgrade_btn.custom_minimum_size = Vector2(48, 0)
+			upgrade_btn.custom_minimum_size = Vector2(96, 0)
 			if GameManager.money < cost:
 				upgrade_btn.disabled = true
 			else:
@@ -101,9 +101,9 @@ func _refresh() -> void:
 		else:
 			# Buy button (green)
 			var buy_btn := Button.new()
-			buy_btn.add_theme_font_size_override("font_size", 7)
+			buy_btn.add_theme_font_size_override("font_size", 14)
 			buy_btn.text = "Buy %s" % Economy.format_money(defn["cost"])
-			buy_btn.custom_minimum_size = Vector2(55, 0)
+			buy_btn.custom_minimum_size = Vector2(110, 0)
 			var prev_owned := true
 			for other_id in sorted_tools:
 				var oid: String = other_id
@@ -126,19 +126,19 @@ func _refresh() -> void:
 func _style_button(btn: Button, bg_color: Color) -> void:
 	var style := StyleBoxFlat.new()
 	style.bg_color = bg_color
-	style.border_width_left = 1
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 1
+	style.border_width_left = 2
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
 	style.border_color = bg_color.lightened(0.4)
-	style.corner_radius_top_left = 2
-	style.corner_radius_top_right = 2
-	style.corner_radius_bottom_left = 2
-	style.corner_radius_bottom_right = 2
-	style.content_margin_left = 3
-	style.content_margin_right = 3
-	style.content_margin_top = 1
-	style.content_margin_bottom = 1
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	style.content_margin_left = 6
+	style.content_margin_right = 6
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
 	btn.add_theme_stylebox_override("normal", style)
 
 	var hover_style := style.duplicate()

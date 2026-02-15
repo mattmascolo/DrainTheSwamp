@@ -4,51 +4,51 @@
 
 [sub_resource type="StyleBoxFlat" id="stamina_fill"]
 bg_color = Color(0.2, 0.75, 0.3, 1)
-corner_radius_top_left = 1
-corner_radius_top_right = 1
-corner_radius_bottom_left = 1
-corner_radius_bottom_right = 1
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_left = 2
+corner_radius_bottom_right = 2
 
 [sub_resource type="StyleBoxFlat" id="stamina_bg"]
 bg_color = Color(0.12, 0.12, 0.18, 0.85)
-corner_radius_top_left = 1
-corner_radius_top_right = 1
-corner_radius_bottom_left = 1
-corner_radius_bottom_right = 1
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_left = 2
+corner_radius_bottom_right = 2
 
 [sub_resource type="StyleBoxFlat" id="topbar_bg"]
 bg_color = Color(0.05, 0.05, 0.08, 0.65)
-corner_radius_bottom_left = 2
-corner_radius_bottom_right = 2
-content_margin_left = 4.0
-content_margin_top = 2.0
-content_margin_right = 4.0
-content_margin_bottom = 2.0
+corner_radius_bottom_left = 4
+corner_radius_bottom_right = 4
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
 
 [sub_resource type="StyleBoxFlat" id="bottombar_bg"]
 bg_color = Color(0.05, 0.05, 0.08, 0.65)
-corner_radius_top_left = 2
-corner_radius_top_right = 2
-content_margin_left = 4.0
-content_margin_top = 2.0
-content_margin_right = 4.0
-content_margin_bottom = 2.0
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
 
 [sub_resource type="StyleBoxFlat" id="btn_normal"]
 bg_color = Color(0.18, 0.22, 0.3, 0.9)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
 border_color = Color(0.35, 0.4, 0.55, 0.8)
-corner_radius_top_left = 2
-corner_radius_top_right = 2
-corner_radius_bottom_left = 2
-corner_radius_bottom_right = 2
-content_margin_left = 4.0
-content_margin_top = 1.0
-content_margin_right = 4.0
-content_margin_bottom = 1.0
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_left = 4
+corner_radius_bottom_right = 4
+content_margin_left = 8.0
+content_margin_top = 2.0
+content_margin_right = 8.0
+content_margin_bottom = 2.0
 
 [node name="HUD" type="CanvasLayer"]
 layer = 10
@@ -76,16 +76,16 @@ theme_override_styles/panel = SubResource("topbar_bg")
 [node name="HBox" type="HBoxContainer" parent="MarginContainer/VBoxContainer/TopBar"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 16
 
 [node name="MoneyLabel" type="Label" parent="MarginContainer/VBoxContainer/TopBar/HBox"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 0.9, 0.3, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.7)
-theme_override_constants/shadow_offset_x = 1
-theme_override_constants/shadow_offset_y = 1
-theme_override_font_sizes/font_size = 8
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 16
 text = "$0.00"
 
 [node name="CarryLabel" type="Label" parent="MarginContainer/VBoxContainer/TopBar/HBox"]
@@ -93,9 +93,9 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.7, 0.85, 1, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.7)
-theme_override_constants/shadow_offset_x = 1
-theme_override_constants/shadow_offset_y = 1
-theme_override_font_sizes/font_size = 8
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 16
 text = "Bag: 0.000/0.100"
 
 [node name="Spacer" type="Control" parent="MarginContainer/VBoxContainer/TopBar/HBox"]
@@ -108,9 +108,9 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.5, 0.85, 1, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.7)
-theme_override_constants/shadow_offset_x = 1
-theme_override_constants/shadow_offset_y = 1
-theme_override_font_sizes/font_size = 8
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 16
 text = "Water: 100.0%"
 
 [node name="GameArea" type="Control" parent="MarginContainer/VBoxContainer"]
@@ -126,25 +126,25 @@ theme_override_styles/panel = SubResource("bottombar_bg")
 [node name="HBox" type="HBoxContainer" parent="MarginContainer/VBoxContainer/BottomBar"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 4
+theme_override_constants/separation = 8
 
 [node name="ToolLabel" type="Label" parent="MarginContainer/VBoxContainer/BottomBar/HBox"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.9, 0.88, 0.82, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.7)
-theme_override_constants/shadow_offset_x = 1
-theme_override_constants/shadow_offset_y = 1
-theme_override_font_sizes/font_size = 7
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 14
 text = "Spoon"
 
 [node name="StaminaBar" type="ProgressBar" parent="MarginContainer/VBoxContainer/BottomBar/HBox"]
 layout_mode = 2
 mouse_filter = 2
-custom_minimum_size = Vector2(45, 8)
+custom_minimum_size = Vector2(90, 16)
 theme_override_styles/fill = SubResource("stamina_fill")
 theme_override_styles/background = SubResource("stamina_bg")
-theme_override_font_sizes/font_size = 4
+theme_override_font_sizes/font_size = 8
 max_value = 5.0
 value = 5.0
 show_percentage = false
@@ -152,11 +152,11 @@ show_percentage = false
 [node name="HoseLabel" type="Label" parent="MarginContainer/VBoxContainer/BottomBar/HBox"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 14
 theme_override_colors/font_color = Color(0.3, 0.85, 1, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.7)
-theme_override_constants/shadow_offset_x = 1
-theme_override_constants/shadow_offset_y = 1
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
 text = "HOSE: 20.0s"
 
 [node name="Spacer2" type="Control" parent="MarginContainer/VBoxContainer/BottomBar/HBox"]
@@ -168,7 +168,7 @@ mouse_filter = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.9, 0.3, 1)
 theme_override_colors/font_hover_color = Color(1, 0.95, 0.5, 1)
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 14
 theme_override_styles/normal = SubResource("btn_normal")
 text = "Shop"
 
@@ -176,7 +176,7 @@ text = "Shop"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.4, 0.85, 1, 1)
 theme_override_colors/font_hover_color = Color(0.6, 0.92, 1, 1)
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 14
 theme_override_styles/normal = SubResource("btn_normal")
 text = "Stats"
 
@@ -184,6 +184,6 @@ text = "Stats"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.8, 0.85, 1)
 theme_override_colors/font_hover_color = Color(0.95, 0.95, 1, 1)
-theme_override_font_sizes/font_size = 7
+theme_override_font_sizes/font_size = 14
 theme_override_styles/normal = SubResource("btn_normal")
 text = "Menu"

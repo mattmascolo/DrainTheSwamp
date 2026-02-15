@@ -1,7 +1,7 @@
 extends CharacterBody2D
 
-const BASE_SPEED: float = 60.0
-const GRAVITY: float = 400.0
+const BASE_SPEED: float = 120.0
+const GRAVITY: float = 800.0
 const SCOOP_COOLDOWN: float = 0.3
 const STAMINA_REGEN_DELAY: float = 1.0
 const STAMINA_REGEN_DELAY_TIME: float = 1.0
@@ -16,6 +16,7 @@ var stamina_idle_timer: float = 0.0
 var scoop_requested: bool = false
 var facing_right: bool = true
 var flash_tween: Tween = null
+var tool_tween: Tween = null
 var walk_time: float = 0.0
 var is_walking: bool = false
 
@@ -57,20 +58,23 @@ func _physics_process(delta: float) -> void:
 	# Walk animation
 	if is_walking:
 		walk_time += delta * 8.0
-		var bob: float = sin(walk_time) * 0.8
+		var bob: float = sin(walk_time) * 1.6
 		visual.position.y = bob
 		# Leg animation
-		var leg_offset: float = sin(walk_time) * 1.5
-		boot_left.position.y = -4.0 + leg_offset
-		boot_right.position.y = -4.0 - leg_offset
+		var leg_offset: float = sin(walk_time) * 3.0
+		boot_left.position.y = -8.0 + leg_offset
+		boot_right.position.y = -8.0 - leg_offset
 		# Arm swing
-		arm_right.position.y = -12.0 + sin(walk_time + PI) * 1.0
+		arm_right.position.y = -24.0 + sin(walk_time + PI) * 2.0
+		# Tool swings with the arm
+		tool_sprite.rotation = sin(walk_time + PI) * 0.15
 	else:
 		walk_time = 0.0
 		visual.position.y = 0.0
-		boot_left.position.y = -4.0
-		boot_right.position.y = -4.0
-		arm_right.position.y = -12.0
+		boot_left.position.y = -8.0
+		boot_right.position.y = -8.0
+		arm_right.position.y = -24.0
+		tool_sprite.rotation = 0.0
 
 	# Scoop cooldown
 	if scoop_cooldown_timer > 0.0:
@@ -118,6 +122,13 @@ func _scoop_feedback() -> void:
 	scoop_tween.tween_property(arm_right, "rotation", -0.5, 0.08)
 	scoop_tween.tween_property(arm_right, "rotation", 0.0, 0.12)
 
+	# Tool swings with the scoop
+	if tool_tween and tool_tween.is_valid():
+		tool_tween.kill()
+	tool_tween = create_tween()
+	tool_tween.tween_property(tool_sprite, "rotation", -0.7, 0.08)
+	tool_tween.tween_property(tool_sprite, "rotation", 0.0, 0.12)
+
 	# Show gallons collected (blue)
 	var output: float = GameManager.get_tool_output(GameManager.current_tool_id)
 	_spawn_floating_text("+%.4f gal" % output, Color(0.4, 0.8, 1.0))
@@ -126,16 +137,16 @@ func _scoop_feedback() -> void:
 	_spawn_splash()
 
 func _spawn_splash() -> void:
-	for i in range(4):
+	for i in range(6):
 		var dot := ColorRect.new()
-		dot.size = Vector2(1, 1)
+		dot.size = Vector2(2, 2)
 		dot.color = Color(0.4, 0.65, 0.85, 0.8)
-		dot.position = Vector2(randf_range(-6, 6), -2)
+		dot.position = Vector2(randf_range(-12, 12), -4)
 		dot.z_index = 8
 		add_child(dot)
 
 		var tw := create_tween()
-		tw.tween_property(dot, "position", dot.position + Vector2(randf_range(-8, 8), randf_range(-12, -4)), 0.4)
+		tw.tween_property(dot, "position", dot.position + Vector2(randf_range(-16, 16), randf_range(-24, -8)), 0.4)
 		tw.parallel().tween_property(dot, "modulate:a", 0.0, 0.4)
 		tw.tween_callback(dot.queue_free)
 
@@ -150,59 +161,59 @@ func _update_tool_visual() -> void:
 	match tool_id:
 		"spoon":
 			var handle := ColorRect.new()
-			handle.size = Vector2(1, 5)
-			handle.position = Vector2(0, -2)
+			handle.size = Vector2(2, 10)
+			handle.position = Vector2(0, -4)
 			handle.color = Color(0.7, 0.7, 0.7)
 			tool_sprite.add_child(handle)
 			tool_visuals.append(handle)
 			var bowl := ColorRect.new()
-			bowl.size = Vector2(2, 2)
-			bowl.position = Vector2(-0.5, 3)
+			bowl.size = Vector2(4, 4)
+			bowl.position = Vector2(-1, 6)
 			bowl.color = Color(0.8, 0.8, 0.8)
 			tool_sprite.add_child(bowl)
 			tool_visuals.append(bowl)
 		"cup":
 			var body := ColorRect.new()
-			body.size = Vector2(3, 4)
-			body.position = Vector2(-1, 0)
+			body.size = Vector2(6, 8)
+			body.position = Vector2(-2, 0)
 			body.color = Color(0.85, 0.85, 0.9)
 			tool_sprite.add_child(body)
 			tool_visuals.append(body)
 			var rim := ColorRect.new()
-			rim.size = Vector2(4, 1)
-			rim.position = Vector2(-1.5, -1)
+			rim.size = Vector2(8, 2)
+			rim.position = Vector2(-3, -2)
 			rim.color = Color(0.75, 0.75, 0.8)
 			tool_sprite.add_child(rim)
 			tool_visuals.append(rim)
 		"bucket":
 			var body := ColorRect.new()
-			body.size = Vector2(4, 5)
-			body.position = Vector2(-2, -1)
+			body.size = Vector2(8, 10)
+			body.position = Vector2(-4, -2)
 			body.color = Color(0.45, 0.45, 0.5)
 			tool_sprite.add_child(body)
 			tool_visuals.append(body)
 			var handle := ColorRect.new()
-			handle.size = Vector2(6, 1)
-			handle.position = Vector2(-3, -3)
+			handle.size = Vector2(12, 2)
+			handle.position = Vector2(-6, -6)
 			handle.color = Color(0.55, 0.55, 0.6)
 			tool_sprite.add_child(handle)
 			tool_visuals.append(handle)
 			var rim := ColorRect.new()
-			rim.size = Vector2(5, 1)
-			rim.position = Vector2(-2.5, -1)
+			rim.size = Vector2(10, 2)
+			rim.position = Vector2(-5, -2)
 			rim.color = Color(0.5, 0.5, 0.55)
 			tool_sprite.add_child(rim)
 			tool_visuals.append(rim)
 		"hose":
 			var nozzle := ColorRect.new()
-			nozzle.size = Vector2(5, 2)
-			nozzle.position = Vector2(-1, -1)
+			nozzle.size = Vector2(10, 4)
+			nozzle.position = Vector2(-2, -2)
 			nozzle.color = Color(0.2, 0.55, 0.2)
 			tool_sprite.add_child(nozzle)
 			tool_visuals.append(nozzle)
 			var pipe := ColorRect.new()
-			pipe.size = Vector2(2, 4)
-			pipe.position = Vector2(-1, 1)
+			pipe.size = Vector2(4, 8)
+			pipe.position = Vector2(-2, 2)
 			pipe.color = Color(0.25, 0.5, 0.25)
 			tool_sprite.add_child(pipe)
 			tool_visuals.append(pipe)
@@ -213,17 +224,17 @@ func show_floating_text(text: String, color: Color = Color(0.3, 1.0, 0.4)) -> vo
 func _spawn_floating_text(text: String, color: Color = Color(0.3, 1.0, 0.4)) -> void:
 	var label := Label.new()
 	label.text = text
-	label.add_theme_font_size_override("font_size", 7)
+	label.add_theme_font_size_override("font_size", 14)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.7))
 	label.add_theme_constant_override("shadow_offset_x", 1)
 	label.add_theme_constant_override("shadow_offset_y", 1)
-	label.position = Vector2(-14, -24)
+	label.position = Vector2(-28, -48)
 	label.z_index = 10
 	add_child(label)
 
 	var tween := create_tween()
-	tween.tween_property(label, "position:y", label.position.y - 16, 0.8)
+	tween.tween_property(label, "position:y", label.position.y - 32, 0.8)
 	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.8)
 	tween.tween_callback(label.queue_free)
 

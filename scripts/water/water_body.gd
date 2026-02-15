@@ -1,8 +1,8 @@
 extends ColorRect
 
-@export var basin_bottom_y: float = 163.0
-@export var basin_top_y: float = 100.0
-var full_height: float = 63.0
+@export var basin_bottom_y: float = 326.0
+@export var basin_top_y: float = 200.0
+var full_height: float = 126.0
 
 # Color shifts: murky when full, clearer when low
 var color_full := Color(0.2, 0.32, 0.12, 0.92)
