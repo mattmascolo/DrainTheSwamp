@@ -3,13 +3,20 @@ extends PanelContainer
 @onready var tool_list: VBoxContainer = $MarginContainer/VBoxContainer/ScrollContainer/ToolList
 @onready var close_button: Button = $MarginContainer/VBoxContainer/TopBar/CloseButton
 
+var _dirty: bool = false
+
 func _ready() -> void:
 	close_button.pressed.connect(func() -> void: visible = false)
-	GameManager.money_changed.connect(func(_m: float) -> void: _refresh())
-	GameManager.tool_upgraded.connect(func(_t: String, _l: int) -> void: _refresh())
-	GameManager.tool_changed.connect(func(_d: Dictionary) -> void: _refresh())
-	GameManager.camel_changed.connect(func() -> void: _refresh())
+	GameManager.money_changed.connect(func(_m: float) -> void: _dirty = true)
+	GameManager.tool_upgraded.connect(func(_t: String, _l: int) -> void: _dirty = true)
+	GameManager.tool_changed.connect(func(_d: Dictionary) -> void: _dirty = true)
+	GameManager.camel_changed.connect(func() -> void: _dirty = true)
 	visible = false
+
+func _process(_delta: float) -> void:
+	if _dirty and visible:
+		_dirty = false
+		_refresh()
 
 func open() -> void:
 	visible = true
@@ -21,7 +28,7 @@ func _refresh() -> void:
 		child.queue_free()
 
 	var sorted_tools: Array = GameManager.tool_definitions.keys()
-	sorted_tools.sort_custom(func(a: Variant, b: Variant) -> bool: return GameManager.tool_definitions[a]["order"] < GameManager.tool_definitions[b]["order"])
+	sorted_tools.sort_custom(func(a: Variant, b: Variant) -> bool: return GameManager.tool_definitions[a]["cost"] < GameManager.tool_definitions[b]["cost"])
 
 	for tool_id in sorted_tools:
 		var tid: String = tool_id
@@ -112,12 +119,11 @@ func _refresh() -> void:
 			buy_btn.text = "Buy %s" % Economy.format_money(defn["cost"])
 			buy_btn.custom_minimum_size = Vector2(110, 0)
 			var prev_owned := true
-			for other_id in sorted_tools:
-				var oid: String = other_id
-				if GameManager.tool_definitions[oid]["order"] == defn["order"] - 1:
-					if not GameManager.tools_owned[oid]["owned"]:
-						prev_owned = false
-					break
+			var tool_index: int = sorted_tools.find(tid)
+			if tool_index > 0:
+				var prev_id: String = sorted_tools[tool_index - 1]
+				if not GameManager.tools_owned[prev_id]["owned"]:
+					prev_owned = false
 			if GameManager.money < defn["cost"] or not prev_owned:
 				buy_btn.disabled = true
 			else:

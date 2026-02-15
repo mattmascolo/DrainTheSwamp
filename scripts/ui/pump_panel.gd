@@ -3,11 +3,18 @@ extends PanelContainer
 @onready var content: VBoxContainer = $MarginContainer/VBoxContainer/ScrollContainer/Content
 @onready var close_button: Button = $MarginContainer/VBoxContainer/TopBar/CloseButton
 
+var _dirty: bool = false
+
 func _ready() -> void:
 	close_button.pressed.connect(func() -> void: visible = false)
-	GameManager.money_changed.connect(func(_m: float) -> void: _refresh())
-	GameManager.pump_changed.connect(func() -> void: _refresh())
+	GameManager.money_changed.connect(func(_m: float) -> void: _dirty = true)
+	GameManager.pump_changed.connect(func() -> void: _dirty = true)
 	visible = false
+
+func _process(_delta: float) -> void:
+	if _dirty and visible:
+		_dirty = false
+		_refresh()
 
 func open() -> void:
 	visible = true
