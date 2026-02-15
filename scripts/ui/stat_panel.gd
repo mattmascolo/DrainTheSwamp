@@ -26,17 +26,19 @@ func open() -> void:
 	_refresh_cooldown = 0.0
 	_refresh()
 	# Slide in from left (Phase 10a)
-	position.x = -320
+	var vp_w: float = get_viewport_rect().size.x
+	position.x = -vp_w
 	var tw := create_tween()
 	tw.set_ease(Tween.EASE_OUT)
 	tw.set_trans(Tween.TRANS_CUBIC)
 	tw.tween_property(self, "position:x", 0.0, 0.2)
 
 func close() -> void:
+	var vp_w: float = get_viewport_rect().size.x
 	var tw := create_tween()
 	tw.set_ease(Tween.EASE_IN)
 	tw.set_trans(Tween.TRANS_CUBIC)
-	tw.tween_property(self, "position:x", -320.0, 0.15)
+	tw.tween_property(self, "position:x", -vp_w, 0.15)
 	tw.tween_callback(func() -> void: visible = false)
 
 func _refresh() -> void:

@@ -926,7 +926,7 @@ func _build_fireflies() -> void:
 		fly.color = Color(0.8, 1.0, 0.3, 0.0)
 		fly.z_index = 6
 		var base_x: float = randf_range(50, 1870)
-		var base_y: float = randf_range(80, 260)
+		var base_y: float = minf(randf_range(60, 130), _get_terrain_y_at(base_x) - 15.0)
 		fly.position = Vector2(base_x, base_y)
 		add_child(fly)
 		# Additive glow pool under each firefly
@@ -1344,7 +1344,7 @@ func _build_dragonflies() -> void:
 		wing_r.color = Color(0.8, 0.9, 1.0, 0.4)
 		df.add_child(wing_r)
 		var base_x: float = randf_range(80, 1840)
-		var base_y: float = randf_range(100, 240)
+		var base_y: float = minf(randf_range(60, 130), _get_terrain_y_at(base_x) - 20.0)
 		df.position = Vector2(base_x, base_y)
 		dragonflies.append({
 			"node": df,
@@ -1918,7 +1918,9 @@ func _get_terrain_y_at(x: float) -> float:
 		if x >= terrain_points[i].x and x <= terrain_points[i + 1].x:
 			var t: float = (x - terrain_points[i].x) / (terrain_points[i + 1].x - terrain_points[i].x + 0.001)
 			return lerpf(terrain_points[i].y, terrain_points[i + 1].y, t)
-	return -1.0
+	if x < terrain_points[0].x:
+		return terrain_points[0].y
+	return terrain_points[terrain_points.size() - 1].y
 
 # --- Unique Pool Features ---
 func _build_pool_features() -> void:
@@ -2951,9 +2953,10 @@ func _build_weather() -> void:
 	rain_particles.emitting = false
 	rain_particles.amount = 200
 	rain_particles.lifetime = 0.5
-	rain_particles.position = Vector2(160, -10)
+	var weather_vp := get_viewport_rect().size
+	rain_particles.position = Vector2(weather_vp.x / 2.0, -10)
 	rain_particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	rain_particles.emission_rect_extents = Vector2(200, 4)
+	rain_particles.emission_rect_extents = Vector2(weather_vp.x * 0.55, 4)
 	rain_particles.direction = Vector2(-0.2, 1.0)
 	rain_particles.spread = 8.0
 	rain_particles.initial_velocity_min = 200.0
@@ -2964,7 +2967,7 @@ func _build_weather() -> void:
 	rain_particles.scale_amount_max = 1.2
 	rain_layer.add_child(rain_particles)
 	lightning_rect = ColorRect.new()
-	lightning_rect.size = Vector2(320, 180)
+	lightning_rect.size = weather_vp
 	lightning_rect.color = Color(1, 1, 1, 0)
 	lightning_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rain_layer.add_child(lightning_rect)
@@ -3285,7 +3288,8 @@ func _build_post_processing() -> void:
 	post_process_layer.layer = 100
 	add_child(post_process_layer)
 	post_process_rect = ColorRect.new()
-	post_process_rect.size = Vector2(320, 180)
+	var vp_size := get_viewport_rect().size
+	post_process_rect.size = vp_size
 	post_process_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var mat := ShaderMaterial.new()
 	mat.shader = POST_PROCESS_SHADER
@@ -3457,8 +3461,9 @@ func _process(delta: float) -> void:
 		var aline: Line2D = al["line"]
 		aline.clear_points()
 		if aurora_fade > 0.01:
+			var half_vp: float = get_viewport_rect().size.x / 2.0
 			for s in range(20):
-				var ax: float = cam_x_au - 180.0 + s * 20.0
+				var ax: float = cam_x_au - half_vp + s * (half_vp * 2.0 / 19.0)
 				var ay: float = al["base_y"] + sin(wave_time * al["speed"] + s * 0.5 + al["phase"]) * 6.0
 				aline.add_point(Vector2(ax, ay))
 			aline.default_color.a = aurora_fade * 0.3
@@ -3565,6 +3570,7 @@ func _process(delta: float) -> void:
 		var node: ColorRect = fd["node"]
 		var px: float = fd["base_x"] + sin(wave_time * fd["speed_x"] + fd["phase_x"]) * fd["amp_x"]
 		var py: float = fd["base_y"] + sin(wave_time * fd["speed_y"] + fd["phase_y"]) * fd["amp_y"]
+		py = minf(py, _get_terrain_y_at(px) - 10.0)
 		node.position = Vector2(px, py)
 		var glow: float = (sin(wave_time * 1.8 + fd["glow_phase"]) + 1.0) * 0.5
 		var fly_vis: float = fly_alpha * lerpf(0.2, 0.9, glow)
@@ -3586,7 +3592,8 @@ func _process(delta: float) -> void:
 			continue
 		var node: ColorRect = ld["node"]
 		node.position.x += ld["speed"] * delta
-		node.position.y = ld["base_y"] + sin(wave_time * 1.2 + ld["wobble_phase"]) * ld["wobble_amp"]
+		var leaf_y: float = ld["base_y"] + sin(wave_time * 1.2 + ld["wobble_phase"]) * ld["wobble_amp"]
+		node.position.y = minf(leaf_y, _get_terrain_y_at(node.position.x) - 10.0)
 		node.rotation += delta * 0.8
 		# Fade near end of life
 		var life_frac: float = ld["lifetime"] / ld["max_life"]
@@ -3715,6 +3722,7 @@ func _process(delta: float) -> void:
 		var dnode: Node2D = dd["node"]
 		var dpx: float = dd["base_x"] + sin(wave_time * dd["speed"] + dd["phase_x"]) * dd["amp_x"]
 		var dpy: float = dd["base_y"] + sin(wave_time * dd["speed"] * 0.7 + dd["phase_y"]) * dd["amp_y"]
+		dpy = minf(dpy, _get_terrain_y_at(dpx) - 15.0)
 		dnode.position = Vector2(dpx, dpy)
 		dnode.modulate.a = df_alpha
 		# Wing flap
@@ -4137,12 +4145,12 @@ func _process(delta: float) -> void:
 			ct.rotation = sway
 
 func _get_cycle_color(t: float) -> Color:
-	var pre_dawn := Color(0.35, 0.3, 0.55)
-	var dawn := Color(1.0, 0.65, 0.45)
-	var sunrise := Color(1.0, 0.85, 0.7)
+	var pre_dawn := Color(0.5, 0.45, 0.65)
+	var dawn := Color(1.0, 0.8, 0.65)
+	var sunrise := Color(1.0, 0.92, 0.85)
 	var noon := Color(1.0, 1.0, 1.0)
-	var golden_hour := Color(1.0, 0.82, 0.55)
-	var sunset := Color(0.95, 0.5, 0.35)
+	var golden_hour := Color(1.0, 0.85, 0.6)
+	var sunset := Color(0.95, 0.55, 0.4)
 	var dusk := Color(0.65, 0.35, 0.5)
 	var night := Color(0.28, 0.32, 0.58)
 
