@@ -1,0 +1,11 @@
+# Godot editor cache
+.godot/
+
+# Exported builds
+export/
+*.pck
+*.zip
+
+# OS files
+.DS_Store
+Thumbs.db

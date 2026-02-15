@@ -1,0 +1,240 @@
+extends CharacterBody2D
+
+const BASE_SPEED: float = 60.0
+const GRAVITY: float = 400.0
+const SCOOP_COOLDOWN: float = 0.3
+const STAMINA_REGEN_DELAY: float = 1.0
+const STAMINA_REGEN_DELAY_TIME: float = 1.0
+
+signal pump_requested()
+
+var near_water: bool = false
+var near_swamp_index: int = -1
+var near_pump: bool = false
+var scoop_cooldown_timer: float = 0.0
+var stamina_idle_timer: float = 0.0
+var scoop_requested: bool = false
+var facing_right: bool = true
+var flash_tween: Tween = null
+var walk_time: float = 0.0
+var is_walking: bool = false
+
+@onready var visual: Node2D = $Visual
+@onready var tool_sprite: Node2D = $Visual/ToolSprite
+@onready var boot_left: ColorRect = $Visual/BootLeft
+@onready var boot_right: ColorRect = $Visual/BootRight
+@onready var arm_right: ColorRect = $Visual/ArmRight
+
+# Tool visual elements (built dynamically)
+var tool_visuals: Array[ColorRect] = []
+
+func _ready() -> void:
+	GameManager.tool_changed.connect(func(_d: Dictionary) -> void: _update_tool_visual())
+	_update_tool_visual()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("scoop"):
+		scoop_requested = true
+
+func _physics_process(delta: float) -> void:
+	# Gravity
+	if not is_on_floor():
+		velocity.y += GRAVITY * delta
+
+	# Movement
+	var direction: float = Input.get_axis("move_left", "move_right")
+	var speed: float = BASE_SPEED * GameManager.get_movement_speed_multiplier()
+	velocity.x = direction * speed
+
+	if direction != 0.0:
+		facing_right = direction > 0.0
+		visual.scale.x = 1.0 if facing_right else -1.0
+
+	is_walking = direction != 0.0 and is_on_floor()
+
+	move_and_slide()
+
+	# Walk animation
+	if is_walking:
+		walk_time += delta * 8.0
+		var bob: float = sin(walk_time) * 0.8
+		visual.position.y = bob
+		# Leg animation
+		var leg_offset: float = sin(walk_time) * 1.5
+		boot_left.position.y = -4.0 + leg_offset
+		boot_right.position.y = -4.0 - leg_offset
+		# Arm swing
+		arm_right.position.y = -12.0 + sin(walk_time + PI) * 1.0
+	else:
+		walk_time = 0.0
+		visual.position.y = 0.0
+		boot_left.position.y = -4.0
+		boot_right.position.y = -4.0
+		arm_right.position.y = -12.0
+
+	# Scoop cooldown
+	if scoop_cooldown_timer > 0.0:
+		scoop_cooldown_timer -= delta
+
+	# Stamina regen
+	stamina_idle_timer += delta
+	if stamina_idle_timer >= STAMINA_REGEN_DELAY_TIME:
+		GameManager.regen_stamina(delta)
+
+	# Handle scoop request
+	if scoop_requested:
+		scoop_requested = false
+		if scoop_cooldown_timer <= 0.0:
+			_handle_scoop()
+
+func _handle_scoop() -> void:
+	if near_pump:
+		pump_requested.emit()
+		return
+	if GameManager.current_tool_id == "hose":
+		if near_water and near_swamp_index >= 0:
+			GameManager.try_activate_hose(near_swamp_index)
+		return
+	if not near_water or near_swamp_index < 0:
+		return
+	if GameManager.try_scoop(near_swamp_index):
+		scoop_cooldown_timer = SCOOP_COOLDOWN
+		stamina_idle_timer = 0.0
+		_scoop_feedback()
+	elif GameManager.current_stamina >= 1.0 and GameManager.is_inventory_full():
+		_spawn_floating_text("FULL!", Color(1.0, 0.4, 0.3))
+		scoop_cooldown_timer = SCOOP_COOLDOWN
+
+func _scoop_feedback() -> void:
+	# Flash the sprite
+	if flash_tween and flash_tween.is_valid():
+		flash_tween.kill()
+	flash_tween = create_tween()
+	visual.modulate = Color(2.0, 2.0, 2.0)
+	flash_tween.tween_property(visual, "modulate", Color.WHITE, 0.15)
+
+	# Scoop arm animation
+	var scoop_tween := create_tween()
+	scoop_tween.tween_property(arm_right, "rotation", -0.5, 0.08)
+	scoop_tween.tween_property(arm_right, "rotation", 0.0, 0.12)
+
+	# Show gallons collected (blue)
+	var output: float = GameManager.get_tool_output(GameManager.current_tool_id)
+	_spawn_floating_text("+%.4f gal" % output, Color(0.4, 0.8, 1.0))
+
+	# Splash particles
+	_spawn_splash()
+
+func _spawn_splash() -> void:
+	for i in range(4):
+		var dot := ColorRect.new()
+		dot.size = Vector2(1, 1)
+		dot.color = Color(0.4, 0.65, 0.85, 0.8)
+		dot.position = Vector2(randf_range(-6, 6), -2)
+		dot.z_index = 8
+		add_child(dot)
+
+		var tw := create_tween()
+		tw.tween_property(dot, "position", dot.position + Vector2(randf_range(-8, 8), randf_range(-12, -4)), 0.4)
+		tw.parallel().tween_property(dot, "modulate:a", 0.0, 0.4)
+		tw.tween_callback(dot.queue_free)
+
+func _update_tool_visual() -> void:
+	# Clear existing tool visuals
+	for v in tool_visuals:
+		if is_instance_valid(v):
+			v.queue_free()
+	tool_visuals.clear()
+
+	var tool_id: String = GameManager.current_tool_id
+	match tool_id:
+		"spoon":
+			var handle := ColorRect.new()
+			handle.size = Vector2(1, 5)
+			handle.position = Vector2(0, -2)
+			handle.color = Color(0.7, 0.7, 0.7)
+			tool_sprite.add_child(handle)
+			tool_visuals.append(handle)
+			var bowl := ColorRect.new()
+			bowl.size = Vector2(2, 2)
+			bowl.position = Vector2(-0.5, 3)
+			bowl.color = Color(0.8, 0.8, 0.8)
+			tool_sprite.add_child(bowl)
+			tool_visuals.append(bowl)
+		"cup":
+			var body := ColorRect.new()
+			body.size = Vector2(3, 4)
+			body.position = Vector2(-1, 0)
+			body.color = Color(0.85, 0.85, 0.9)
+			tool_sprite.add_child(body)
+			tool_visuals.append(body)
+			var rim := ColorRect.new()
+			rim.size = Vector2(4, 1)
+			rim.position = Vector2(-1.5, -1)
+			rim.color = Color(0.75, 0.75, 0.8)
+			tool_sprite.add_child(rim)
+			tool_visuals.append(rim)
+		"bucket":
+			var body := ColorRect.new()
+			body.size = Vector2(4, 5)
+			body.position = Vector2(-2, -1)
+			body.color = Color(0.45, 0.45, 0.5)
+			tool_sprite.add_child(body)
+			tool_visuals.append(body)
+			var handle := ColorRect.new()
+			handle.size = Vector2(6, 1)
+			handle.position = Vector2(-3, -3)
+			handle.color = Color(0.55, 0.55, 0.6)
+			tool_sprite.add_child(handle)
+			tool_visuals.append(handle)
+			var rim := ColorRect.new()
+			rim.size = Vector2(5, 1)
+			rim.position = Vector2(-2.5, -1)
+			rim.color = Color(0.5, 0.5, 0.55)
+			tool_sprite.add_child(rim)
+			tool_visuals.append(rim)
+		"hose":
+			var nozzle := ColorRect.new()
+			nozzle.size = Vector2(5, 2)
+			nozzle.position = Vector2(-1, -1)
+			nozzle.color = Color(0.2, 0.55, 0.2)
+			tool_sprite.add_child(nozzle)
+			tool_visuals.append(nozzle)
+			var pipe := ColorRect.new()
+			pipe.size = Vector2(2, 4)
+			pipe.position = Vector2(-1, 1)
+			pipe.color = Color(0.25, 0.5, 0.25)
+			tool_sprite.add_child(pipe)
+			tool_visuals.append(pipe)
+
+func show_floating_text(text: String, color: Color = Color(0.3, 1.0, 0.4)) -> void:
+	_spawn_floating_text(text, color)
+
+func _spawn_floating_text(text: String, color: Color = Color(0.3, 1.0, 0.4)) -> void:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 7)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.7))
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	label.position = Vector2(-14, -24)
+	label.z_index = 10
+	add_child(label)
+
+	var tween := create_tween()
+	tween.tween_property(label, "position:y", label.position.y - 16, 0.8)
+	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.8)
+	tween.tween_callback(label.queue_free)
+
+func set_near_pump(value: bool) -> void:
+	near_pump = value
+
+func set_near_water(value: bool, swamp_index: int = -1) -> void:
+	if value:
+		near_water = true
+		near_swamp_index = swamp_index
+	else:
+		if swamp_index == near_swamp_index:
+			near_water = false
+			near_swamp_index = -1

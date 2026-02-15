@@ -1,0 +1,110 @@
+extends PanelContainer
+
+signal resume_pressed
+signal reset_confirmed
+
+var confirming_reset: bool = false
+
+@onready var button_list: VBoxContainer = $MarginContainer/VBoxContainer/ButtonList
+@onready var close_button: Button = $MarginContainer/VBoxContainer/TopBar/CloseButton
+
+func _ready() -> void:
+	close_button.pressed.connect(func() -> void: _close())
+	visible = false
+	_build_buttons()
+
+func open() -> void:
+	visible = true
+	confirming_reset = false
+	_build_buttons()
+	get_tree().paused = true
+
+func _close() -> void:
+	visible = false
+	confirming_reset = false
+	get_tree().paused = false
+	resume_pressed.emit()
+
+func _build_buttons() -> void:
+	for child in button_list.get_children():
+		child.queue_free()
+
+	var resume_btn := Button.new()
+	resume_btn.add_theme_font_size_override("font_size", 8)
+	resume_btn.text = "Resume"
+	resume_btn.custom_minimum_size = Vector2(80, 14)
+	resume_btn.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
+	resume_btn.pressed.connect(func() -> void: _close())
+	_style_button(resume_btn, Color(0.08, 0.22, 0.1))
+	button_list.add_child(resume_btn)
+
+	var sep := HSeparator.new()
+	button_list.add_child(sep)
+
+	if not confirming_reset:
+		var reset_btn := Button.new()
+		reset_btn.add_theme_font_size_override("font_size", 8)
+		reset_btn.text = "Reset Game"
+		reset_btn.custom_minimum_size = Vector2(80, 14)
+		reset_btn.add_theme_color_override("font_color", Color(1.0, 0.6, 0.5))
+		reset_btn.pressed.connect(func() -> void: confirming_reset = true; _build_buttons())
+		_style_button(reset_btn, Color(0.25, 0.1, 0.08))
+		button_list.add_child(reset_btn)
+	else:
+		var warn_label := Label.new()
+		warn_label.add_theme_font_size_override("font_size", 7)
+		warn_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.4))
+		warn_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+		warn_label.add_theme_constant_override("shadow_offset_x", 1)
+		warn_label.add_theme_constant_override("shadow_offset_y", 1)
+		warn_label.text = "All progress will be lost!"
+		warn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		button_list.add_child(warn_label)
+
+		var confirm_row := HBoxContainer.new()
+		confirm_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		confirm_row.add_theme_constant_override("separation", 8)
+
+		var yes_btn := Button.new()
+		yes_btn.add_theme_font_size_override("font_size", 7)
+		yes_btn.text = "Yes, Reset"
+		yes_btn.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
+		yes_btn.pressed.connect(func() -> void: reset_confirmed.emit(); _close())
+		_style_button(yes_btn, Color(0.3, 0.08, 0.06))
+		confirm_row.add_child(yes_btn)
+
+		var no_btn := Button.new()
+		no_btn.add_theme_font_size_override("font_size", 7)
+		no_btn.text = "Cancel"
+		no_btn.add_theme_color_override("font_color", Color(0.8, 0.85, 0.9))
+		no_btn.pressed.connect(func() -> void: confirming_reset = false; _build_buttons())
+		_style_button(no_btn, Color(0.15, 0.18, 0.22))
+		confirm_row.add_child(no_btn)
+
+		button_list.add_child(confirm_row)
+
+func _style_button(btn: Button, bg_color: Color) -> void:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg_color
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.border_color = bg_color.lightened(0.4)
+	style.corner_radius_top_left = 2
+	style.corner_radius_top_right = 2
+	style.corner_radius_bottom_left = 2
+	style.corner_radius_bottom_right = 2
+	style.content_margin_left = 4
+	style.content_margin_right = 4
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
+	btn.add_theme_stylebox_override("normal", style)
+
+	var hover_style := style.duplicate()
+	hover_style.bg_color = bg_color.lightened(0.15)
+	btn.add_theme_stylebox_override("hover", hover_style)
+
+	var pressed_style := style.duplicate()
+	pressed_style.bg_color = bg_color.darkened(0.1)
+	btn.add_theme_stylebox_override("pressed", pressed_style)
