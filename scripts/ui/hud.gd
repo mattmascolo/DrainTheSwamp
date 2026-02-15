@@ -3,6 +3,7 @@ extends CanvasLayer
 @onready var money_label: Label = $MarginContainer/VBoxContainer/TopBar/HBox/MoneyLabel
 @onready var carry_label: Label = $MarginContainer/VBoxContainer/TopBar/HBox/CarryLabel
 @onready var water_label: Label = $MarginContainer/VBoxContainer/TopBar/HBox/WaterLabel
+@onready var day_label: Label = $MarginContainer/VBoxContainer/TopBar/HBox/DayLabel
 @onready var tool_label: Label = $MarginContainer/VBoxContainer/BottomBar/HBox/ToolLabel
 @onready var stamina_bar: ProgressBar = $MarginContainer/VBoxContainer/BottomBar/HBox/StaminaBar
 @onready var hose_label: Label = $MarginContainer/VBoxContainer/BottomBar/HBox/HoseLabel
@@ -24,6 +25,7 @@ func _ready() -> void:
 	GameManager.hose_state_changed.connect(_on_hose_state_changed)
 	GameManager.swamp_completed.connect(_on_swamp_completed)
 	GameManager.water_carried_changed.connect(_on_water_carried_changed)
+	GameManager.day_changed.connect(_on_day_changed)
 
 	shop_button.pressed.connect(func() -> void: shop_pressed.emit())
 	stats_button.pressed.connect(func() -> void: stats_pressed.emit())
@@ -36,6 +38,32 @@ func _ready() -> void:
 	_on_stamina_changed(GameManager.current_stamina, GameManager.get_max_stamina())
 	_on_water_carried_changed(GameManager.water_carried, GameManager.get_stat_value("carrying_capacity"))
 	hose_label.visible = false
+	_update_day_label()
+
+func _process(_delta: float) -> void:
+	_update_day_label()
+
+func _update_day_label() -> void:
+	var t: float = GameManager.cycle_progress
+	var time_str: String
+	if t < 0.15:
+		time_str = "Night"
+	elif t < 0.25:
+		time_str = "Dawn"
+	elif t < 0.45:
+		time_str = "Morning"
+	elif t < 0.55:
+		time_str = "Midday"
+	elif t < 0.65:
+		time_str = "Afternoon"
+	elif t < 0.75:
+		time_str = "Dusk"
+	else:
+		time_str = "Night"
+	day_label.text = "Day %d - %s" % [GameManager.current_day, time_str]
+
+func _on_day_changed(_day: int) -> void:
+	_update_day_label()
 
 func _on_money_changed(amount: float) -> void:
 	money_label.text = Economy.format_money(amount)

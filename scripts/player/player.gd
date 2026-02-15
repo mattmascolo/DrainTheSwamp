@@ -19,12 +19,18 @@ var flash_tween: Tween = null
 var tool_tween: Tween = null
 var walk_time: float = 0.0
 var is_walking: bool = false
+var dust_timer: float = 0.0
 
 @onready var visual: Node2D = $Visual
 @onready var tool_sprite: Node2D = $Visual/ToolSprite
 @onready var boot_left: ColorRect = $Visual/BootLeft
 @onready var boot_right: ColorRect = $Visual/BootRight
+@onready var boot_sole_left: ColorRect = $Visual/BootSoleLeft
+@onready var boot_sole_right: ColorRect = $Visual/BootSoleRight
+@onready var boot_lace_left: ColorRect = $Visual/BootLaceLeft
+@onready var boot_lace_right: ColorRect = $Visual/BootLaceRight
 @onready var arm_right: ColorRect = $Visual/ArmRight
+@onready var hand_right: ColorRect = $Visual/HandRight
 
 # Tool visual elements (built dynamically)
 var tool_visuals: Array[ColorRect] = []
@@ -36,6 +42,21 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("scoop"):
 		scoop_requested = true
+	# Dev mode: F1 = +$1k, F2 = +$10k, F3 = +$100k
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_F1:
+				GameManager.money += 1000.0
+				GameManager.money_changed.emit(GameManager.money)
+				_spawn_floating_text("+$1,000", Color(1.0, 0.85, 0.2))
+			KEY_F2:
+				GameManager.money += 10000.0
+				GameManager.money_changed.emit(GameManager.money)
+				_spawn_floating_text("+$10,000", Color(1.0, 0.85, 0.2))
+			KEY_F3:
+				GameManager.money += 100000.0
+				GameManager.money_changed.emit(GameManager.money)
+				_spawn_floating_text("+$100,000", Color(1.0, 0.85, 0.2))
 
 func _physics_process(delta: float) -> void:
 	# Gravity
@@ -64,17 +85,35 @@ func _physics_process(delta: float) -> void:
 		var leg_offset: float = sin(walk_time) * 3.0
 		boot_left.position.y = -8.0 + leg_offset
 		boot_right.position.y = -8.0 - leg_offset
+		boot_sole_left.position.y = -2.0 + leg_offset
+		boot_sole_right.position.y = -2.0 - leg_offset
+		boot_lace_left.position.y = -6.0 + leg_offset
+		boot_lace_right.position.y = -6.0 - leg_offset
 		# Arm swing
-		arm_right.position.y = -24.0 + sin(walk_time + PI) * 2.0
+		var arm_offset: float = sin(walk_time + PI) * 2.0
+		arm_right.position.y = -24.0 + arm_offset
+		hand_right.position.y = -13.0 + arm_offset
 		# Tool swings with the arm
 		tool_sprite.rotation = sin(walk_time + PI) * 0.15
+		# Dust particles
+		dust_timer += delta
+		if dust_timer >= 0.25:
+			dust_timer = 0.0
+			_spawn_dust()
 	else:
 		walk_time = 0.0
-		visual.position.y = 0.0
+		var breath: float = sin(Time.get_ticks_msec() * 0.003) * 0.6
+		visual.position.y = breath
 		boot_left.position.y = -8.0
 		boot_right.position.y = -8.0
+		boot_sole_left.position.y = -2.0
+		boot_sole_right.position.y = -2.0
+		boot_lace_left.position.y = -6.0
+		boot_lace_right.position.y = -6.0
 		arm_right.position.y = -24.0
+		hand_right.position.y = -13.0
 		tool_sprite.rotation = 0.0
+		dust_timer = 0.0
 
 	# Scoop cooldown
 	if scoop_cooldown_timer > 0.0:
@@ -249,3 +288,16 @@ func set_near_water(value: bool, swamp_index: int = -1) -> void:
 		if swamp_index == near_swamp_index:
 			near_water = false
 			near_swamp_index = -1
+
+func _spawn_dust() -> void:
+	for i in range(2):
+		var dot := ColorRect.new()
+		dot.size = Vector2(3, 2)
+		dot.color = Color(0.45, 0.35, 0.2, 0.6)
+		dot.position = Vector2(randf_range(-6, 6), -2)
+		dot.z_index = -1
+		add_child(dot)
+		var tw := create_tween()
+		tw.tween_property(dot, "position", dot.position + Vector2(randf_range(-8, 8), randf_range(-6, -2)), 0.5)
+		tw.parallel().tween_property(dot, "modulate:a", 0.0, 0.5)
+		tw.tween_callback(dot.queue_free)

@@ -7,6 +7,7 @@ func _ready() -> void:
 	close_button.pressed.connect(func() -> void: visible = false)
 	GameManager.money_changed.connect(func(_m: float) -> void: _refresh())
 	GameManager.tool_upgraded.connect(func(_t: String, _l: int) -> void: _refresh())
+	GameManager.tool_changed.connect(func(_d: Dictionary) -> void: _refresh())
 	visible = false
 
 func open() -> void:
@@ -15,6 +16,7 @@ func open() -> void:
 
 func _refresh() -> void:
 	for child in tool_list.get_children():
+		tool_list.remove_child(child)
 		child.queue_free()
 
 	var sorted_tools: Array = GameManager.tool_definitions.keys()
@@ -80,7 +82,7 @@ func _refresh() -> void:
 				equip_btn.text = "Equip"
 				equip_btn.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
 				var t: String = tid
-				equip_btn.pressed.connect(func() -> void: GameManager.equip_tool(t); _refresh())
+				equip_btn.pressed.connect(func() -> void: GameManager.equip_tool(t))
 			_style_button(equip_btn, Color(0.3, 0.28, 0.1))
 			entry.add_child(equip_btn)
 
@@ -95,7 +97,7 @@ func _refresh() -> void:
 			else:
 				upgrade_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
 				var t: String = tid
-				upgrade_btn.pressed.connect(func() -> void: GameManager.upgrade_tool(t); _refresh())
+				upgrade_btn.pressed.connect(func() -> void: GameManager.upgrade_tool(t))
 			_style_button(upgrade_btn, Color(0.1, 0.18, 0.3))
 			entry.add_child(upgrade_btn)
 		else:
@@ -116,7 +118,7 @@ func _refresh() -> void:
 			else:
 				buy_btn.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
 				var t: String = tid
-				buy_btn.pressed.connect(func() -> void: GameManager.buy_tool(t); GameManager.equip_tool(t); _refresh())
+				buy_btn.pressed.connect(func() -> void: GameManager.buy_tool(t); GameManager.equip_tool(t))
 			_style_button(buy_btn, Color(0.08, 0.22, 0.1))
 			entry.add_child(buy_btn)
 
@@ -148,3 +150,9 @@ func _style_button(btn: Button, bg_color: Color) -> void:
 	var pressed_style := style.duplicate()
 	pressed_style.bg_color = bg_color.darkened(0.1)
 	btn.add_theme_stylebox_override("pressed", pressed_style)
+
+	var disabled_style := style.duplicate()
+	disabled_style.bg_color = Color(0.08, 0.08, 0.1, 0.5)
+	disabled_style.border_color = Color(0.15, 0.15, 0.18, 0.4)
+	btn.add_theme_stylebox_override("disabled", disabled_style)
+	btn.add_theme_color_override("font_disabled_color", Color(0.35, 0.35, 0.4))

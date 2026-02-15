@@ -15,6 +15,7 @@ func open() -> void:
 
 func _refresh() -> void:
 	for child in content.get_children():
+		content.remove_child(child)
 		child.queue_free()
 
 	if not GameManager.pump_owned:
@@ -40,7 +41,7 @@ func _refresh() -> void:
 			buy_btn.disabled = true
 		else:
 			buy_btn.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
-			buy_btn.pressed.connect(func() -> void: GameManager.buy_pump(); _refresh())
+			buy_btn.pressed.connect(func() -> void: GameManager.buy_pump())
 		_style_button(buy_btn, Color(0.08, 0.22, 0.1))
 		content.add_child(buy_btn)
 	else:
@@ -70,7 +71,7 @@ func _refresh() -> void:
 			up_btn.disabled = true
 		else:
 			up_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
-			up_btn.pressed.connect(func() -> void: GameManager.upgrade_pump(); _refresh())
+			up_btn.pressed.connect(func() -> void: GameManager.upgrade_pump())
 		_style_button(up_btn, Color(0.1, 0.18, 0.3))
 		content.add_child(up_btn)
 
@@ -105,7 +106,7 @@ func _refresh() -> void:
 			else:
 				btn.text = defn["name"]
 				btn.add_theme_color_override("font_color", Color(0.85, 0.88, 0.95))
-				btn.pressed.connect(func() -> void: GameManager.set_pump_target(idx); _refresh())
+				btn.pressed.connect(func() -> void: GameManager.set_pump_target(idx))
 				_style_button(btn, Color(0.12, 0.15, 0.2))
 			content.add_child(btn)
 
@@ -134,3 +135,9 @@ func _style_button(btn: Button, bg_color: Color) -> void:
 	var pressed_style := style.duplicate()
 	pressed_style.bg_color = bg_color.darkened(0.1)
 	btn.add_theme_stylebox_override("pressed", pressed_style)
+
+	var disabled_style := style.duplicate()
+	disabled_style.bg_color = Color(0.08, 0.08, 0.1, 0.5)
+	disabled_style.border_color = Color(0.15, 0.15, 0.18, 0.4)
+	btn.add_theme_stylebox_override("disabled", disabled_style)
+	btn.add_theme_color_override("font_disabled_color", Color(0.35, 0.35, 0.4))

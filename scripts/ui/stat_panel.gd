@@ -15,6 +15,7 @@ func open() -> void:
 
 func _refresh() -> void:
 	for child in stat_list.get_children():
+		stat_list.remove_child(child)
 		child.queue_free()
 
 	for stat_id in GameManager.stat_definitions:
@@ -79,7 +80,7 @@ func _refresh() -> void:
 		else:
 			upgrade_btn.add_theme_color_override("font_color", Color(0.4, 0.85, 1.0))
 			var s: String = sid
-			upgrade_btn.pressed.connect(func() -> void: GameManager.upgrade_stat(s); _refresh())
+			upgrade_btn.pressed.connect(func() -> void: GameManager.upgrade_stat(s))
 		_style_button(upgrade_btn, Color(0.1, 0.18, 0.3))
 		entry.add_child(upgrade_btn)
 
@@ -111,3 +112,9 @@ func _style_button(btn: Button, bg_color: Color) -> void:
 	var pressed_style := style.duplicate()
 	pressed_style.bg_color = bg_color.darkened(0.1)
 	btn.add_theme_stylebox_override("pressed", pressed_style)
+
+	var disabled_style := style.duplicate()
+	disabled_style.bg_color = Color(0.08, 0.08, 0.1, 0.5)
+	disabled_style.border_color = Color(0.15, 0.15, 0.18, 0.4)
+	btn.add_theme_stylebox_override("disabled", disabled_style)
+	btn.add_theme_color_override("font_disabled_color", Color(0.35, 0.35, 0.4))

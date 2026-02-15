@@ -12,6 +12,7 @@ signal hose_state_changed(active: bool, time_remaining: float)
 signal swamp_completed(swamp_index: int, reward: float)
 signal pump_changed()
 signal water_carried_changed(current: float, capacity: float)
+signal day_changed(day: int)
 
 # --- Swamp Definitions ---
 var swamp_definitions: Array = [
@@ -123,6 +124,10 @@ const HOSE_DURATION: float = 20.0
 var pump_owned: bool = false
 var pump_level: int = 0
 var pump_target_swamp: int = -1
+
+# Day tracking
+var current_day: int = 1
+var cycle_progress: float = 0.2
 
 func _ready() -> void:
 	_init_swamp_states()
@@ -401,6 +406,8 @@ func reset_game() -> void:
 	pump_owned = false
 	pump_level = 0
 	pump_target_swamp = -1
+	current_day = 1
+	cycle_progress = 0.2
 	_init_swamp_states()
 
 	# Emit all signals to update UI
@@ -412,6 +419,7 @@ func reset_game() -> void:
 	hose_state_changed.emit(false, 0.0)
 	pump_changed.emit()
 	water_carried_changed.emit(0.0, get_stat_value("carrying_capacity"))
+	day_changed.emit(current_day)
 
 func regen_stamina(delta: float) -> void:
 	var max_stam: float = get_max_stamina()
@@ -463,7 +471,8 @@ func get_save_data() -> Dictionary:
 		"swamp_states": swamp_save,
 		"pump_owned": pump_owned,
 		"pump_level": pump_level,
-		"pump_target_swamp": pump_target_swamp
+		"pump_target_swamp": pump_target_swamp,
+		"current_day": current_day
 	}
 
 func load_save_data(data: Dictionary) -> void:
@@ -486,6 +495,7 @@ func load_save_data(data: Dictionary) -> void:
 	pump_owned = data.get("pump_owned", false)
 	pump_level = data.get("pump_level", 0)
 	pump_target_swamp = data.get("pump_target_swamp", -1)
+	current_day = int(data.get("current_day", 1))
 
 	# Load swamp states
 	if data.has("swamp_states"):
