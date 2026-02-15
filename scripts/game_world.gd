@@ -11,16 +11,16 @@ var cycle_time: float = 0.0
 # Plus initial left shore and final right shore
 var terrain_points: Array[Vector2] = [
 	Vector2(0, 136), Vector2(80, 136),              # Left shore (pump area)
-	Vector2(108, 158), Vector2(178, 162),            # Puddle: gentle entry, tilted floor (+4)
-	Vector2(214, 140), Vector2(278, 150),            # Ridge 1
-	Vector2(338, 198), Vector2(462, 203),            # Pond: wide, slight tilt (+5)
-	Vector2(538, 160), Vector2(598, 174),            # Ridge 2
-	Vector2(682, 236), Vector2(828, 243),            # Marsh: wide, tilt (+7)
-	Vector2(908, 192), Vector2(958, 208),            # Ridge 3
-	Vector2(1048, 280), Vector2(1215, 289),          # Bog: wide, tilt (+9)
-	Vector2(1308, 226), Vector2(1358, 244),          # Ridge 4
-	Vector2(1468, 326), Vector2(1685, 336),          # Deep Swamp: very wide, tilt (+10)
-	Vector2(1775, 276), Vector2(1920, 290),          # Right shore
+	Vector2(108, 160), Vector2(178, 164),            # Puddle: gentle entry, tilted floor (+4)
+	Vector2(214, 146), Vector2(278, 158),            # Ridge 1 (lower, slopes down)
+	Vector2(338, 206), Vector2(462, 212),            # Pond: wide, slight tilt (+6)
+	Vector2(538, 184), Vector2(598, 198),            # Ridge 2 (lower)
+	Vector2(682, 250), Vector2(828, 258),            # Marsh: wide, tilt (+8)
+	Vector2(908, 232), Vector2(958, 250),            # Ridge 3 (lower)
+	Vector2(1048, 306), Vector2(1215, 316),          # Bog: wide, tilt (+10)
+	Vector2(1308, 286), Vector2(1358, 306),          # Ridge 4 (lower)
+	Vector2(1468, 360), Vector2(1685, 372),          # Deep Swamp: very wide, tilt (+12)
+	Vector2(1775, 344), Vector2(1920, 362),          # Right shore (much lower)
 ]
 
 # Swamp geometry indices: swamp i -> terrain_points indices
@@ -34,6 +34,7 @@ var terrain_body: StaticBody2D = null
 var water_detect_areas: Array[Area2D] = []
 var water_walls: Array = []
 var swamp_labels: Array[Label] = []
+var swamp_percent_labels: Array[Label] = []
 var clouds: Array[ColorRect] = []
 var cattails: Array[Node2D] = []
 var stars: Array[ColorRect] = []
@@ -87,6 +88,29 @@ const GROUND_DARK_COLOR := Color(0.28, 0.18, 0.08)
 const WATER_COLOR := Color(0.18, 0.32, 0.22, 0.92)
 const WATER_EMPTY_COLOR := Color(0.3, 0.45, 0.32, 0.65)
 const WATER_SURFACE_COLOR := Color(0.35, 0.55, 0.4, 0.6)
+
+# Per-pool water colors
+const SWAMP_WATER_COLORS: Array[Color] = [
+	Color(0.22, 0.42, 0.35, 0.85),  # Puddle: clear light blue-green
+	Color(0.18, 0.35, 0.22, 0.90),  # Pond: standard green
+	Color(0.22, 0.30, 0.18, 0.93),  # Marsh: murky olive-brown
+	Color(0.18, 0.22, 0.14, 0.95),  # Bog: dark peaty
+	Color(0.12, 0.20, 0.25, 0.96),  # Deep Swamp: deep dark teal
+]
+const SWAMP_WATER_EMPTY_COLORS: Array[Color] = [
+	Color(0.35, 0.52, 0.45, 0.60),
+	Color(0.30, 0.45, 0.32, 0.65),
+	Color(0.32, 0.40, 0.28, 0.68),
+	Color(0.28, 0.32, 0.24, 0.70),
+	Color(0.22, 0.30, 0.35, 0.72),
+]
+const SWAMP_DEPTH_COLORS: Array[Color] = [
+	Color(0.10, 0.25, 0.18, 0.45),  # Puddle: lighter depth
+	Color(0.08, 0.18, 0.10, 0.60),  # Pond: standard
+	Color(0.10, 0.15, 0.08, 0.65),  # Marsh: olive depth
+	Color(0.08, 0.10, 0.06, 0.70),  # Bog: dark peat depth
+	Color(0.05, 0.10, 0.14, 0.75),  # Deep Swamp: dark teal depth
+]
 const GRASS_COLOR := Color(0.25, 0.48, 0.15)
 const GRASS_LIGHT_COLOR := Color(0.35, 0.58, 0.2)
 const ROCK_COLOR := Color(0.42, 0.4, 0.38)
@@ -129,6 +153,8 @@ func _ready() -> void:
 	_build_seaweed()
 	_build_turtles()
 	_build_tadpoles()
+	_build_pool_features()
+	_build_left_boundary()
 	_build_right_boundary()
 
 	GameManager.water_level_changed.connect(_on_water_level_changed)
@@ -717,7 +743,7 @@ func _build_lily_pads() -> void:
 func _build_depth_gradients() -> void:
 	for i in range(SWAMP_COUNT):
 		var dp := Polygon2D.new()
-		dp.color = Color(0.08, 0.18, 0.1, 0.6)
+		dp.color = SWAMP_DEPTH_COLORS[i]
 		dp.z_index = 1
 		add_child(dp)
 		depth_polygons.append(dp)
@@ -1618,6 +1644,242 @@ func _get_terrain_y_at(x: float) -> float:
 			return lerpf(terrain_points[i].y, terrain_points[i + 1].y, t)
 	return -1.0
 
+# --- Unique Pool Features ---
+func _build_pool_features() -> void:
+	for i in range(SWAMP_COUNT):
+		var geo: Dictionary = _get_swamp_geometry(i)
+		var bl: Vector2 = geo["basin_left"]
+		var br: Vector2 = geo["basin_right"]
+		var et: Vector2 = geo["entry_top"]
+		var xt: Vector2 = geo["exit_top"]
+		var bw: float = br.x - bl.x
+		var basin_y: float = maxf(bl.y, br.y)
+		match i:
+			0: _build_puddle_features(bl, br, et, xt, bw, basin_y)
+			1: _build_pond_features(bl, br, et, xt, bw, basin_y)
+			2: _build_marsh_features(bl, br, et, xt, bw, basin_y)
+			3: _build_bog_features(bl, br, et, xt, bw, basin_y)
+			4: _build_deep_swamp_features(bl, br, et, xt, bw, basin_y)
+
+# Puddle: pebbles and sandy patch
+func _build_puddle_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, bw: float, basin_y: float) -> void:
+	# Sandy patch on bottom
+	var sand := ColorRect.new()
+	sand.size = Vector2(bw * 0.6, 4)
+	sand.position = Vector2(bl.x + bw * 0.2, basin_y - 3)
+	sand.color = Color(0.62, 0.55, 0.38, 0.35)
+	sand.z_index = 1
+	add_child(sand)
+	# Small pebbles
+	for j in range(randi_range(5, 8)):
+		var peb := ColorRect.new()
+		var sz: float = randf_range(2, 5)
+		peb.size = Vector2(sz, sz * randf_range(0.5, 0.8))
+		peb.position = Vector2(bl.x + randf_range(4, bw - 4), basin_y - randf_range(1, 4))
+		var gray: float = randf_range(0.35, 0.55)
+		peb.color = Color(gray, gray * randf_range(0.9, 1.1), gray * randf_range(0.85, 1.0), 0.7)
+		peb.z_index = 1
+		add_child(peb)
+
+# Pond: submerged log with branch and weeds
+func _build_pond_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, bw: float, basin_y: float) -> void:
+	# Submerged log
+	var log_line := Line2D.new()
+	log_line.width = 4.0
+	log_line.default_color = Color(0.28, 0.18, 0.10, 0.8)
+	log_line.z_index = 1
+	var log_x1: float = bl.x + bw * 0.15
+	var log_x2: float = bl.x + bw * 0.75
+	log_line.add_point(Vector2(log_x1, basin_y - 2))
+	log_line.add_point(Vector2(log_x2, basin_y - 5))
+	add_child(log_line)
+	# Broken branch sticking up
+	var branch := Line2D.new()
+	branch.width = 2.0
+	branch.default_color = Color(0.32, 0.22, 0.12, 0.75)
+	branch.z_index = 2
+	var branch_x: float = lerpf(log_x1, log_x2, 0.6)
+	var branch_base_y: float = lerpf(basin_y - 2, basin_y - 5, 0.6)
+	branch.add_point(Vector2(branch_x, branch_base_y))
+	branch.add_point(Vector2(branch_x + 4, branch_base_y - 16))
+	branch.add_point(Vector2(branch_x + 8, branch_base_y - 22))
+	add_child(branch)
+	# Water weeds growing off log
+	for j in range(3):
+		var weed := ColorRect.new()
+		weed.size = Vector2(2, randf_range(6, 12))
+		var wx: float = lerpf(log_x1, log_x2, randf_range(0.2, 0.8))
+		var wy: float = lerpf(basin_y - 2, basin_y - 5, (wx - log_x1) / (log_x2 - log_x1))
+		weed.position = Vector2(wx, wy - weed.size.y)
+		weed.color = Color(0.2, 0.45, 0.18, 0.65)
+		weed.z_index = 2
+		add_child(weed)
+
+# Marsh: root network, reed clusters, silt overlay
+func _build_marsh_features(bl: Vector2, br: Vector2, et: Vector2, xt: Vector2, bw: float, basin_y: float) -> void:
+	# Exposed roots from slopes into water
+	for j in range(randi_range(3, 4)):
+		var root := Line2D.new()
+		root.width = randf_range(2.0, 3.0)
+		root.default_color = Color(0.35, 0.22, 0.12, 0.7)
+		root.z_index = 1
+		var from_left: bool = j < 2
+		var start_x: float
+		var start_y: float
+		if from_left:
+			start_x = et.x + randf_range(2, 12)
+			start_y = et.y + randf_range(-2, 4)
+		else:
+			start_x = xt.x - randf_range(2, 12)
+			start_y = xt.y + randf_range(-2, 4)
+		var end_x: float = bl.x + randf_range(bw * 0.2, bw * 0.8)
+		var end_y: float = basin_y - randf_range(0, 4)
+		root.add_point(Vector2(start_x, start_y))
+		root.add_point(Vector2(lerpf(start_x, end_x, 0.5), lerpf(start_y, end_y, 0.5) + randf_range(-3, 3)))
+		root.add_point(Vector2(end_x, end_y))
+		add_child(root)
+	# Thick reed clusters at edges
+	for j in range(4):
+		var rx: float
+		if j < 2:
+			rx = et.x + randf_range(-4, 8)
+		else:
+			rx = xt.x + randf_range(-8, 4)
+		var ry: float = et.y if j < 2 else xt.y
+		for k in range(randi_range(2, 4)):
+			var reed := Line2D.new()
+			reed.width = 1.5
+			reed.default_color = Color(0.3, 0.42, 0.18, 0.8)
+			reed.z_index = 4
+			var reed_h: float = randf_range(14, 24)
+			reed.add_point(Vector2(rx + k * 2, ry))
+			reed.add_point(Vector2(rx + k * 2 + randf_range(-2, 2), ry - reed_h))
+			add_child(reed)
+			# Bulrush top
+			var bulrush := ColorRect.new()
+			bulrush.size = Vector2(3, 5)
+			bulrush.position = Vector2(rx + k * 2 - 1, ry - reed_h - 5)
+			bulrush.color = Color(0.35, 0.25, 0.12, 0.85)
+			bulrush.z_index = 4
+			add_child(bulrush)
+	# Murky silt overlay on bottom third
+	var silt := Polygon2D.new()
+	silt.color = Color(0.3, 0.22, 0.12, 0.15)
+	silt.z_index = 2
+	var silt_y: float = lerpf(et.y, basin_y, 0.65)
+	silt.polygon = PackedVector2Array([
+		Vector2(bl.x + 4, silt_y),
+		Vector2(bl.x, bl.y),
+		Vector2(br.x, br.y),
+		Vector2(br.x - 4, silt_y),
+	])
+	add_child(silt)
+
+# Bog: peat mounds, submerged stumps, moss
+func _build_bog_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, bw: float, basin_y: float) -> void:
+	# Submerged tree stumps
+	for j in range(2):
+		var stump := Polygon2D.new()
+		stump.color = Color(0.25, 0.16, 0.08, 0.8)
+		stump.z_index = 1
+		var sx: float = bl.x + bw * (0.25 + j * 0.45) + randf_range(-8, 8)
+		var sw: float = randf_range(8, 14)
+		var sh: float = randf_range(10, 18)
+		stump.polygon = PackedVector2Array([
+			Vector2(sx - sw * 0.5, basin_y),
+			Vector2(sx - sw * 0.35, basin_y - sh),
+			Vector2(sx + sw * 0.35, basin_y - sh),
+			Vector2(sx + sw * 0.5, basin_y),
+		])
+		add_child(stump)
+		# Moss patch on stump top
+		var moss := ColorRect.new()
+		moss.size = Vector2(sw * 0.5, 3)
+		moss.position = Vector2(sx - sw * 0.25, basin_y - sh - 1)
+		moss.color = Color(0.22, 0.45, 0.15, 0.6)
+		moss.z_index = 2
+		add_child(moss)
+	# Peat mounds on basin floor
+	for j in range(randi_range(3, 4)):
+		var peat := Polygon2D.new()
+		peat.color = Color(0.15, 0.12, 0.06, 0.65)
+		peat.z_index = 1
+		var px: float = bl.x + randf_range(10, bw - 10)
+		var pw: float = randf_range(8, 16)
+		var ph: float = randf_range(3, 6)
+		peat.polygon = PackedVector2Array([
+			Vector2(px - pw * 0.5, basin_y),
+			Vector2(px - pw * 0.3, basin_y - ph),
+			Vector2(px + pw * 0.3, basin_y - ph),
+			Vector2(px + pw * 0.5, basin_y),
+		])
+		add_child(peat)
+
+# Deep Swamp: dead trees, hanging moss, extra glow
+func _build_deep_swamp_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, bw: float, basin_y: float) -> void:
+	# Dead trees rising from basin
+	for j in range(2):
+		var tx: float = bl.x + bw * (0.2 + j * 0.55) + randf_range(-10, 10)
+		var tree_h: float = randf_range(60, 85)
+		# Trunk
+		var trunk := Line2D.new()
+		trunk.width = 4.0
+		trunk.default_color = Color(0.22, 0.15, 0.08, 0.85)
+		trunk.z_index = 4
+		trunk.add_point(Vector2(tx, basin_y))
+		trunk.add_point(Vector2(tx + randf_range(-3, 3), basin_y - tree_h))
+		add_child(trunk)
+		var top_x: float = tx + randf_range(-3, 3)
+		var top_y: float = basin_y - tree_h
+		# Bare branches
+		for k in range(randi_range(3, 5)):
+			var br_line := Line2D.new()
+			br_line.width = 2.0
+			br_line.default_color = Color(0.25, 0.18, 0.10, 0.75)
+			br_line.z_index = 4
+			var branch_y: float = top_y + randf_range(5, tree_h * 0.4)
+			var branch_dir: float = 1.0 if randf() > 0.5 else -1.0
+			var branch_len: float = randf_range(12, 28)
+			br_line.add_point(Vector2(tx, branch_y))
+			br_line.add_point(Vector2(tx + branch_dir * branch_len, branch_y - randf_range(4, 12)))
+			add_child(br_line)
+			# Hanging moss strands from branches
+			if randf() > 0.4:
+				var moss_line := Line2D.new()
+				moss_line.width = 1.0
+				moss_line.default_color = Color(0.28, 0.42, 0.22, 0.5)
+				moss_line.z_index = 4
+				var moss_x: float = tx + branch_dir * branch_len * randf_range(0.3, 0.8)
+				var moss_top_y: float = branch_y - randf_range(2, 8)
+				moss_line.add_point(Vector2(moss_x, moss_top_y))
+				moss_line.add_point(Vector2(moss_x + randf_range(-2, 2), moss_top_y + randf_range(8, 18)))
+				add_child(moss_line)
+	# Extra glow spots in deep water
+	for j in range(randi_range(3, 5)):
+		var glow_node := Node2D.new()
+		glow_node.z_index = 2
+		glow_node.position = Vector2(bl.x + randf_range(10, bw - 10), basin_y - randf_range(4, 20))
+		add_child(glow_node)
+		var glow_color := Color(0.3, 0.6, 0.5)
+		var bulb := ColorRect.new()
+		bulb.size = Vector2(3, 3)
+		bulb.position = Vector2(-1.5, -1.5)
+		bulb.color = Color(glow_color.r, glow_color.g, glow_color.b, 0.6)
+		glow_node.add_child(bulb)
+		var aura := ColorRect.new()
+		aura.size = Vector2(7, 7)
+		aura.position = Vector2(-3.5, -3.5)
+		aura.color = Color(glow_color.r, glow_color.g, glow_color.b, 0.15)
+		glow_node.add_child(aura)
+		glow_plants.append({
+			"node": glow_node,
+			"bulb": bulb,
+			"aura": aura,
+			"glow_color": glow_color,
+			"phase": randf() * TAU,
+			"pulse_speed": randf_range(1.2, 2.5),
+		})
+
 # --- Swamp Geometry ---
 func _get_swamp_geometry(swamp_index: int) -> Dictionary:
 	var base: int = 4 * swamp_index
@@ -1634,7 +1896,7 @@ func _build_water() -> void:
 	water_surface_lines.clear()
 	for i in range(SWAMP_COUNT):
 		var wp := Polygon2D.new()
-		wp.color = WATER_COLOR
+		wp.color = SWAMP_WATER_COLORS[i]
 		wp.z_index = 2
 		add_child(wp)
 		water_polygons.append(wp)
@@ -1678,8 +1940,8 @@ func _update_water_polygon(swamp_index: int) -> void:
 
 	water_polygons[swamp_index].polygon = points
 
-	# Tint water based on fill
-	var col: Color = WATER_COLOR.lerp(WATER_EMPTY_COLOR, 1.0 - fill)
+	# Tint water based on fill using per-pool colors
+	var col: Color = SWAMP_WATER_COLORS[swamp_index].lerp(SWAMP_WATER_EMPTY_COLORS[swamp_index], 1.0 - fill)
 	water_polygons[swamp_index].color = col
 
 	# Update surface line
@@ -1763,6 +2025,16 @@ func _update_water_walls(swamp_index: int) -> void:
 	right_body.position = Vector2(right_x, water_y - 28)
 
 # --- Right Boundary Wall ---
+func _build_left_boundary() -> void:
+	var wall_body := StaticBody2D.new()
+	wall_body.position = Vector2(-4, terrain_points[0].y - 60)
+	var col := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(8, 200)
+	col.shape = rect
+	wall_body.add_child(col)
+	add_child(wall_body)
+
 func _build_right_boundary() -> void:
 	var last_point: Vector2 = terrain_points[terrain_points.size() - 1]
 	var wall_body := StaticBody2D.new()
@@ -1826,10 +2098,12 @@ func _build_water_detect_areas() -> void:
 # --- Swamp Labels ---
 func _build_swamp_labels() -> void:
 	swamp_labels.clear()
+	swamp_percent_labels.clear()
 	for i in range(SWAMP_COUNT):
 		var geo: Dictionary = _get_swamp_geometry(i)
 		var basin_mid_x: float = (geo["basin_left"].x + geo["basin_right"].x) * 0.5
 		var label_y: float = geo["entry_top"].y - 24
+		var basin_y: float = maxf(geo["basin_left"].y, geo["basin_right"].y)
 
 		var label := Label.new()
 		label.text = GameManager.swamp_definitions[i]["name"]
@@ -1842,6 +2116,20 @@ func _build_swamp_labels() -> void:
 		label.z_index = 5
 		add_child(label)
 		swamp_labels.append(label)
+
+		# Percentage label below basin
+		var pct_label := Label.new()
+		var pct: float = GameManager.get_swamp_water_percent(i)
+		pct_label.text = "%.1f%%" % pct
+		pct_label.add_theme_font_size_override("font_size", 10)
+		pct_label.add_theme_color_override("font_color", Color(0.75, 0.8, 0.85, 0.6))
+		pct_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.4))
+		pct_label.add_theme_constant_override("shadow_offset_x", 1)
+		pct_label.add_theme_constant_override("shadow_offset_y", 1)
+		pct_label.position = Vector2(basin_mid_x - 16, basin_y + 8)
+		pct_label.z_index = 5
+		add_child(pct_label)
+		swamp_percent_labels.append(pct_label)
 
 # --- Signal Handlers ---
 func _on_swamp_body_entered(body: Node2D, swamp_index: int) -> void:
@@ -2119,11 +2407,17 @@ func _on_water_level_changed(swamp_index: int, _percent: float) -> void:
 		_update_water_walls(swamp_index)
 		_update_depth_gradient(swamp_index)
 		_update_mud_visibility()
+		if swamp_index < swamp_percent_labels.size():
+			var pct: float = GameManager.get_swamp_water_percent(swamp_index)
+			swamp_percent_labels[swamp_index].text = "%.1f%%" % pct
 
 func _on_swamp_completed(swamp_index: int, _reward: float) -> void:
 	if swamp_index >= 0 and swamp_index < swamp_labels.size():
 		swamp_labels[swamp_index].add_theme_color_override("font_color", Color(0.3, 1.0, 0.4, 0.9))
 		swamp_labels[swamp_index].text = GameManager.swamp_definitions[swamp_index]["name"] + " [DONE]"
+	if swamp_index >= 0 and swamp_index < swamp_percent_labels.size():
+		swamp_percent_labels[swamp_index].text = "0.0%"
+		swamp_percent_labels[swamp_index].add_theme_color_override("font_color", Color(0.3, 1.0, 0.4, 0.9))
 
 # --- Pump Station ---
 func _build_pump_station() -> void:
