@@ -140,28 +140,54 @@ const WATER_COLOR := Color(0.18, 0.32, 0.22, 0.92)
 const WATER_EMPTY_COLOR := Color(0.3, 0.45, 0.32, 0.65)
 const WATER_SURFACE_COLOR := Color(0.35, 0.55, 0.4, 0.6)
 
-# Per-pool water colors
+# Per-pool water colors — distinct identity per pool
 const SWAMP_WATER_COLORS: Array[Color] = [
-	Color(0.22, 0.42, 0.35, 0.85),  # Puddle: clear light blue-green
-	Color(0.18, 0.35, 0.22, 0.90),  # Pond: standard green
-	Color(0.22, 0.30, 0.18, 0.93),  # Marsh: murky olive-brown
-	Color(0.18, 0.22, 0.14, 0.95),  # Bog: dark peaty
-	Color(0.12, 0.20, 0.25, 0.96),  # Deep Swamp: deep dark teal
+	Color(0.30, 0.55, 0.60, 0.70),  # Puddle: crystal clear light aqua
+	Color(0.18, 0.42, 0.22, 0.88),  # Pond: classic pastoral green
+	Color(0.30, 0.28, 0.15, 0.92),  # Marsh: murky brown-olive
+	Color(0.12, 0.10, 0.08, 0.95),  # Bog: dark peaty brown-black
+	Color(0.08, 0.12, 0.20, 0.97),  # Deep Swamp: inky dark blue
 ]
 const SWAMP_WATER_EMPTY_COLORS: Array[Color] = [
-	Color(0.35, 0.52, 0.45, 0.60),
-	Color(0.30, 0.45, 0.32, 0.65),
-	Color(0.32, 0.40, 0.28, 0.68),
-	Color(0.28, 0.32, 0.24, 0.70),
-	Color(0.22, 0.30, 0.35, 0.72),
+	Color(0.45, 0.65, 0.68, 0.45),  # Puddle: pale aqua
+	Color(0.30, 0.52, 0.32, 0.55),  # Pond: faded green
+	Color(0.40, 0.38, 0.25, 0.60),  # Marsh: dried mud
+	Color(0.22, 0.18, 0.14, 0.65),  # Bog: dark peat residue
+	Color(0.15, 0.18, 0.28, 0.68),  # Deep Swamp: dark slate
 ]
 const SWAMP_DEPTH_COLORS: Array[Color] = [
-	Color(0.10, 0.25, 0.18, 0.45),  # Puddle: lighter depth
-	Color(0.08, 0.18, 0.10, 0.60),  # Pond: standard
-	Color(0.10, 0.15, 0.08, 0.65),  # Marsh: olive depth
-	Color(0.08, 0.10, 0.06, 0.70),  # Bog: dark peat depth
-	Color(0.05, 0.10, 0.14, 0.75),  # Deep Swamp: dark teal depth
+	Color(0.15, 0.35, 0.38, 0.40),  # Puddle: light teal depth
+	Color(0.06, 0.22, 0.08, 0.55),  # Pond: forest green depth
+	Color(0.18, 0.14, 0.06, 0.65),  # Marsh: mud brown depth
+	Color(0.05, 0.04, 0.03, 0.75),  # Bog: near-black depth
+	Color(0.03, 0.05, 0.12, 0.80),  # Deep Swamp: dark navy depth
 ]
+# Per-pool shader parameters: [wave_strength, specular, choppiness, turbidity, foam_density]
+const POOL_SHADER_PARAMS: Array[Array] = [
+	[0.5, 0.4, 0.0, 0.0, 0.3],     # Puddle: calm, clear, minimal foam
+	[1.2, 0.3, 0.3, 0.15, 0.8],    # Pond: gentle waves, some sheen
+	[1.5, 0.15, 0.8, 0.5, 1.2],    # Marsh: choppy, murky
+	[1.8, 0.1, 1.2, 0.7, 1.5],     # Bog: rough, opaque
+	[2.5, 0.08, 2.0, 0.85, 2.0],   # Deep Swamp: wild, very murky
+]
+# Per-pool foam colors
+const POOL_FOAM_COLORS: Array[Color] = [
+	Color(0.95, 0.97, 1.0, 0.35),   # Puddle: clean white
+	Color(0.85, 0.92, 0.85, 0.30),  # Pond: green-white
+	Color(0.65, 0.58, 0.42, 0.28),  # Marsh: brownish foam
+	Color(0.45, 0.38, 0.28, 0.25),  # Bog: dark brown foam
+	Color(0.30, 0.35, 0.48, 0.22),  # Deep Swamp: dark bluish foam
+]
+# Per-pool wave params: [amplitude, frequency]
+const POOL_WAVE_PARAMS: Array[Array] = [
+	[0.5, 3.0],   # Puddle: small/fast ripples
+	[1.0, 2.2],   # Pond: moderate
+	[1.6, 1.5],   # Marsh: medium/slower
+	[2.2, 1.1],   # Bog: large/slow
+	[3.0, 0.8],   # Deep Swamp: large/very slow
+]
+# Per-pool bowl depth for rounded basin shape
+const POOL_BOWL_DEPTHS: Array[float] = [1.0, 2.0, 3.0, 4.0, 5.0]
 const GRASS_COLOR := Color(0.25, 0.48, 0.15)
 const GRASS_LIGHT_COLOR := Color(0.35, 0.58, 0.2)
 const ROCK_COLOR := Color(0.42, 0.4, 0.38)
@@ -179,6 +205,7 @@ func _ready() -> void:
 	_build_treeline()
 	_build_terrain()
 	_build_terrain_details()
+	_build_terrain_zones()
 	_build_pump_station()
 	_build_water()
 	_build_water_walls()
@@ -512,7 +539,7 @@ func _build_terrain_details() -> void:
 	for rp in rock_positions:
 		_place_rock(rp, randf_range(4, 10), randf_range(4, 8))
 
-	# Dirt specks on terrain surface
+	# Dirt specks on terrain surface (zone-tinted)
 	for i in range(60):
 		var rx: float = randf_range(0, 1920)
 		var ry: float = _get_terrain_y_at(rx)
@@ -520,7 +547,9 @@ func _build_terrain_details() -> void:
 			var speck := ColorRect.new()
 			speck.position = Vector2(rx, ry + randf_range(2, 12))
 			speck.size = Vector2(randf_range(2, 6), randf_range(2, 4))
-			speck.color = GROUND_DARK_COLOR.lerp(GROUND_COLOR, randf_range(0, 1))
+			var base_col: Color = GROUND_DARK_COLOR.lerp(GROUND_COLOR, randf_range(0, 1))
+			var zone_col: Color = ZONE_TINT_COLORS[_get_zone_index(rx)]
+			speck.color = base_col.lerp(zone_col, 0.3)
 			speck.color.a = randf_range(0.3, 0.6)
 			speck.z_index = 0
 			add_child(speck)
@@ -628,6 +657,146 @@ func _place_rock(pos: Vector2, w: float, h: float) -> void:
 	hl.color = Color(0.55, 0.53, 0.5, 0.5)
 	hl.z_index = 1
 	add_child(hl)
+
+# Zone palette for terrain: left (sandy) to right (dark)
+const ZONE_TINT_COLORS: Array[Color] = [
+	Color(0.65, 0.55, 0.35, 0.18),  # Zone 0 (Puddle): warm sandy tan
+	Color(0.50, 0.38, 0.22, 0.20),  # Zone 1 (Pond): earthy medium brown
+	Color(0.38, 0.28, 0.14, 0.22),  # Zone 2 (Marsh): dark muddy brown
+	Color(0.25, 0.18, 0.10, 0.25),  # Zone 3 (Bog): very dark peaty brown
+	Color(0.12, 0.10, 0.08, 0.28),  # Zone 4 (Deep Swamp): nearly black
+]
+
+func _get_zone_index(x: float) -> int:
+	# Zone boundaries at midpoints between pools
+	# Pool centers: ~143(Puddle), ~400(Pond), ~755(Marsh), ~1131(Bog), ~1576(Deep Swamp)
+	var zone_boundaries: Array[float] = [270.0, 570.0, 940.0, 1360.0]
+	for i in range(zone_boundaries.size()):
+		if x < zone_boundaries[i]:
+			return i
+	return 4
+
+func _build_terrain_zones() -> void:
+	# Instead of hard-edged zone polygons, scatter many small tinted patches
+	# that get denser near zone centers, creating a smooth gradient across the world.
+	var zone_centers: Array[float] = [135.0, 400.0, 755.0, 1130.0, 1575.0]
+	var zone_radii: Array[float] = [180.0, 200.0, 220.0, 250.0, 280.0]
+
+	for zi in range(5):
+		var center_x: float = zone_centers[zi]
+		var radius: float = zone_radii[zi]
+		var col: Color = ZONE_TINT_COLORS[zi]
+		# Scatter tinted patches across the zone's influence area
+		var patch_count: int = 18
+		for _j in range(patch_count):
+			var px: float = center_x + randf_range(-radius, radius)
+			px = clampf(px, 0.0, 1920.0)
+			var py: float = _get_terrain_y_at(px)
+			if py < 0:
+				continue
+			# Fade alpha based on distance from zone center
+			var dist_frac: float = absf(px - center_x) / radius
+			var alpha: float = col.a * (1.0 - dist_frac * dist_frac)
+			if alpha < 0.02:
+				continue
+			var patch := ColorRect.new()
+			var pw: float = randf_range(24, 60)
+			var ph: float = randf_range(20, 50)
+			patch.position = Vector2(px - pw * 0.5, py + randf_range(0, 6))
+			patch.size = Vector2(pw, ph)
+			patch.color = Color(col.r, col.g, col.b, alpha)
+			patch.z_index = 0
+			add_child(patch)
+
+	# Ridge crack details between pools
+	_build_ridge_details()
+	# Basin slope erosion marks
+	_build_slope_erosion()
+
+func _build_ridge_details() -> void:
+	# Ridges are between pools: indices 4-5, 8-9, 12-13, 16-17 in terrain_points
+	var ridge_indices: Array[int] = [4, 8, 12, 16]
+	for ri in ridge_indices:
+		if ri + 1 >= terrain_points.size():
+			continue
+		var ridge_left: Vector2 = terrain_points[ri]
+		var ridge_right: Vector2 = terrain_points[ri + 1]
+		var ridge_mid_x: float = (ridge_left.x + ridge_right.x) * 0.5
+		var ridge_w: float = ridge_right.x - ridge_left.x
+
+		# 3-5 short cracks on the ridge
+		for _j in range(randi_range(3, 5)):
+			var crack := Line2D.new()
+			crack.width = 1.0
+			crack.default_color = Color(0.58, 0.50, 0.38, randf_range(0.2, 0.4))
+			crack.z_index = 1
+			var cx: float = randf_range(ridge_left.x + 4, ridge_right.x - 4)
+			var cy: float = _get_terrain_y_at(cx)
+			if cy < 0:
+				continue
+			cy += randf_range(1, 4)
+			crack.add_point(Vector2(cx, cy))
+			crack.add_point(Vector2(cx + randf_range(-6, 6), cy + randf_range(3, 8)))
+			add_child(crack)
+
+		# 1-2 dry patches on the ridge
+		for _j in range(randi_range(1, 2)):
+			var dry := ColorRect.new()
+			var dx: float = randf_range(ridge_left.x + 2, ridge_right.x - 8)
+			var dy: float = _get_terrain_y_at(dx)
+			if dy < 0:
+				continue
+			dry.position = Vector2(dx, dy + randf_range(1, 3))
+			dry.size = Vector2(randf_range(6, 14), randf_range(3, 5))
+			dry.color = Color(0.58, 0.48, 0.32, randf_range(0.15, 0.25))
+			dry.z_index = 1
+			add_child(dry)
+
+func _build_slope_erosion() -> void:
+	for i in range(SWAMP_COUNT):
+		var geo: Dictionary = _get_swamp_geometry(i)
+		var entry_top: Vector2 = geo["entry_top"]
+		var basin_left: Vector2 = geo["basin_left"]
+		var basin_right: Vector2 = geo["basin_right"]
+		var exit_top: Vector2 = geo["exit_top"]
+
+		# Entry slope erosion grooves
+		for _j in range(randi_range(2, 3)):
+			var erosion := Line2D.new()
+			erosion.width = 1.0
+			erosion.default_color = Color(0.30, 0.20, 0.10, randf_range(0.2, 0.35))
+			erosion.z_index = 1
+			var offset: float = randf_range(3, 8)
+			var t1: float = randf_range(0.1, 0.3)
+			var t2: float = randf_range(0.7, 0.9)
+			erosion.add_point(Vector2(
+				lerpf(entry_top.x, basin_left.x, t1),
+				lerpf(entry_top.y, basin_left.y, t1) + offset
+			))
+			erosion.add_point(Vector2(
+				lerpf(entry_top.x, basin_left.x, t2),
+				lerpf(entry_top.y, basin_left.y, t2) + offset
+			))
+			add_child(erosion)
+
+		# Exit slope erosion grooves
+		for _j in range(randi_range(2, 3)):
+			var erosion := Line2D.new()
+			erosion.width = 1.0
+			erosion.default_color = Color(0.30, 0.20, 0.10, randf_range(0.2, 0.35))
+			erosion.z_index = 1
+			var offset: float = randf_range(3, 8)
+			var t1: float = randf_range(0.1, 0.3)
+			var t2: float = randf_range(0.7, 0.9)
+			erosion.add_point(Vector2(
+				lerpf(basin_right.x, exit_top.x, t1),
+				lerpf(basin_right.y, exit_top.y, t1) + offset
+			))
+			erosion.add_point(Vector2(
+				lerpf(basin_right.x, exit_top.x, t2),
+				lerpf(basin_right.y, exit_top.y, t2) + offset
+			))
+			add_child(erosion)
 
 func _build_vegetation() -> void:
 	# Cattails near water edges
@@ -1116,8 +1285,9 @@ func _update_foam_line(swamp_index: int, left_x: float, right_x: float, water_y:
 			foam_strength = (t - 0.8) / 0.2
 		var wave_offset: float = sin(wave_time * 3.0 + px * 0.3) * 0.8 * foam_strength
 		line.add_point(Vector2(px, water_y - 0.5 + wave_offset))
-	var alpha: float = lerpf(0.15, 0.35, (sin(wave_time * 1.2) + 1.0) * 0.5)
-	line.default_color = Color(0.85, 0.92, 0.88, alpha)
+	var base_foam: Color = POOL_FOAM_COLORS[swamp_index]
+	var alpha: float = lerpf(base_foam.a * 0.5, base_foam.a, (sin(wave_time * 1.2) + 1.0) * 0.5)
+	line.default_color = Color(base_foam.r, base_foam.g, base_foam.b, alpha)
 
 # --- Fog Patches Near Swamps ---
 func _build_fog_patches() -> void:
@@ -1892,17 +2062,20 @@ func _build_bog_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, b
 		var sx: float = bl.x + bw * (0.25 + j * 0.45) + randf_range(-8, 8)
 		var sw: float = randf_range(8, 14)
 		var sh: float = randf_range(10, 18)
+		var stump_base_y: float = _get_terrain_y_at(sx)
+		if stump_base_y < 0 or stump_base_y < basin_y:
+			stump_base_y = basin_y
 		stump.polygon = PackedVector2Array([
-			Vector2(sx - sw * 0.5, basin_y),
-			Vector2(sx - sw * 0.35, basin_y - sh),
-			Vector2(sx + sw * 0.35, basin_y - sh),
-			Vector2(sx + sw * 0.5, basin_y),
+			Vector2(sx - sw * 0.5, stump_base_y),
+			Vector2(sx - sw * 0.35, stump_base_y - sh),
+			Vector2(sx + sw * 0.35, stump_base_y - sh),
+			Vector2(sx + sw * 0.5, stump_base_y),
 		])
 		add_child(stump)
 		# Moss patch on stump top
 		var moss := ColorRect.new()
 		moss.size = Vector2(sw * 0.5, 3)
-		moss.position = Vector2(sx - sw * 0.25, basin_y - sh - 1)
+		moss.position = Vector2(sx - sw * 0.25, stump_base_y - sh - 1)
 		moss.color = Color(0.22, 0.45, 0.15, 0.6)
 		moss.z_index = 2
 		add_child(moss)
@@ -1924,20 +2097,27 @@ func _build_bog_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, b
 
 # Deep Swamp: dead trees, hanging moss, extra glow
 func _build_deep_swamp_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, bw: float, basin_y: float) -> void:
-	# Dead trees rising from basin
+	# Dead trees on terrain edges near pool
 	for j in range(2):
-		var tx: float = bl.x + bw * (0.2 + j * 0.55) + randf_range(-10, 10)
-		var tree_h: float = randf_range(60, 85)
+		var tx: float
+		if j == 0:
+			tx = bl.x - randf_range(8, 25)
+		else:
+			tx = br.x + randf_range(8, 25)
+		var base_y: float = _get_terrain_y_at(tx)
+		if base_y < 0:
+			base_y = basin_y
+		var tree_h: float = randf_range(25, 45)
 		# Trunk
 		var trunk := Line2D.new()
 		trunk.width = 4.0
 		trunk.default_color = Color(0.22, 0.15, 0.08, 0.85)
 		trunk.z_index = 4
-		trunk.add_point(Vector2(tx, basin_y))
-		trunk.add_point(Vector2(tx + randf_range(-3, 3), basin_y - tree_h))
+		trunk.add_point(Vector2(tx, base_y))
+		trunk.add_point(Vector2(tx + randf_range(-3, 3), base_y - tree_h))
 		add_child(trunk)
 		var top_x: float = tx + randf_range(-3, 3)
-		var top_y: float = basin_y - tree_h
+		var top_y: float = base_y - tree_h
 		# Bare branches
 		for k in range(randi_range(3, 5)):
 			var br_line := Line2D.new()
@@ -2008,6 +2188,11 @@ func _build_water() -> void:
 		wp.z_index = 2
 		var wmat := ShaderMaterial.new()
 		wmat.shader = WATER_SHADER
+		wmat.set_shader_parameter("wave_strength", POOL_SHADER_PARAMS[i][0])
+		wmat.set_shader_parameter("specular_intensity", POOL_SHADER_PARAMS[i][1])
+		wmat.set_shader_parameter("choppiness", POOL_SHADER_PARAMS[i][2])
+		wmat.set_shader_parameter("turbidity", POOL_SHADER_PARAMS[i][3])
+		wmat.set_shader_parameter("foam_density", POOL_SHADER_PARAMS[i][4])
 		wp.material = wmat
 		add_child(wp)
 		water_polygons.append(wp)
@@ -2057,15 +2242,43 @@ func _update_water_polygon(swamp_index: int) -> void:
 	var right_x: float = _lerp_x_at_y(basin_right, exit_top, water_y)
 
 	var points := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	var bowl_depth: float = POOL_BOWL_DEPTHS[swamp_index]
+
+	# Top-left corner
 	points.append(Vector2(left_x, water_y))
+	uvs.append(Vector2(0, 0))
+
+	# Left basin point
 	points.append(Vector2(basin_left.x, basin_left.y))
+
+	# 3 intermediate bowl points along basin floor
+	var basin_floor_y: float = lerpf(basin_left.y, basin_right.y, 0.5)
+	for bi in range(3):
+		var bt: float = (float(bi) + 1.0) / 4.0
+		var bx: float = lerpf(basin_left.x, basin_right.x, bt)
+		var by: float = lerpf(basin_left.y, basin_right.y, bt) + sin(bt * PI) * bowl_depth
+		points.append(Vector2(bx, by))
+
+	# Right basin point
 	points.append(Vector2(basin_right.x, basin_right.y))
+
+	# Top-right corner
 	points.append(Vector2(right_x, water_y))
 
+	# Generate UVs based on normalized positions
+	var min_y: float = water_y
+	var max_y: float = basin_floor_y + bowl_depth
+	var y_range: float = maxf(max_y - min_y, 1.0)
+	uvs.clear()
+	var total_pts: int = points.size()
+	for pi in range(total_pts):
+		var ux: float = float(pi) / float(total_pts - 1)
+		var uy: float = clampf((points[pi].y - min_y) / y_range, 0.0, 1.0)
+		uvs.append(Vector2(ux, uy))
+
 	water_polygons[swamp_index].polygon = points
-	water_polygons[swamp_index].uv = PackedVector2Array([
-		Vector2(0, 0), Vector2(0, 1), Vector2(1, 1), Vector2(1, 0)
-	])
+	water_polygons[swamp_index].uv = uvs
 
 	# Tint water based on fill using per-pool colors
 	var col: Color = SWAMP_WATER_COLORS[swamp_index].lerp(SWAMP_WATER_EMPTY_COLORS[swamp_index], 1.0 - fill)
@@ -2079,10 +2292,12 @@ func _update_water_surface_line(swamp_index: int, left_x: float, right_x: float,
 	line.clear_points()
 	var segments: int = int((right_x - left_x) / 6.0)
 	segments = maxi(segments, 4)
+	var wave_amp: float = POOL_WAVE_PARAMS[swamp_index][0]
+	var wave_freq: float = POOL_WAVE_PARAMS[swamp_index][1]
 	for i in range(segments + 1):
 		var t: float = float(i) / float(segments)
 		var px: float = lerpf(left_x, right_x, t)
-		var wave_offset: float = sin(wave_time * 2.0 + px * 0.15) * 1.6
+		var wave_offset: float = sin(wave_time * wave_freq + px * 0.15) * wave_amp
 		line.add_point(Vector2(px, water_y + wave_offset))
 	# Update water edge glow
 	if swamp_index < water_glow_lines.size():
@@ -3204,7 +3419,9 @@ func _process(delta: float) -> void:
 			last_drain_thresholds[i] = fill_now
 			var geo: Dictionary = _get_swamp_geometry(i)
 			var bx: float = randf_range(geo["basin_left"].x - 15, geo["basin_right"].x + 15)
-			var by: float = geo["basin_left"].y + randf_range(-3, 3)
+			var by: float = _get_terrain_y_at(bx)
+			if by < 0:
+				by = geo["basin_left"].y
 			if grown_plants.size() < 80:
 				_spawn_drain_plant(bx, by)
 

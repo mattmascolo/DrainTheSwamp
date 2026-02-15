@@ -189,7 +189,7 @@ func _physics_process(delta: float) -> void:
 			drip.size = Vector2(1, 2)
 			drip.color = Color(0.3, 0.55, 0.8, 0.6)
 			drip.position = Vector2(randf_range(-3, 3), 0)
-			drip.z_index = -1
+			drip.z_index = 2
 			add_child(drip)
 			var dtw := create_tween()
 			dtw.tween_property(drip, "position:y", 4.0, 0.4)
@@ -590,20 +590,20 @@ func set_near_water(value: bool, swamp_index: int = -1) -> void:
 			near_swamp_index = -1
 
 func _spawn_dust_puff(foot_x: float) -> void:
-	var sizes: Array[Vector2] = [Vector2(4, 3), Vector2(3, 3), Vector2(5, 3)]
+	var sizes: Array[Vector2] = [Vector2(6, 5), Vector2(5, 5), Vector2(7, 4)]
 	for i in range(3):
 		var puff := ColorRect.new()
 		puff.size = sizes[i]
 		var r_var: float = randf_range(-0.05, 0.05)
-		puff.color = Color(0.55 + r_var, 0.45 + r_var, 0.3 + r_var, 0.5)
+		puff.color = Color(0.72 + r_var, 0.64 + r_var, 0.50 + r_var, 0.65)
 		puff.position = Vector2(foot_x + randf_range(-2, 2), -2 + randf_range(-1, 1))
-		puff.z_index = -1
+		puff.z_index = 2
 		add_child(puff)
 
 		var tw := create_tween()
 		tw.set_parallel(true)
-		tw.tween_property(puff, "size", puff.size + Vector2(2, 2), 0.5)
-		tw.tween_property(puff, "position", puff.position + Vector2(randf_range(-4, 4), randf_range(-8, -4)), 0.6)
+		tw.tween_property(puff, "size", puff.size + Vector2(4, 3), 0.5)
+		tw.tween_property(puff, "position", puff.position + Vector2(randf_range(-4, 4), randf_range(-12, -5)), 0.6)
 		tw.tween_property(puff, "modulate:a", 0.0, 0.6)
 		tw.set_parallel(false)
 		tw.tween_callback(puff.queue_free)
@@ -614,7 +614,7 @@ func _spawn_speed_line() -> void:
 	var dir_offset: float = -12.0 if facing_right else 12.0
 	line.position = Vector2(dir_offset + randf_range(-4, 4), randf_range(-20, 4))
 	line.color = Color(1.0, 1.0, 1.0, 0.25)
-	line.z_index = -1
+	line.z_index = 2
 	add_child(line)
 	var tw := create_tween()
 	tw.tween_property(line, "modulate:a", 0.0, 0.15)
