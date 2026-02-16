@@ -14,15 +14,20 @@ signal pump_changed()
 signal water_carried_changed(current: float, capacity: float)
 signal day_changed(day: int)
 signal camel_changed()
-signal upgrade_changed()
+signal upgrade_changed
+signal cave_unlocked(cave_id: String)
+signal cave_entered(cave_id: String)
+signal cave_exited(cave_id: String)
+signal loot_collected(cave_id: String, loot_id: String, reward_text: String)
+signal lore_read(cave_id: String, lore_id: String)
 
 # --- Swamp Definitions ---
 var swamp_definitions: Array = [
-	{"name": "Puddle", "total_gallons": 0.5, "money_per_gallon": 50.0, "reward": 25.0},
-	{"name": "Pond", "total_gallons": 10.0, "money_per_gallon": 75.0, "reward": 300.0},
-	{"name": "Marsh", "total_gallons": 100.0, "money_per_gallon": 150.0, "reward": 5000.0},
-	{"name": "Bog", "total_gallons": 800.0, "money_per_gallon": 400.0, "reward": 50000.0},
-	{"name": "Deep Swamp", "total_gallons": 5000.0, "money_per_gallon": 1000.0, "reward": 500000.0}
+	{"name": "Puddle", "total_gallons": 5.0, "money_per_gallon": 25.0, "reward": 0.0},
+	{"name": "Pond", "total_gallons": 25.0, "money_per_gallon": 50.0, "reward": 0.0},
+	{"name": "Marsh", "total_gallons": 200.0, "money_per_gallon": 100.0, "reward": 0.0},
+	{"name": "Bog", "total_gallons": 1500.0, "money_per_gallon": 300.0, "reward": 0.0},
+	{"name": "Deep Swamp", "total_gallons": 8000.0, "money_per_gallon": 800.0, "reward": 0.0}
 ]
 
 var swamp_states: Array = []
@@ -87,8 +92,8 @@ var tool_definitions: Dictionary = {
 	},
 	"hose": {
 		"name": "Garden Hose",
-		"base_output": 0.3,
-		"cost": 3000.0,
+		"base_output": 0.5,
+		"cost": 8000.0,
 		"type": "semi_auto",
 		"order": 8
 	}
@@ -102,8 +107,8 @@ var stat_definitions: Dictionary = {
 		"base_value": 1.0,
 		"growth_rate": 1.18,
 		"scale": "exponential",
-		"base_cost": 5.0,
-		"cost_exponent": 1.12,
+		"base_cost": 10.0,
+		"cost_exponent": 1.20,
 		"format": "gal"
 	},
 	"movement_speed": {
@@ -111,8 +116,8 @@ var stat_definitions: Dictionary = {
 		"base_value": 1.0,
 		"growth_rate": 1.12,
 		"scale": "exponential",
-		"base_cost": 8.0,
-		"cost_exponent": 1.12,
+		"base_cost": 12.0,
+		"cost_exponent": 1.14,
 		"format": "multiplier"
 	},
 	"stamina": {
@@ -120,8 +125,8 @@ var stat_definitions: Dictionary = {
 		"base_value": 5.0,
 		"growth_rate": 1.15,
 		"scale": "exponential",
-		"base_cost": 5.0,
-		"cost_exponent": 1.12,
+		"base_cost": 10.0,
+		"cost_exponent": 1.18,
 		"format": "value"
 	},
 	"stamina_regen": {
@@ -129,8 +134,8 @@ var stat_definitions: Dictionary = {
 		"base_value": 0.8,
 		"growth_rate": 1.15,
 		"scale": "exponential",
-		"base_cost": 8.0,
-		"cost_exponent": 1.12,
+		"base_cost": 12.0,
+		"cost_exponent": 1.18,
 		"format": "per_sec"
 	},
 	# --- Global Power Stats (slightly pricier, scales faster) ---
@@ -164,9 +169,9 @@ var stat_definitions: Dictionary = {
 }
 
 # --- Pump Definition ---
-const PUMP_COST: float = 100.0
-const PUMP_UPGRADE_BASE: float = 50.0
-const PUMP_SWAMP_EFFICIENCY: Array = [1.0, 0.5, 0.25, 0.1, 0.05]
+const PUMP_COST: float = 500.0
+const PUMP_UPGRADE_BASE: float = 100.0
+const PUMP_SWAMP_EFFICIENCY: Array = [1.0, 0.8, 0.6, 0.4, 0.25]
 
 # --- Game State ---
 var money: float = 0.0
@@ -204,7 +209,7 @@ var last_scoop_swamp: int = 0
 var hose_active: bool = false
 var hose_timer: float = 0.0
 var hose_swamp_index: int = -1
-const HOSE_DURATION: float = 30.0
+const HOSE_DURATION: float = 20.0
 
 # Pump state
 var pump_owned: bool = false
@@ -283,6 +288,26 @@ var upgrades_owned: Dictionary = {
 	"lucky_charm": 0,
 	"auto_scooper": 0,
 	"lantern": 0
+}
+
+# --- Cave Definitions ---
+const CAVE_DEFINITIONS: Dictionary = {
+	"muddy_hollow": {"name": "Muddy Hollow", "swamp_index": 0, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/muddy_hollow.tscn", "order": 0},
+	"gator_den": {"name": "Gator Den", "swamp_index": 1, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/gator_den.tscn", "order": 1},
+	"the_sinkhole": {"name": "The Sinkhole", "swamp_index": 2, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/the_sinkhole.tscn", "order": 2},
+	"collapsed_mine": {"name": "Collapsed Mine", "swamp_index": 3, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/collapsed_mine.tscn", "order": 3},
+	"the_abyss": {"name": "The Abyss", "swamp_index": 4, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/the_abyss.tscn", "order": 4},
+}
+
+# Cave state
+var in_cave: bool = false
+var current_cave: String = ""
+var cave_data: Dictionary = {
+	"muddy_hollow": {"unlocked": false, "entered": false, "loot_collected": {}},
+	"gator_den": {"unlocked": false, "entered": false, "loot_collected": {}},
+	"the_sinkhole": {"unlocked": false, "entered": false, "loot_collected": {}},
+	"collapsed_mine": {"unlocked": false, "entered": false, "loot_collected": {}},
+	"the_abyss": {"unlocked": false, "entered": false, "loot_collected": {}},
 }
 
 # Day tracking
@@ -390,7 +415,7 @@ func get_stat_upgrade_cost(stat_id: String) -> float:
 
 # --- Pump computed ---
 func get_pump_drain_rate() -> float:
-	return 0.001 * pow(1.15, pump_level)
+	return 0.005 * pow(1.20, pump_level)
 
 func get_pump_income_rate() -> float:
 	var total_income: float = 0.0
@@ -403,7 +428,7 @@ func get_pump_income_rate() -> float:
 	return total_income
 
 func get_pump_upgrade_cost() -> float:
-	return PUMP_UPGRADE_BASE * pow(1.15, pump_level)
+	return PUMP_UPGRADE_BASE * pow(1.20, pump_level)
 
 # --- Internal: drain swamp without earning money ---
 func _drain_swamp(swamp_index: int, gallons: float) -> float:
@@ -418,13 +443,11 @@ func _drain_swamp(swamp_index: int, gallons: float) -> float:
 		return 0.0
 	swamp_states[swamp_index]["gallons_drained"] += actual
 	water_level_changed.emit(swamp_index, get_swamp_water_percent(swamp_index))
+	check_cave_unlocks(swamp_index)
 
 	if swamp_states[swamp_index]["gallons_drained"] >= total and not swamp_states[swamp_index]["completed"]:
 		swamp_states[swamp_index]["completed"] = true
-		var reward: float = swamp_definitions[swamp_index]["reward"]
-		money += reward
-		money_changed.emit(money)
-		swamp_completed.emit(swamp_index, reward)
+		swamp_completed.emit(swamp_index, 0.0)
 
 	return actual
 
@@ -632,6 +655,8 @@ func get_lantern_energy() -> float:
 	return minf(2.4 * pow(1.12, level - 1), 8.0)
 
 func get_darkness_factor() -> float:
+	if in_cave:
+		return 1.0
 	var t: float = cycle_progress
 	# Mirror _get_cycle_color breakpoints: full day 0.22-0.55, full night 0.75-1.0/0.0-0.1
 	# Darkness = how far from noon brightness (1.0 = full night, 0.0 = full day)
@@ -733,6 +758,46 @@ func _init_camel_states() -> void:
 	for i in range(camel_count):
 		camel_states.append({"state": "to_player", "x": 30.0, "water_carried": 0.0, "source_swamp": 0, "state_timer": 0.0})
 
+# --- Cave Functions ---
+func check_cave_unlocks(swamp_index: int = -1) -> void:
+	for cave_id: String in CAVE_DEFINITIONS:
+		var defn: Dictionary = CAVE_DEFINITIONS[cave_id]
+		if cave_data[cave_id]["unlocked"]:
+			continue
+		var si: int = defn["swamp_index"]
+		if swamp_index >= 0 and si != swamp_index:
+			continue
+		var fill: float = get_swamp_fill_fraction(si)
+		if fill <= defn["drain_threshold"]:
+			cave_data[cave_id]["unlocked"] = true
+			cave_unlocked.emit(cave_id)
+
+func is_cave_unlocked(cave_id: String) -> bool:
+	return cave_data.get(cave_id, {}).get("unlocked", false)
+
+func enter_cave(cave_id: String) -> void:
+	in_cave = true
+	current_cave = cave_id
+	cave_data[cave_id]["entered"] = true
+	cave_entered.emit(cave_id)
+
+func exit_cave() -> void:
+	var old_cave: String = current_cave
+	in_cave = false
+	current_cave = ""
+	cave_exited.emit(old_cave)
+
+func collect_loot(cave_id: String, loot_id: String, reward_text: String) -> void:
+	if not cave_data.has(cave_id):
+		return
+	cave_data[cave_id]["loot_collected"][loot_id] = true
+	loot_collected.emit(cave_id, loot_id, reward_text)
+
+func is_loot_collected(cave_id: String, loot_id: String) -> bool:
+	if not cave_data.has(cave_id):
+		return false
+	return cave_data[cave_id]["loot_collected"].get(loot_id, false)
+
 func reset_game() -> void:
 	money = 0.0
 	current_tool_id = "hands"
@@ -778,6 +843,15 @@ func reset_game() -> void:
 	}
 	current_day = 1
 	cycle_progress = 0.2
+	in_cave = false
+	current_cave = ""
+	cave_data = {
+		"muddy_hollow": {"unlocked": false, "entered": false, "loot_collected": {}},
+		"gator_den": {"unlocked": false, "entered": false, "loot_collected": {}},
+		"the_sinkhole": {"unlocked": false, "entered": false, "loot_collected": {}},
+		"collapsed_mine": {"unlocked": false, "entered": false, "loot_collected": {}},
+		"the_abyss": {"unlocked": false, "entered": false, "loot_collected": {}},
+	}
 	_init_swamp_states()
 
 	# Emit all signals to update UI
@@ -801,7 +875,7 @@ func regen_stamina(delta: float) -> void:
 		stamina_changed.emit(current_stamina, max_stam)
 
 func _process(delta: float) -> void:
-	# Hose auto-drain (earns money directly)
+	# Hose fills water_carried (like manual scooping, player must sell at shop)
 	if hose_active:
 		hose_timer -= delta
 		if hose_timer <= 0.0:
@@ -817,9 +891,21 @@ func _process(delta: float) -> void:
 					hose_swamp_index = -1
 					hose_state_changed.emit(false, 0.0)
 				else:
-					var gallons: float = get_tool_output("hose") * delta
-					drain_water(hose_swamp_index, gallons)
-					hose_state_changed.emit(true, hose_timer)
+					var capacity: float = get_stat_value("carrying_capacity")
+					var remaining_space: float = capacity - water_carried
+					if remaining_space <= 0.001:
+						hose_active = false
+						hose_timer = 0.0
+						hose_swamp_index = -1
+						hose_state_changed.emit(false, 0.0)
+					else:
+						var gallons: float = minf(get_tool_output("hose") * delta, remaining_space)
+						var actual: float = _drain_swamp(hose_swamp_index, gallons)
+						if actual > 0.0:
+							water_carried += actual
+							last_scoop_swamp = hose_swamp_index
+							water_carried_changed.emit(water_carried, capacity)
+						hose_state_changed.emit(true, hose_timer)
 
 	# Pump passive drain (earns money directly, drains all pools)
 	if pump_owned:
@@ -846,7 +932,7 @@ func get_save_data() -> Dictionary:
 	for state in swamp_states:
 		swamp_save.append({"gallons_drained": state["gallons_drained"], "completed": state["completed"]})
 	return {
-		"version": 10,
+		"version": 12,
 		"money": money,
 		"current_tool_id": current_tool_id,
 		"tools_owned": tools_owned.duplicate(true),
@@ -861,7 +947,8 @@ func get_save_data() -> Dictionary:
 		"camel_count": camel_count,
 		"camel_capacity_level": camel_capacity_level,
 		"camel_speed_level": camel_speed_level,
-		"upgrades_owned": upgrades_owned.duplicate(true)
+		"upgrades_owned": upgrades_owned.duplicate(true),
+		"cave_data": cave_data.duplicate(true)
 	}
 
 func load_save_data(data: Dictionary) -> void:
@@ -910,6 +997,26 @@ func load_save_data(data: Dictionary) -> void:
 			var k: String = key
 			if upgrades_owned.has(k):
 				upgrades_owned[k] = int(data["upgrades_owned"][k])
+
+	# Cave data
+	if data.has("cave_data"):
+		for key in data["cave_data"]:
+			var k: String = key
+			if cave_data.has(k):
+				var saved: Dictionary = data["cave_data"][k]
+				cave_data[k]["unlocked"] = saved.get("unlocked", false)
+				cave_data[k]["entered"] = saved.get("entered", false)
+				if saved.has("loot_collected"):
+					cave_data[k]["loot_collected"] = saved["loot_collected"].duplicate()
+
+	# Version migration
+	var save_version: int = int(data.get("version", 1))
+	if save_version < 12:
+		# Swamp sizes changed in v12 — clamp drained to new caps
+		for i in range(swamp_states.size()):
+			var cap: float = swamp_definitions[i]["total_gallons"]
+			swamp_states[i]["gallons_drained"] = minf(swamp_states[i]["gallons_drained"], cap)
+			swamp_states[i]["completed"] = swamp_states[i]["gallons_drained"] >= cap
 
 	# Emit signals
 	money_changed.emit(money)

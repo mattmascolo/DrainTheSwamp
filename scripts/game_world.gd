@@ -7,23 +7,86 @@ const CYCLE_DURATION: float = 300.0
 var cycle_time: float = 0.0
 
 # Terrain: array of Vector2 points defining the ground surface
-# Pattern per swamp: entry_slope_top, basin_left, basin_right, exit_slope_top
-# Plus initial left shore and final right shore
+# Each pool has a unique contour; ridges between them vary in shape
 var terrain_points: Array[Vector2] = [
-	Vector2(0, 136), Vector2(80, 136),              # Left shore (pump area)
-	Vector2(108, 160), Vector2(178, 164),            # Puddle: gentle entry, tilted floor (+4)
-	Vector2(214, 146), Vector2(278, 158),            # Ridge 1 (lower, slopes down)
-	Vector2(338, 206), Vector2(462, 212),            # Pond: wide, slight tilt (+6)
-	Vector2(538, 184), Vector2(598, 198),            # Ridge 2 (lower)
-	Vector2(682, 250), Vector2(828, 258),            # Marsh: wide, tilt (+8)
-	Vector2(908, 232), Vector2(958, 250),            # Ridge 3 (lower)
-	Vector2(1048, 306), Vector2(1215, 316),          # Bog: wide, tilt (+10)
-	Vector2(1308, 286), Vector2(1358, 306),          # Ridge 4 (lower)
-	Vector2(1468, 360), Vector2(1685, 372),          # Deep Swamp: very wide, tilt (+12)
-	Vector2(1775, 344), Vector2(1920, 362),          # Right shore (much lower)
+	# Left shore (shop area) — indices 0-1
+	Vector2(-40, 136), Vector2(80, 136),
+	# Puddle (~7 pts) — indices 2-8: gentle, worn, slight asymmetry
+	Vector2(108, 160),   # entry top
+	Vector2(130, 168),   # entry mid-shelf
+	Vector2(142, 163),   # small notch up
+	Vector2(155, 168),   # basin dip
+	Vector2(165, 166),   # basin bump
+	Vector2(175, 164),   # basin right
+	Vector2(200, 148),   # exit top (gradual climb)
+	# Ridge 1 — smooth hump — indices 9-10
+	Vector2(230, 142), Vector2(270, 155),
+	# Pond (~9 pts) — indices 11-19: stepped, layered
+	Vector2(310, 195),   # entry top
+	Vector2(330, 204),   # entry shelf
+	Vector2(348, 200),   # step back up
+	Vector2(370, 210),   # deeper dip (off-center V)
+	Vector2(395, 212),   # basin floor
+	Vector2(420, 210),   # slight rise
+	Vector2(440, 208),   # gradual exit
+	Vector2(455, 205),   # exit bump
+	Vector2(480, 186),   # exit top
+	# Ridge 2 — plateau — indices 20-22
+	Vector2(520, 178), Vector2(555, 180), Vector2(595, 192),
+	# Marsh (~11 pts) — indices 23-33: uneven, organic
+	Vector2(650, 240),   # entry top
+	Vector2(670, 248),   # entry slope
+	Vector2(688, 244),   # bump
+	Vector2(705, 252),   # dip
+	Vector2(725, 256),   # basin
+	Vector2(748, 258),   # deepest
+	Vector2(770, 254),   # rise
+	Vector2(790, 256),   # second dip
+	Vector2(808, 250),   # rise
+	Vector2(822, 248),   # exit slope
+	Vector2(845, 232),   # exit top
+	# Ridge 3 — jagged peak — indices 34-36
+	Vector2(880, 224), Vector2(910, 218), Vector2(945, 238),
+	# Bog (~11 pts) — indices 37-47: steep, cracked, stair-step
+	Vector2(1010, 296),  # entry top
+	Vector2(1028, 306),  # steep entry
+	Vector2(1045, 302),  # crack ledge
+	Vector2(1060, 312),  # deeper
+	Vector2(1085, 316),  # basin
+	Vector2(1115, 318),  # deepest
+	Vector2(1145, 314),  # rise
+	Vector2(1168, 316),  # second crack
+	Vector2(1188, 310),  # stair step up
+	Vector2(1205, 306),  # exit ledge
+	Vector2(1230, 284),  # exit top
+	# Ridge 4 — cracked flat — indices 48-51
+	Vector2(1270, 276), Vector2(1300, 280), Vector2(1330, 278), Vector2(1360, 294),
+	# Deep Swamp (~13 pts) — indices 52-64: jagged, raw, multiple ledges
+	Vector2(1430, 348),  # entry top
+	Vector2(1448, 356),  # entry ledge
+	Vector2(1465, 352),  # notch up
+	Vector2(1485, 362),  # deeper
+	Vector2(1510, 368),  # basin shelf
+	Vector2(1540, 372),  # deep basin
+	Vector2(1570, 374),  # deepest
+	Vector2(1598, 370),  # rise
+	Vector2(1620, 372),  # second dip
+	Vector2(1645, 366),  # ledge
+	Vector2(1665, 368),  # notch
+	Vector2(1682, 362),  # exit slope
+	Vector2(1710, 344),  # exit top
+	# Right shore — indices 65-66
+	Vector2(1775, 340), Vector2(1920, 358),
 ]
 
-# Swamp geometry indices: swamp i -> terrain_points indices
+# Swamp geometry: [entry_top_index, exit_top_index] into terrain_points
+const SWAMP_RANGES: Array = [
+	[2, 8],    # Puddle
+	[11, 19],  # Pond
+	[23, 33],  # Marsh
+	[37, 47],  # Bog
+	[52, 64],  # Deep Swamp
+]
 const SWAMP_COUNT: int = 5
 const WATER_SHADER = preload("res://shaders/water.gdshader")
 const POST_PROCESS_SHADER = preload("res://shaders/post_process.gdshader")
@@ -49,6 +112,8 @@ var shimmer_lines: Array[Line2D] = []
 var mud_patches: Array[Dictionary] = []
 var player_in_pump_area: bool = false
 var pump_player_ref: Node2D = null
+var player_in_shop_area: bool = false
+var shop_player_ref: Node2D = null
 var camels: Array[Dictionary] = []
 
 # Second pass visuals
@@ -123,6 +188,10 @@ var aurora_fade: float = 0.0
 var owl_node: Node2D = null
 var owl_blink_timer: float = 4.0
 
+# Cave entrances
+var cave_entrances: Array[Dictionary] = []
+const CAVE_IDS: Array = ["muddy_hollow", "gator_den", "the_sinkhole", "collapsed_mine", "the_abyss"]
+
 # Dynamic shadows (Phase 13c)
 var player_shadow: ColorRect = null
 
@@ -187,7 +256,6 @@ const POOL_WAVE_PARAMS: Array[Array] = [
 	[3.0, 0.8],   # Deep Swamp: large/very slow
 ]
 # Per-pool bowl depth for rounded basin shape
-const POOL_BOWL_DEPTHS: Array[float] = [1.0, 2.0, 3.0, 4.0, 5.0]
 const GRASS_COLOR := Color(0.25, 0.48, 0.15)
 const GRASS_LIGHT_COLOR := Color(0.35, 0.58, 0.2)
 const ROCK_COLOR := Color(0.42, 0.4, 0.38)
@@ -206,6 +274,7 @@ func _ready() -> void:
 	_build_terrain()
 	_build_terrain_details()
 	_build_terrain_zones()
+	_build_shop()
 	_build_pump_station()
 	_build_water()
 	_build_water_walls()
@@ -240,9 +309,11 @@ func _ready() -> void:
 	_build_drain_reveals()
 	_build_atmosphere()
 	_build_player_shadow()
+	_build_cave_entrances()
 	_init_drain_thresholds()
 
 	GameManager.water_level_changed.connect(_on_water_level_changed)
+	GameManager.cave_unlocked.connect(_on_cave_unlocked)
 	GameManager.swamp_completed.connect(_on_swamp_completed)
 	GameManager.camel_changed.connect(_on_camel_changed)
 	_build_camels()
@@ -713,13 +784,14 @@ func _build_terrain_zones() -> void:
 	_build_slope_erosion()
 
 func _build_ridge_details() -> void:
-	# Ridges are between pools: indices 4-5, 8-9, 12-13, 16-17 in terrain_points
-	var ridge_indices: Array[int] = [4, 8, 12, 16]
-	for ri in ridge_indices:
-		if ri + 1 >= terrain_points.size():
+	# Ridges are between pools: exit_top of pool N through entry_top of pool N+1
+	for pool_i in range(SWAMP_COUNT - 1):
+		var ridge_start: int = SWAMP_RANGES[pool_i][1]  # exit_top of pool N
+		var ridge_end: int = SWAMP_RANGES[pool_i + 1][0]  # entry_top of pool N+1
+		if ridge_start >= terrain_points.size() or ridge_end >= terrain_points.size():
 			continue
-		var ridge_left: Vector2 = terrain_points[ri]
-		var ridge_right: Vector2 = terrain_points[ri + 1]
+		var ridge_left: Vector2 = terrain_points[ridge_start]
+		var ridge_right: Vector2 = terrain_points[ridge_end]
 		var ridge_mid_x: float = (ridge_left.x + ridge_right.x) * 0.5
 		var ridge_w: float = ridge_right.x - ridge_left.x
 
@@ -818,10 +890,10 @@ func _build_vegetation() -> void:
 
 	# Grass tufts on ridges (skip basin floors)
 	for i in range(terrain_points.size()):
-		# Basin floor indices: 4*s+2, 4*s+3 for each swamp
+		# Skip points inside pool basins
 		var is_basin: bool = false
 		for s in range(SWAMP_COUNT):
-			if i == 4 * s + 2 or i == 4 * s + 3:
+			if i > SWAMP_RANGES[s][0] and i < SWAMP_RANGES[s][1]:
 				is_basin = true
 				break
 		if is_basin:
@@ -1031,24 +1103,23 @@ func _update_depth_gradient(swamp_index: int) -> void:
 	if fill <= 0.001:
 		depth_polygons[swamp_index].polygon = PackedVector2Array()
 		return
-	var geo: Dictionary = _get_swamp_geometry(swamp_index)
-	var entry_top: Vector2 = geo["entry_top"]
-	var basin_left: Vector2 = geo["basin_left"]
-	var basin_right: Vector2 = geo["basin_right"]
-	var exit_top: Vector2 = geo["exit_top"]
-	var basin_y: float = maxf(basin_left.y, basin_right.y)
-	var overflow_y: float = maxf(entry_top.y, exit_top.y)
-	var water_y: float = basin_y - fill * (basin_y - overflow_y)
+	var deepest_y: float = _get_pool_deepest_y(swamp_index)
+	var overflow_y: float = _get_pool_overflow_y(swamp_index)
+	var water_y: float = deepest_y - fill * (deepest_y - overflow_y)
 	# Depth zone covers bottom 60% of water
-	var depth_y: float = lerpf(water_y, basin_y, 0.4)
-	var left_x: float = _lerp_x_at_y(entry_top, basin_left, depth_y)
-	var right_x: float = _lerp_x_at_y(basin_right, exit_top, depth_y)
-	depth_polygons[swamp_index].polygon = PackedVector2Array([
-		Vector2(left_x, depth_y),
-		Vector2(basin_left.x, basin_left.y),
-		Vector2(basin_right.x, basin_right.y),
-		Vector2(right_x, depth_y),
-	])
+	var depth_y: float = lerpf(water_y, deepest_y, 0.4)
+	var left_x: float = _find_water_left_x(swamp_index, depth_y)
+	var right_x: float = _find_water_right_x(swamp_index, depth_y)
+	# Trace terrain contour below depth_y
+	var pts := PackedVector2Array()
+	pts.append(Vector2(left_x, depth_y))
+	var r: Array = SWAMP_RANGES[swamp_index]
+	for i in range(r[0], r[1] + 1):
+		var pt: Vector2 = terrain_points[i]
+		if pt.y >= depth_y and pt.x >= left_x and pt.x <= right_x:
+			pts.append(pt)
+	pts.append(Vector2(right_x, depth_y))
+	depth_polygons[swamp_index].polygon = pts
 
 # --- Water Shimmer Lines ---
 func _build_shimmer_lines() -> void:
@@ -1402,11 +1473,8 @@ func _spawn_bubble(swamp_index: int) -> void:
 	var fill: float = GameManager.get_swamp_fill_fraction(swamp_index)
 	if fill < 0.05:
 		return
-	var entry_top: Vector2 = geo["entry_top"]
-	var exit_top: Vector2 = geo["exit_top"]
-	var basin_y: float = basin_left.y
-	var overflow_y: float = maxf(entry_top.y, exit_top.y)
-	var water_y: float = basin_y - fill * (basin_y - overflow_y)
+	var basin_y: float = _get_pool_deepest_y(swamp_index)
+	var water_y: float = _get_pool_water_y(swamp_index)
 	var bx: float = randf_range(basin_left.x + 5, basin_right.x - 5)
 	var bubble := ColorRect.new()
 	var bsize: float = randf_range(2, 4)
@@ -2182,12 +2250,18 @@ func _build_deep_swamp_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vec
 
 # --- Swamp Geometry ---
 func _get_swamp_geometry(swamp_index: int) -> Dictionary:
-	var base: int = 4 * swamp_index
+	var r: Array = SWAMP_RANGES[swamp_index]
+	var start_idx: int = r[0]
+	var end_idx: int = r[1]
+	var all_pts: Array[Vector2] = []
+	for i in range(start_idx, end_idx + 1):
+		all_pts.append(terrain_points[i])
 	return {
-		"entry_top": terrain_points[base + 1],
-		"basin_left": terrain_points[base + 2],
-		"basin_right": terrain_points[base + 3],
-		"exit_top": terrain_points[base + 4]
+		"entry_top": terrain_points[start_idx],
+		"basin_left": terrain_points[start_idx + 1],
+		"basin_right": terrain_points[end_idx - 1],
+		"exit_top": terrain_points[end_idx],
+		"all_points": all_pts,
 	}
 
 # --- Water ---
@@ -2233,11 +2307,6 @@ func _build_water() -> void:
 
 func _update_water_polygon(swamp_index: int) -> void:
 	var fill: float = GameManager.get_swamp_fill_fraction(swamp_index)
-	var geo: Dictionary = _get_swamp_geometry(swamp_index)
-	var entry_top: Vector2 = geo["entry_top"]
-	var basin_left: Vector2 = geo["basin_left"]
-	var basin_right: Vector2 = geo["basin_right"]
-	var exit_top: Vector2 = geo["exit_top"]
 
 	if fill <= 0.001:
 		water_polygons[swamp_index].polygon = PackedVector2Array()
@@ -2246,47 +2315,34 @@ func _update_water_polygon(swamp_index: int) -> void:
 			water_glow_lines[swamp_index].clear_points()
 		return
 
-	# Use the deeper basin point as reference for water level
-	var basin_y: float = maxf(basin_left.y, basin_right.y)
-	var overflow_y: float = maxf(entry_top.y, exit_top.y)
-	var water_y: float = basin_y - fill * (basin_y - overflow_y)
+	var deepest_y: float = _get_pool_deepest_y(swamp_index)
+	var overflow_y: float = _get_pool_overflow_y(swamp_index)
+	var water_y: float = deepest_y - fill * (deepest_y - overflow_y)
 
-	var left_x: float = _lerp_x_at_y(entry_top, basin_left, water_y)
-	var right_x: float = _lerp_x_at_y(basin_right, exit_top, water_y)
+	var left_x: float = _find_water_left_x(swamp_index, water_y)
+	var right_x: float = _find_water_right_x(swamp_index, water_y)
 
+	# Build polygon by tracing terrain contour underwater
 	var points := PackedVector2Array()
-	var uvs := PackedVector2Array()
-	var bowl_depth: float = POOL_BOWL_DEPTHS[swamp_index]
-
-	# Top-left corner
 	points.append(Vector2(left_x, water_y))
-	uvs.append(Vector2(0, 0))
 
-	# Left basin point
-	points.append(Vector2(basin_left.x, basin_left.y))
+	# Collect all pool terrain points that are below water_y
+	var r: Array = SWAMP_RANGES[swamp_index]
+	for i in range(r[0], r[1] + 1):
+		var pt: Vector2 = terrain_points[i]
+		if pt.y >= water_y and pt.x >= left_x and pt.x <= right_x:
+			points.append(pt)
 
-	# 3 intermediate bowl points along basin floor
-	var basin_floor_y: float = lerpf(basin_left.y, basin_right.y, 0.5)
-	for bi in range(3):
-		var bt: float = (float(bi) + 1.0) / 4.0
-		var bx: float = lerpf(basin_left.x, basin_right.x, bt)
-		var by: float = lerpf(basin_left.y, basin_right.y, bt) + sin(bt * PI) * bowl_depth
-		points.append(Vector2(bx, by))
-
-	# Right basin point
-	points.append(Vector2(basin_right.x, basin_right.y))
-
-	# Top-right corner
 	points.append(Vector2(right_x, water_y))
 
 	# Generate UVs based on normalized positions
 	var min_y: float = water_y
-	var max_y: float = basin_floor_y + bowl_depth
+	var max_y: float = deepest_y
 	var y_range: float = maxf(max_y - min_y, 1.0)
-	uvs.clear()
+	var uvs := PackedVector2Array()
 	var total_pts: int = points.size()
 	for pi in range(total_pts):
-		var ux: float = float(pi) / float(total_pts - 1)
+		var ux: float = float(pi) / float(maxi(total_pts - 1, 1))
 		var uy: float = clampf((points[pi].y - min_y) / y_range, 0.0, 1.0)
 		uvs.append(Vector2(ux, uy))
 
@@ -2328,6 +2384,49 @@ func _lerp_x_at_y(p1: Vector2, p2: Vector2, target_y: float) -> float:
 	var t: float = (target_y - p1.y) / (p2.y - p1.y)
 	t = clampf(t, 0.0, 1.0)
 	return p1.x + t * (p2.x - p1.x)
+
+# Multi-segment helpers for complex pool terrain
+func _get_pool_deepest_y(swamp_index: int) -> float:
+	var r: Array = SWAMP_RANGES[swamp_index]
+	var deepest: float = terrain_points[r[0]].y
+	for i in range(r[0], r[1] + 1):
+		if terrain_points[i].y > deepest:
+			deepest = terrain_points[i].y
+	return deepest
+
+func _get_pool_overflow_y(swamp_index: int) -> float:
+	var r: Array = SWAMP_RANGES[swamp_index]
+	return maxf(terrain_points[r[0]].y, terrain_points[r[1]].y)
+
+func _get_pool_water_y(swamp_index: int) -> float:
+	var fill: float = GameManager.get_swamp_fill_fraction(swamp_index)
+	var deepest: float = _get_pool_deepest_y(swamp_index)
+	var overflow: float = _get_pool_overflow_y(swamp_index)
+	return deepest - fill * (deepest - overflow)
+
+func _find_water_left_x(swamp_index: int, water_y: float) -> float:
+	# Search entry slope segments from entry_top toward basin
+	var r: Array = SWAMP_RANGES[swamp_index]
+	for i in range(r[0], r[1]):
+		var p1: Vector2 = terrain_points[i]
+		var p2: Vector2 = terrain_points[i + 1]
+		# Check if water_y intersects this segment
+		if (p1.y <= water_y and p2.y >= water_y) or (p1.y >= water_y and p2.y <= water_y):
+			return _lerp_x_at_y(p1, p2, water_y)
+	# Fallback: entry_top x
+	return terrain_points[r[0]].x
+
+func _find_water_right_x(swamp_index: int, water_y: float) -> float:
+	# Search exit slope segments from exit_top toward basin (reverse)
+	var r: Array = SWAMP_RANGES[swamp_index]
+	for i in range(r[1], r[0], -1):
+		var p1: Vector2 = terrain_points[i]
+		var p2: Vector2 = terrain_points[i - 1]
+		# Check if water_y intersects this segment
+		if (p1.y <= water_y and p2.y >= water_y) or (p1.y >= water_y and p2.y <= water_y):
+			return _lerp_x_at_y(p1, p2, water_y)
+	# Fallback: exit_top x
+	return terrain_points[r[1]].x
 
 # --- Water Walls ---
 func _build_water_walls() -> void:
@@ -2372,18 +2471,9 @@ func _update_water_walls(swamp_index: int) -> void:
 	left_body.visible = true
 	right_body.visible = true
 
-	var geo: Dictionary = _get_swamp_geometry(swamp_index)
-	var entry_top: Vector2 = geo["entry_top"]
-	var basin_left: Vector2 = geo["basin_left"]
-	var basin_right: Vector2 = geo["basin_right"]
-	var exit_top: Vector2 = geo["exit_top"]
-
-	var basin_y: float = maxf(basin_left.y, basin_right.y)
-	var overflow_y: float = maxf(entry_top.y, exit_top.y)
-	var water_y: float = basin_y - fill * (basin_y - overflow_y)
-
-	var left_x: float = _lerp_x_at_y(entry_top, basin_left, water_y)
-	var right_x: float = _lerp_x_at_y(basin_right, exit_top, water_y)
+	var water_y: float = _get_pool_water_y(swamp_index)
+	var left_x: float = _find_water_left_x(swamp_index, water_y)
+	var right_x: float = _find_water_right_x(swamp_index, water_y)
 
 	left_body.position = Vector2(left_x, water_y - 28)
 	right_body.position = Vector2(right_x, water_y - 28)
@@ -2391,7 +2481,7 @@ func _update_water_walls(swamp_index: int) -> void:
 # --- Right Boundary Wall ---
 func _build_left_boundary() -> void:
 	var wall_body := StaticBody2D.new()
-	wall_body.position = Vector2(-4, terrain_points[0].y - 60)
+	wall_body.position = Vector2(terrain_points[0].x - 4, terrain_points[0].y - 60)
 	var col := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()
 	rect.size = Vector2(8, 200)
@@ -2420,40 +2510,25 @@ func _build_water_detect_areas() -> void:
 		add_child(area)
 		water_detect_areas.append(area)
 
-		var geo: Dictionary = _get_swamp_geometry(i)
-		var entry_top: Vector2 = geo["entry_top"]
-		var basin_left: Vector2 = geo["basin_left"]
-		var basin_right: Vector2 = geo["basin_right"]
-		var exit_top: Vector2 = geo["exit_top"]
+		var r: Array = SWAMP_RANGES[i]
+		var deepest_y: float = _get_pool_deepest_y(i)
 
-		# Entry slope detection
-		var entry_mid: Vector2 = (entry_top + basin_left) * 0.5
-		var entry_shape := CollisionShape2D.new()
-		var entry_rect := RectangleShape2D.new()
-		entry_rect.size = Vector2((basin_left - entry_top).length(), 40)
-		entry_shape.shape = entry_rect
-		entry_shape.position = entry_mid + Vector2(0, -10)
-		entry_shape.rotation = atan2(basin_left.y - entry_top.y, basin_left.x - entry_top.x)
-		area.add_child(entry_shape)
+		# Include approach slopes (one point before entry, one after exit)
+		var approach_left: Vector2 = terrain_points[maxi(r[0] - 1, 0)]
+		var approach_right: Vector2 = terrain_points[mini(r[1] + 1, terrain_points.size() - 1)]
 
-		# Basin floor detection
-		var basin_mid: Vector2 = (basin_left + basin_right) * 0.5
-		var basin_shape := CollisionShape2D.new()
-		var basin_rect := RectangleShape2D.new()
-		basin_rect.size = Vector2(basin_right.x - basin_left.x, 32)
-		basin_shape.shape = basin_rect
-		basin_shape.position = basin_mid + Vector2(0, -12)
-		area.add_child(basin_shape)
-
-		# Exit slope detection
-		var exit_mid: Vector2 = (basin_right + exit_top) * 0.5
-		var exit_shape := CollisionShape2D.new()
-		var exit_rect := RectangleShape2D.new()
-		exit_rect.size = Vector2((exit_top - basin_right).length(), 40)
-		exit_shape.shape = exit_rect
-		exit_shape.position = exit_mid + Vector2(0, -10)
-		exit_shape.rotation = atan2(exit_top.y - basin_right.y, exit_top.x - basin_right.x)
-		area.add_child(exit_shape)
+		# Single bounding rectangle covering pool + approach slopes
+		# Extend 40px above to catch player collision body (centered 20px above feet)
+		var pool_left_x: float = approach_left.x
+		var pool_right_x: float = approach_right.x
+		var pool_top_y: float = minf(approach_left.y, approach_right.y) - 40.0
+		var pool_h: float = deepest_y - pool_top_y + 10.0
+		var detect_shape := CollisionShape2D.new()
+		var detect_rect := RectangleShape2D.new()
+		detect_rect.size = Vector2(pool_right_x - pool_left_x, pool_h)
+		detect_shape.shape = detect_rect
+		detect_shape.position = Vector2((pool_left_x + pool_right_x) * 0.5, pool_top_y + pool_h * 0.5)
+		area.add_child(detect_shape)
 
 		var idx: int = i
 		area.body_entered.connect(func(body: Node2D) -> void: _on_swamp_body_entered(body, idx))
@@ -2466,31 +2541,39 @@ func _build_swamp_labels() -> void:
 	for i in range(SWAMP_COUNT):
 		var geo: Dictionary = _get_swamp_geometry(i)
 		var basin_mid_x: float = (geo["basin_left"].x + geo["basin_right"].x) * 0.5
-		var label_y: float = geo["entry_top"].y - 24
 		var basin_y: float = maxf(geo["basin_left"].y, geo["basin_right"].y)
 
+		# Pool name label — positioned in dirt below water
 		var label := Label.new()
 		label.text = GameManager.swamp_definitions[i]["name"]
-		label.add_theme_font_size_override("font_size", 12)
-		label.add_theme_color_override("font_color", Color(0.8, 0.85, 0.9, 0.7))
-		label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.add_theme_font_size_override("font_size", 11)
+		label.add_theme_color_override("font_color", Color(0.95, 0.90, 0.75, 0.9))
+		label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 		label.add_theme_constant_override("shadow_offset_x", 1)
 		label.add_theme_constant_override("shadow_offset_y", 1)
-		label.position = Vector2(basin_mid_x - 30, label_y)
+		label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+		label.add_theme_constant_override("outline_size", 2)
+		label.custom_minimum_size = Vector2(80, 0)
+		label.position = Vector2(basin_mid_x - 40, basin_y + 6)
 		label.z_index = 5
 		add_child(label)
 		swamp_labels.append(label)
 
-		# Percentage label below basin
+		# Percentage label — right below the name
 		var pct_label := Label.new()
 		var pct: float = GameManager.get_swamp_water_percent(i)
 		pct_label.text = "%.1f%%" % pct
+		pct_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		pct_label.add_theme_font_size_override("font_size", 10)
-		pct_label.add_theme_color_override("font_color", Color(0.75, 0.8, 0.85, 0.6))
-		pct_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.4))
+		pct_label.add_theme_color_override("font_color", Color(0.85, 0.80, 0.65, 0.85))
+		pct_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 		pct_label.add_theme_constant_override("shadow_offset_x", 1)
 		pct_label.add_theme_constant_override("shadow_offset_y", 1)
-		pct_label.position = Vector2(basin_mid_x - 16, basin_y + 8)
+		pct_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+		pct_label.add_theme_constant_override("outline_size", 2)
+		pct_label.custom_minimum_size = Vector2(80, 0)
+		pct_label.position = Vector2(basin_mid_x - 40, basin_y + 20)
 		pct_label.z_index = 5
 		add_child(pct_label)
 		swamp_percent_labels.append(pct_label)
@@ -2667,8 +2750,8 @@ func _update_camels(delta: float) -> void:
 						cs["state_timer"] = 0.0
 
 			"to_pump":
-				# Walk left to pump (x≈30)
-				var pump_x: float = 30.0
+				# Walk left to shop to sell (x≈6)
+				var pump_x: float = 6.0
 				var dx2: float = pump_x - cs["x"]
 				if absf(dx2) > 5.0:
 					var dir2: float = signf(dx2)
@@ -2797,6 +2880,7 @@ func _on_water_level_changed(swamp_index: int, _percent: float) -> void:
 		if swamp_index < swamp_percent_labels.size():
 			var pct: float = GameManager.get_swamp_water_percent(swamp_index)
 			swamp_percent_labels[swamp_index].text = "%.1f%%" % pct
+		_check_cave_entrance_updates(swamp_index)
 
 func _on_swamp_completed(swamp_index: int, _reward: float) -> void:
 	if swamp_index >= 0 and swamp_index < swamp_labels.size():
@@ -2811,10 +2895,195 @@ func _on_swamp_completed(swamp_index: int, _reward: float) -> void:
 	_milestone_flash()
 
 # --- Pump Station ---
+func _build_shop() -> void:
+	# Physical shop building on left shore
+	var sx: float = -22.0  # Shop left edge x
+	var shop_y: float = 136.0  # Shore ground level
+
+	# Stone platform/foundation
+	var platform := ColorRect.new()
+	platform.position = Vector2(sx, shop_y - 6)
+	platform.size = Vector2(56, 8)
+	platform.color = Color(0.45, 0.4, 0.35)
+	platform.z_index = 2
+	add_child(platform)
+
+	# Main wall
+	var wall := ColorRect.new()
+	wall.position = Vector2(sx + 6, shop_y - 46)
+	wall.size = Vector2(44, 40)
+	wall.color = Color(0.42, 0.32, 0.2)
+	wall.z_index = 3
+	add_child(wall)
+
+	# Plank lines on wall
+	for pi in range(5):
+		var plank := ColorRect.new()
+		plank.position = Vector2(sx + 6, shop_y - 46 + pi * 8)
+		plank.size = Vector2(44, 1)
+		plank.color = Color(0.35, 0.26, 0.15, 0.4)
+		plank.z_index = 3
+		add_child(plank)
+
+	# Roof (triangle using Polygon2D)
+	var roof := Polygon2D.new()
+	roof.polygon = PackedVector2Array([
+		Vector2(sx + 2, shop_y - 46),
+		Vector2(sx + 28, shop_y - 62),
+		Vector2(sx + 54, shop_y - 46),
+	])
+	roof.color = Color(0.5, 0.22, 0.12)
+	roof.z_index = 4
+	add_child(roof)
+
+	# Roof edge line
+	var roof_edge := ColorRect.new()
+	roof_edge.position = Vector2(sx + 2, shop_y - 47)
+	roof_edge.size = Vector2(52, 2)
+	roof_edge.color = Color(0.4, 0.18, 0.1)
+	roof_edge.z_index = 4
+	add_child(roof_edge)
+
+	# Door
+	var door_frame := ColorRect.new()
+	door_frame.position = Vector2(sx + 19, shop_y - 30)
+	door_frame.size = Vector2(18, 24)
+	door_frame.color = Color(0.25, 0.18, 0.1)
+	door_frame.z_index = 4
+	add_child(door_frame)
+
+	# Door handle
+	var handle := ColorRect.new()
+	handle.position = Vector2(sx + 32, shop_y - 18)
+	handle.size = Vector2(2, 2)
+	handle.color = Color(0.7, 0.6, 0.3)
+	handle.z_index = 5
+	add_child(handle)
+
+	# Window
+	var window := ColorRect.new()
+	window.position = Vector2(sx + 36, shop_y - 40)
+	window.size = Vector2(8, 8)
+	window.color = Color(0.6, 0.55, 0.35, 0.6)
+	window.z_index = 4
+	add_child(window)
+
+	# Window cross-frame
+	var wh := ColorRect.new()
+	wh.position = Vector2(sx + 36, shop_y - 36)
+	wh.size = Vector2(8, 1)
+	wh.color = Color(0.35, 0.26, 0.15)
+	wh.z_index = 5
+	add_child(wh)
+	var wv := ColorRect.new()
+	wv.position = Vector2(sx + 40, shop_y - 40)
+	wv.size = Vector2(1, 8)
+	wv.color = Color(0.35, 0.26, 0.15)
+	wv.z_index = 5
+	add_child(wv)
+
+	# Shop sign
+	var sign_board := ColorRect.new()
+	sign_board.position = Vector2(sx + 12, shop_y - 56)
+	sign_board.size = Vector2(32, 10)
+	sign_board.color = Color(0.35, 0.28, 0.15)
+	sign_board.z_index = 5
+	add_child(sign_board)
+
+	var shop_lbl := Label.new()
+	shop_lbl.text = "SHOP"
+	shop_lbl.add_theme_font_size_override("font_size", 10)
+	shop_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4, 0.9))
+	shop_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+	shop_lbl.add_theme_constant_override("shadow_offset_x", 1)
+	shop_lbl.add_theme_constant_override("shadow_offset_y", 1)
+	shop_lbl.position = Vector2(sx + 14, shop_y - 57)
+	shop_lbl.z_index = 6
+	add_child(shop_lbl)
+
+	# "SELL" indicator
+	var sell_lbl := Label.new()
+	sell_lbl.text = "SELL"
+	sell_lbl.add_theme_font_size_override("font_size", 10)
+	sell_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 0.7))
+	sell_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+	sell_lbl.add_theme_constant_override("shadow_offset_x", 1)
+	sell_lbl.add_theme_constant_override("shadow_offset_y", 1)
+	sell_lbl.position = Vector2(sx + 20, shop_y - 8)
+	sell_lbl.z_index = 5
+	add_child(sell_lbl)
+
+	# Shop lantern (warm light beside door)
+	var shop_lantern := PointLight2D.new()
+	shop_lantern.position = Vector2(sx + 18, shop_y - 32)
+	shop_lantern.color = Color(1.0, 0.85, 0.5)
+	shop_lantern.blend_mode = PointLight2D.BLEND_MODE_ADD
+	shop_lantern.energy = 0.8
+	shop_lantern.shadow_enabled = false
+	var grad := GradientTexture2D.new()
+	grad.width = 64
+	grad.height = 64
+	grad.fill = GradientTexture2D.FILL_RADIAL
+	grad.fill_from = Vector2(0.5, 0.5)
+	grad.fill_to = Vector2(0.5, 0.0)
+	var g := Gradient.new()
+	g.set_offset(0, 0.0)
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.set_offset(1, 1.0)
+	g.set_color(1, Color(0, 0, 0, 0))
+	grad.gradient = g
+	shop_lantern.texture = grad
+	shop_lantern.texture_scale = 0.3
+	add_child(shop_lantern)
+
+	# Vine detail on wall
+	var vine := Line2D.new()
+	vine.width = 1.5
+	vine.default_color = Color(0.2, 0.4, 0.15, 0.6)
+	vine.add_point(Vector2(sx + 6, shop_y - 10))
+	vine.add_point(Vector2(sx + 8, shop_y - 22))
+	vine.add_point(Vector2(sx + 5, shop_y - 34))
+	vine.z_index = 4
+	add_child(vine)
+
+	# Shop interaction Area2D
+	var shop_area := Area2D.new()
+	shop_area.collision_layer = 0
+	shop_area.collision_mask = 1
+	var scol := CollisionShape2D.new()
+	var srect := RectangleShape2D.new()
+	srect.size = Vector2(50, 52)
+	scol.shape = srect
+	scol.position = Vector2(sx + 28, shop_y - 20)
+	shop_area.add_child(scol)
+	add_child(shop_area)
+
+	shop_area.body_entered.connect(_on_shop_body_entered)
+	shop_area.body_exited.connect(_on_shop_body_exited)
+
+func _on_shop_body_entered(body: Node2D) -> void:
+	if body is CharacterBody2D and body.has_method("set_near_shop"):
+		body.set_near_shop(true)
+		player_in_shop_area = true
+		shop_player_ref = body
+		var earned: float = GameManager.sell_water()
+		if earned > 0.01 and body.has_method("show_floating_text"):
+			body.show_floating_text("+%s" % Economy.format_money(earned), Color(1.0, 0.85, 0.2))
+
+func _on_shop_body_exited(body: Node2D) -> void:
+	if body is CharacterBody2D and body.has_method("set_near_shop"):
+		body.set_near_shop(false)
+		player_in_shop_area = false
+		shop_player_ref = null
+
 func _build_pump_station() -> void:
+	# Pump station on Ridge 1 at x≈230
+	var pump_base_x: float = 216.0
+	var pump_y: float = 136.0  # Ridge 1 height
+
 	# Platform/base
 	var platform := ColorRect.new()
-	platform.position = Vector2(6, 130)
+	platform.position = Vector2(pump_base_x, pump_y - 6)
 	platform.size = Vector2(44, 6)
 	platform.color = Color(0.4, 0.38, 0.36)
 	platform.z_index = 2
@@ -2822,7 +3091,7 @@ func _build_pump_station() -> void:
 
 	# Pump body - main housing
 	var pump_body := ColorRect.new()
-	pump_body.position = Vector2(12, 100)
+	pump_body.position = Vector2(pump_base_x + 6, pump_y - 36)
 	pump_body.size = Vector2(28, 30)
 	pump_body.color = Color(0.5, 0.5, 0.55)
 	pump_body.z_index = 3
@@ -2830,7 +3099,7 @@ func _build_pump_station() -> void:
 
 	# Pump body highlight
 	var pump_hl := ColorRect.new()
-	pump_hl.position = Vector2(14, 102)
+	pump_hl.position = Vector2(pump_base_x + 8, pump_y - 34)
 	pump_hl.size = Vector2(8, 26)
 	pump_hl.color = Color(0.58, 0.58, 0.62)
 	pump_hl.z_index = 3
@@ -2838,15 +3107,15 @@ func _build_pump_station() -> void:
 
 	# Pump top cap
 	var pump_cap := ColorRect.new()
-	pump_cap.position = Vector2(10, 96)
+	pump_cap.position = Vector2(pump_base_x + 4, pump_y - 40)
 	pump_cap.size = Vector2(32, 6)
 	pump_cap.color = Color(0.42, 0.42, 0.46)
 	pump_cap.z_index = 3
 	add_child(pump_cap)
 
-	# Pipe extending right
+	# Pipe extending right (toward Pond)
 	var pump_pipe := ColorRect.new()
-	pump_pipe.position = Vector2(40, 112)
+	pump_pipe.position = Vector2(pump_base_x + 34, pump_y - 24)
 	pump_pipe.size = Vector2(20, 6)
 	pump_pipe.color = Color(0.4, 0.4, 0.45)
 	pump_pipe.z_index = 3
@@ -2854,7 +3123,7 @@ func _build_pump_station() -> void:
 
 	# Pipe joint
 	var pipe_joint := ColorRect.new()
-	pipe_joint.position = Vector2(38, 110)
+	pipe_joint.position = Vector2(pump_base_x + 32, pump_y - 26)
 	pipe_joint.size = Vector2(6, 10)
 	pipe_joint.color = Color(0.45, 0.45, 0.5)
 	pipe_joint.z_index = 3
@@ -2862,7 +3131,7 @@ func _build_pump_station() -> void:
 
 	# Indicator light
 	var pump_light := ColorRect.new()
-	pump_light.position = Vector2(20, 104)
+	pump_light.position = Vector2(pump_base_x + 14, pump_y - 32)
 	pump_light.size = Vector2(6, 6)
 	pump_light.color = Color(0.2, 0.85, 0.3)
 	pump_light.z_index = 4
@@ -2874,29 +3143,28 @@ func _build_pump_station() -> void:
 		var vine := Line2D.new()
 		vine.width = 1.5
 		vine.default_color = Color(0.2, 0.4, 0.15, 0.7)
-		var vx: float = 12.0 + vi * 8.0
-		vine.add_point(Vector2(vx, 130))
-		vine.add_point(Vector2(vx + randf_range(-3, 3), 118))
-		vine.add_point(Vector2(vx + randf_range(-4, 4), 106))
+		var vx: float = pump_base_x + 6.0 + vi * 8.0
+		vine.add_point(Vector2(vx, pump_y - 6))
+		vine.add_point(Vector2(vx + randf_range(-3, 3), pump_y - 18))
+		vine.add_point(Vector2(vx + randf_range(-4, 4), pump_y - 30))
 		vine.z_index = 4
 		add_child(vine)
-		# Small leaf on vine
 		var vine_leaf := ColorRect.new()
 		vine_leaf.size = Vector2(3, 2)
-		vine_leaf.position = Vector2(vx + randf_range(-3, 2), randf_range(110, 122))
+		vine_leaf.position = Vector2(vx + randf_range(-3, 2), randf_range(pump_y - 26, pump_y - 14))
 		vine_leaf.color = Color(0.25, 0.5, 0.18, 0.8)
 		vine_leaf.z_index = 4
 		add_child(vine_leaf)
 
-	# Gauge (small circle-ish)
+	# Gauge
 	var gauge := ColorRect.new()
-	gauge.position = Vector2(28, 110)
+	gauge.position = Vector2(pump_base_x + 22, pump_y - 26)
 	gauge.size = Vector2(8, 8)
 	gauge.color = Color(0.15, 0.15, 0.2)
 	gauge.z_index = 4
 	add_child(gauge)
 	var gauge_needle := ColorRect.new()
-	gauge_needle.position = Vector2(30, 111.0)
+	gauge_needle.position = Vector2(pump_base_x + 24, pump_y - 25)
 	gauge_needle.size = Vector2(4, 2)
 	gauge_needle.color = Color(0.9, 0.3, 0.2)
 	gauge_needle.z_index = 4
@@ -2910,23 +3178,11 @@ func _build_pump_station() -> void:
 	pump_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 	pump_lbl.add_theme_constant_override("shadow_offset_x", 1)
 	pump_lbl.add_theme_constant_override("shadow_offset_y", 1)
-	pump_lbl.position = Vector2(10, 80)
+	pump_lbl.position = Vector2(pump_base_x + 4, pump_y - 56)
 	pump_lbl.z_index = 5
 	add_child(pump_lbl)
 
-	# "SELL" indicator
-	var sell_lbl := Label.new()
-	sell_lbl.text = "SELL"
-	sell_lbl.add_theme_font_size_override("font_size", 10)
-	sell_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 0.7))
-	sell_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-	sell_lbl.add_theme_constant_override("shadow_offset_x", 1)
-	sell_lbl.add_theme_constant_override("shadow_offset_y", 1)
-	sell_lbl.position = Vector2(14, 92)
-	sell_lbl.z_index = 5
-	add_child(sell_lbl)
-
-	# Detection area for player interaction
+	# Detection area for player interaction (pump only, no sell)
 	var pump_area := Area2D.new()
 	pump_area.collision_layer = 0
 	pump_area.collision_mask = 1
@@ -2934,7 +3190,7 @@ func _build_pump_station() -> void:
 	var rect := RectangleShape2D.new()
 	rect.size = Vector2(60, 52)
 	shape.shape = rect
-	shape.position = Vector2(30, 112)
+	shape.position = Vector2(pump_base_x + 24, pump_y - 18)
 	pump_area.add_child(shape)
 	add_child(pump_area)
 
@@ -2946,9 +3202,6 @@ func _on_pump_body_entered(body: Node2D) -> void:
 		body.set_near_pump(true)
 		player_in_pump_area = true
 		pump_player_ref = body
-		var earned: float = GameManager.sell_water()
-		if earned > 0.01 and body.has_method("show_floating_text"):
-			body.show_floating_text("+%s" % Economy.format_money(earned), Color(1.0, 0.85, 0.2))
 
 func _on_pump_body_exited(body: Node2D) -> void:
 	if body is CharacterBody2D and body.has_method("set_near_pump"):
@@ -3310,13 +3563,12 @@ func _build_post_processing() -> void:
 
 # --- Day/Night Cycle & Animation ---
 func _process(delta: float) -> void:
-	# Continuous sell while player stands in pump area
-	if player_in_pump_area and is_instance_valid(pump_player_ref):
+	# Continuous sell while player stands in shop area
+	if player_in_shop_area and is_instance_valid(shop_player_ref):
 		var earned: float = GameManager.sell_water()
-		if earned > 0.01 and pump_player_ref.has_method("show_floating_text"):
-			pump_player_ref.show_floating_text("+%s" % Economy.format_money(earned), Color(1.0, 0.85, 0.2))
-			_spawn_pump_steam()
-			_spawn_coin_fly(pump_player_ref.global_position)
+		if earned > 0.01 and shop_player_ref.has_method("show_floating_text"):
+			shop_player_ref.show_floating_text("+%s" % Economy.format_money(earned), Color(1.0, 0.85, 0.2))
+			_spawn_coin_fly(shop_player_ref.global_position)
 
 	# Update camels
 	if GameManager.camel_count > 0:
@@ -3532,16 +3784,9 @@ func _process(delta: float) -> void:
 	for i in range(SWAMP_COUNT):
 		var fill: float = GameManager.get_swamp_fill_fraction(i)
 		if fill > 0.001:
-			var geo: Dictionary = _get_swamp_geometry(i)
-			var entry_top: Vector2 = geo["entry_top"]
-			var basin_left: Vector2 = geo["basin_left"]
-			var basin_right: Vector2 = geo["basin_right"]
-			var exit_top: Vector2 = geo["exit_top"]
-			var basin_y: float = basin_left.y
-			var overflow_y: float = maxf(entry_top.y, exit_top.y)
-			var water_y: float = basin_y - fill * (basin_y - overflow_y)
-			var left_x: float = _lerp_x_at_y(entry_top, basin_left, water_y)
-			var right_x: float = _lerp_x_at_y(basin_right, exit_top, water_y)
+			var water_y: float = _get_pool_water_y(i)
+			var left_x: float = _find_water_left_x(i, water_y)
+			var right_x: float = _find_water_right_x(i, water_y)
 			_update_water_surface_line(i, left_x, right_x, water_y)
 			_update_shimmer_line(i, left_x, right_x, water_y)
 		else:
@@ -3624,14 +3869,7 @@ func _process(delta: float) -> void:
 			node.visible = false
 			continue
 		node.visible = true
-		var geo: Dictionary = _get_swamp_geometry(swamp_i)
-		var entry_top: Vector2 = geo["entry_top"]
-		var basin_left: Vector2 = geo["basin_left"]
-		var basin_right: Vector2 = geo["basin_right"]
-		var exit_top: Vector2 = geo["exit_top"]
-		var basin_y: float = basin_left.y
-		var overflow_y: float = maxf(entry_top.y, exit_top.y)
-		var water_y: float = basin_y - fill * (basin_y - overflow_y)
+		var water_y: float = _get_pool_water_y(swamp_i)
 		var bob_offset: float = sin(wave_time * 1.5 + lp["phase"]) * 1.0
 		node.position = Vector2(lp["x"], water_y + bob_offset)
 
@@ -3639,16 +3877,9 @@ func _process(delta: float) -> void:
 	for i in range(SWAMP_COUNT):
 		var fill: float = GameManager.get_swamp_fill_fraction(i)
 		if fill > 0.001:
-			var geo: Dictionary = _get_swamp_geometry(i)
-			var entry_top: Vector2 = geo["entry_top"]
-			var basin_left: Vector2 = geo["basin_left"]
-			var basin_right: Vector2 = geo["basin_right"]
-			var exit_top: Vector2 = geo["exit_top"]
-			var basin_y: float = basin_left.y
-			var overflow_y: float = maxf(entry_top.y, exit_top.y)
-			var water_y: float = basin_y - fill * (basin_y - overflow_y)
-			var left_x: float = _lerp_x_at_y(entry_top, basin_left, water_y)
-			var right_x: float = _lerp_x_at_y(basin_right, exit_top, water_y)
+			var water_y: float = _get_pool_water_y(i)
+			var left_x: float = _find_water_left_x(i, water_y)
+			var right_x: float = _find_water_right_x(i, water_y)
 			_update_foam_line(i, left_x, right_x, water_y)
 		else:
 			foam_lines[i].clear_points()
@@ -3756,16 +3987,9 @@ func _process(delta: float) -> void:
 			wh_node.visible = false
 			continue
 		wh_node.visible = true
-		var wh_geo: Dictionary = _get_swamp_geometry(wh_swamp)
-		var wh_entry: Vector2 = wh_geo["entry_top"]
-		var wh_bl: Vector2 = wh_geo["basin_left"]
-		var wh_br: Vector2 = wh_geo["basin_right"]
-		var wh_exit: Vector2 = wh_geo["exit_top"]
-		var wh_basin_y: float = wh_bl.y
-		var wh_overflow_y: float = maxf(wh_entry.y, wh_exit.y)
-		var wh_water_y: float = wh_basin_y - wh_fill * (wh_basin_y - wh_overflow_y)
-		var wh_left_x: float = _lerp_x_at_y(wh_entry, wh_bl, wh_water_y)
-		var wh_right_x: float = _lerp_x_at_y(wh_br, wh_exit, wh_water_y)
+		var wh_water_y: float = _get_pool_water_y(wh_swamp)
+		var wh_left_x: float = _find_water_left_x(wh_swamp, wh_water_y)
+		var wh_right_x: float = _find_water_right_x(wh_swamp, wh_water_y)
 		var wh_px: float = lerpf(wh_left_x, wh_right_x, wh["offset_x"])
 		var shimmer: float = (sin(wave_time * 2.0 + wh["phase"]) + 1.0) * 0.5
 		wh_node.position = Vector2(wh_px, wh_water_y + 1)
@@ -3848,11 +4072,9 @@ func _process(delta: float) -> void:
 		var swamp_i: int = fd["swamp"]
 		var fill: float = GameManager.get_swamp_fill_fraction(swamp_i)
 		var geo_f: Dictionary = _get_swamp_geometry(swamp_i)
-		var entry_top_f: Vector2 = geo_f["entry_top"]
 		var basin_left_f: Vector2 = geo_f["basin_left"]
 		var basin_right_f: Vector2 = geo_f["basin_right"]
-		var exit_top_f: Vector2 = geo_f["exit_top"]
-		var basin_y_f: float = basin_left_f.y
+		var basin_y_f: float = _get_pool_deepest_y(swamp_i)
 
 		if fill < 0.02:
 			if fd["alive"]:
@@ -3876,10 +4098,9 @@ func _process(delta: float) -> void:
 			fnode.rotation = 0.0
 
 		fnode.visible = true
-		var overflow_y_f: float = maxf(entry_top_f.y, exit_top_f.y)
-		var water_y_f: float = basin_y_f - fill * (basin_y_f - overflow_y_f)
-		var surface_left_x: float = _lerp_x_at_y(entry_top_f, basin_left_f, water_y_f)
-		var surface_right_x: float = _lerp_x_at_y(basin_right_f, exit_top_f, water_y_f)
+		var water_y_f: float = _get_pool_water_y(swamp_i)
+		var surface_left_x: float = _find_water_left_x(swamp_i, water_y_f)
+		var surface_right_x: float = _find_water_right_x(swamp_i, water_y_f)
 
 		# Depth position
 		var fish_y: float = lerpf(water_y_f + 4, basin_y_f - 4, fd["depth_offset"])
@@ -3995,20 +4216,17 @@ func _process(delta: float) -> void:
 			continue
 		tp_node.visible = true
 		var tp_geo: Dictionary = _get_swamp_geometry(tp_swamp)
-		var tp_entry: Vector2 = tp_geo["entry_top"]
 		var tp_bl: Vector2 = tp_geo["basin_left"]
 		var tp_br: Vector2 = tp_geo["basin_right"]
-		var tp_exit: Vector2 = tp_geo["exit_top"]
-		var tp_basin_y: float = tp_bl.y
-		var tp_overflow_y: float = maxf(tp_entry.y, tp_exit.y)
-		var tp_water_y: float = tp_basin_y - tp_fill * (tp_basin_y - tp_overflow_y)
+		var tp_basin_y: float = _get_pool_deepest_y(tp_swamp)
+		var tp_water_y: float = _get_pool_water_y(tp_swamp)
 		var tp_y: float = lerpf(tp_water_y + 3, tp_basin_y - 2, tp["depth_offset"])
 		tp["swim_phase"] += delta * tp["swim_speed"]
 		var tp_depth_frac: float = 0.0
 		if absf(tp_basin_y - tp_water_y) > 0.1:
 			tp_depth_frac = clampf((tp_y - tp_water_y) / (tp_basin_y - tp_water_y), 0.0, 1.0)
-		var tp_slx: float = _lerp_x_at_y(tp_entry, tp_bl, tp_water_y)
-		var tp_srx: float = _lerp_x_at_y(tp_br, tp_exit, tp_water_y)
+		var tp_slx: float = _find_water_left_x(tp_swamp, tp_water_y)
+		var tp_srx: float = _find_water_right_x(tp_swamp, tp_water_y)
 		var tp_bound_l: float = lerpf(tp_slx, tp_bl.x, tp_depth_frac) + 4.0
 		var tp_bound_r: float = lerpf(tp_srx, tp_br.x, tp_depth_frac) - 4.0
 		var tp_x: float = tp["x"] + sin(tp["swim_phase"]) * tp["swim_range"]
@@ -4024,16 +4242,9 @@ func _process(delta: float) -> void:
 		var ri_swamp: int = randi() % SWAMP_COUNT
 		var ri_fill: float = GameManager.get_swamp_fill_fraction(ri_swamp)
 		if ri_fill > 0.05:
-			var ri_geo: Dictionary = _get_swamp_geometry(ri_swamp)
-			var ri_entry: Vector2 = ri_geo["entry_top"]
-			var ri_bl: Vector2 = ri_geo["basin_left"]
-			var ri_br: Vector2 = ri_geo["basin_right"]
-			var ri_exit: Vector2 = ri_geo["exit_top"]
-			var ri_basin_y: float = ri_bl.y
-			var ri_overflow_y: float = maxf(ri_entry.y, ri_exit.y)
-			var ri_water_y: float = ri_basin_y - ri_fill * (ri_basin_y - ri_overflow_y)
-			var ri_left_x: float = _lerp_x_at_y(ri_entry, ri_bl, ri_water_y)
-			var ri_right_x: float = _lerp_x_at_y(ri_br, ri_exit, ri_water_y)
+			var ri_water_y: float = _get_pool_water_y(ri_swamp)
+			var ri_left_x: float = _find_water_left_x(ri_swamp, ri_water_y)
+			var ri_right_x: float = _find_water_right_x(ri_swamp, ri_water_y)
 			var ri_x: float = randf_range(ri_left_x + 8, ri_right_x - 8)
 			_spawn_ripple(ri_x, ri_water_y)
 	var ripples_to_remove: Array[int] = []
@@ -4147,6 +4358,12 @@ func _process(delta: float) -> void:
 		var head_bob: float = sin(wave_time * 0.8 + tt["phase"]) * 0.5
 		tt_head.position.y += head_bob * 0.02
 
+	# Cave entrance glow pulsing
+	for ce in cave_entrances:
+		if ce["open"] and is_instance_valid(ce["glow"]):
+			var pulse: float = (sin(wave_time * 2.0 + ce["x"] * 0.1) + 1.0) * 0.5
+			ce["glow"].color.a = lerpf(0.15, 0.45, pulse)
+
 	# Cattail wind sway (enhanced with wind direction + rain)
 	var rain_sway_mult: float = 2.0 if weather_state == "rain" else 1.0
 	for ct in cattails:
@@ -4184,3 +4401,187 @@ func _get_cycle_color(t: float) -> Color:
 		return dusk.lerp(night, (t - 0.68) / 0.07)
 	else:
 		return night
+
+# --- Cave Entrances ---
+func _get_pool_deepest_point(swamp_index: int) -> Vector2:
+	var r: Array = SWAMP_RANGES[swamp_index]
+	var deepest_x: float = terrain_points[r[0]].x
+	var deepest_y: float = terrain_points[r[0]].y
+	for idx in range(r[0], r[1] + 1):
+		if terrain_points[idx].y > deepest_y:
+			deepest_y = terrain_points[idx].y
+			deepest_x = terrain_points[idx].x
+	return Vector2(deepest_x, deepest_y)
+
+func _build_cave_entrances() -> void:
+	cave_entrances.clear()
+	for i in range(CAVE_IDS.size()):
+		var cave_id: String = CAVE_IDS[i]
+		var defn: Dictionary = GameManager.CAVE_DEFINITIONS[cave_id]
+		var si: int = defn["swamp_index"]
+		var deepest: Vector2 = _get_pool_deepest_point(si)
+		var cx: float = deepest.x
+		var cy: float = deepest.y
+		var is_unlocked: bool = GameManager.is_cave_unlocked(cave_id)
+
+		var root := Node2D.new()
+		root.position = Vector2(cx, cy)
+		root.z_index = 3
+		add_child(root)
+
+		# Sealed crack at pool bottom — thin dark line
+		var crack := ColorRect.new()
+		crack.size = Vector2(2, 8)
+		crack.position = Vector2(-1, -6)
+		crack.color = Color(0.15, 0.1, 0.08, 0.8)
+		root.add_child(crack)
+
+		# Open entrance visuals — hidden until unlocked
+		var opening := ColorRect.new()
+		opening.size = Vector2(16, 14)
+		opening.position = Vector2(-8, -14)
+		opening.color = Color(0.05, 0.03, 0.02)
+		opening.visible = is_unlocked
+		root.add_child(opening)
+
+		# Rocky edges
+		var edge_left := ColorRect.new()
+		edge_left.size = Vector2(3, 16)
+		edge_left.position = Vector2(-10, -15)
+		edge_left.color = Color(0.35, 0.28, 0.2)
+		edge_left.visible = is_unlocked
+		root.add_child(edge_left)
+
+		var edge_right := ColorRect.new()
+		edge_right.size = Vector2(3, 16)
+		edge_right.position = Vector2(7, -15)
+		edge_right.color = Color(0.35, 0.28, 0.2)
+		edge_right.visible = is_unlocked
+		root.add_child(edge_right)
+
+		# Top lintel
+		var lintel := ColorRect.new()
+		lintel.size = Vector2(20, 3)
+		lintel.position = Vector2(-10, -16)
+		lintel.color = Color(0.3, 0.24, 0.18)
+		lintel.visible = is_unlocked
+		root.add_child(lintel)
+
+		# Glow rect (pulsing amber)
+		var glow := ColorRect.new()
+		glow.size = Vector2(24, 18)
+		glow.position = Vector2(-12, -16)
+		glow.color = Color(0.9, 0.6, 0.2, 0.3)
+		glow.visible = is_unlocked
+		root.add_child(glow)
+
+		# "Press SPACE" hint label
+		var hint := Label.new()
+		hint.text = "Press SPACE to enter"
+		hint.add_theme_font_size_override("font_size", 10)
+		hint.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 0.9))
+		hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+		hint.add_theme_constant_override("shadow_offset_x", 1)
+		hint.add_theme_constant_override("shadow_offset_y", 1)
+		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hint.position = Vector2(-48, -32)
+		hint.z_index = 10
+		hint.visible = false
+		root.add_child(hint)
+
+		# Area2D for player interaction
+		var area := Area2D.new()
+		area.position = Vector2(0, -7)
+		area.collision_layer = 0
+		area.collision_mask = 1
+		var coll := CollisionShape2D.new()
+		var shape := RectangleShape2D.new()
+		shape.size = Vector2(24, 20)
+		coll.shape = shape
+		area.add_child(coll)
+		area.monitoring = is_unlocked
+		root.add_child(area)
+
+		var cid: String = cave_id
+		var hint_ref: Label = hint
+		area.body_entered.connect(func(body: Node2D) -> void:
+			if body.has_method("set_near_cave_entrance"):
+				body.set_near_cave_entrance(true, cid)
+				hint_ref.visible = true
+		)
+		area.body_exited.connect(func(body: Node2D) -> void:
+			if body.has_method("set_near_cave_entrance"):
+				body.set_near_cave_entrance(false, cid)
+				hint_ref.visible = false
+		)
+
+		# Hide crack when open
+		if is_unlocked:
+			crack.visible = false
+
+		cave_entrances.append({
+			"cave_id": cave_id,
+			"x": cx,
+			"root": root,
+			"crack": crack,
+			"opening": opening,
+			"edge_left": edge_left,
+			"edge_right": edge_right,
+			"lintel": lintel,
+			"glow": glow,
+			"hint": hint,
+			"area": area,
+			"open": is_unlocked,
+		})
+
+func _check_cave_entrance_updates(swamp_index: int) -> void:
+	for ce in cave_entrances:
+		var cave_id: String = ce["cave_id"]
+		if ce["open"]:
+			continue
+		var defn: Dictionary = GameManager.CAVE_DEFINITIONS[cave_id]
+		if defn["swamp_index"] != swamp_index:
+			continue
+		if GameManager.is_cave_unlocked(cave_id):
+			_animate_cave_crack_open(ce)
+
+func _on_cave_unlocked(cave_id: String) -> void:
+	for ce in cave_entrances:
+		if ce["cave_id"] == cave_id and not ce["open"]:
+			_animate_cave_crack_open(ce)
+
+func _animate_cave_crack_open(entry: Dictionary) -> void:
+	if entry["open"]:
+		return
+	entry["open"] = true
+
+	var root: Node2D = entry["root"]
+
+	# Dust burst particles
+	for j in range(8):
+		var dust := ColorRect.new()
+		dust.size = Vector2(3, 3)
+		dust.color = Color(0.6, 0.5, 0.35, 0.7)
+		dust.position = Vector2(randf_range(-4, 4), randf_range(-20, -8))
+		dust.z_index = 5
+		root.add_child(dust)
+		var dtw := create_tween()
+		dtw.tween_property(dust, "position", dust.position + Vector2(randf_range(-18, 18), randf_range(-20, 8)), 0.6)
+		dtw.parallel().tween_property(dust, "modulate:a", 0.0, 0.6)
+		dtw.tween_callback(dust.queue_free)
+
+	# Screen shake
+	_screen_shake(3.0, 0.2)
+
+	# Reveal opening after brief delay
+	var reveal_tw := create_tween()
+	reveal_tw.tween_interval(0.3)
+	reveal_tw.tween_callback(func() -> void:
+		entry["crack"].visible = false
+		entry["opening"].visible = true
+		entry["edge_left"].visible = true
+		entry["edge_right"].visible = true
+		entry["lintel"].visible = true
+		entry["glow"].visible = true
+		entry["area"].monitoring = true
+	)

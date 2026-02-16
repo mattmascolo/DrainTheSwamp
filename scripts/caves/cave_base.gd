@@ -1,0 +1,694 @@
+extends Node2D
+
+# Override these in subclass
+var cave_id: String = ""
+var cave_terrain_points: Array[Vector2] = []
+var cave_ceiling_points: Array[Vector2] = []
+var crystal_color: Color = Color(0.8, 0.6, 0.2)  # Override in subclass
+
+# Internal state
+var player_ref: CharacterBody2D = null
+var drip_timer: float = 0.0
+var wave_time: float = 0.0
+var crystal_lights: Array[PointLight2D] = []
+var crystal_phases: Array[float] = []
+var dust_motes: Array[Dictionary] = []
+
+const PLAYER_SCENE = preload("res://scenes/player/player.tscn")
+const GROUND_COLOR := Color(0.3, 0.22, 0.12)
+const CEILING_COLOR := Color(0.2, 0.15, 0.1)
+const WALL_COLOR := Color(0.18, 0.12, 0.08)
+
+func _ready() -> void:
+	_setup_cave()
+
+func _setup_cave() -> void:
+	# CanvasModulate for near-total darkness
+	var modulate := CanvasModulate.new()
+	modulate.color = Color(0.05, 0.05, 0.1)
+	add_child(modulate)
+
+	_build_floor()
+	_build_ceiling()
+	_build_walls()
+	_build_rock_layers()
+	_build_stalactites()
+	_build_stalagmites()
+	_build_crystals()
+	_build_moss_lichen()
+	_build_cave_floor_pools()
+	_build_cracks()
+	_build_roots_cobwebs()
+	_build_dust_motes()
+	_build_exit_zone()
+	_build_exit_glow()
+	_spawn_player()
+	_setup_camera()
+	_setup_loot_and_lore()
+
+# --- Floor ---
+func _build_floor() -> void:
+	if cave_terrain_points.size() < 2:
+		return
+
+	var vp_size: Vector2 = get_viewport_rect().size
+	var floor_points: PackedVector2Array = PackedVector2Array()
+	for pt in cave_terrain_points:
+		floor_points.append(pt)
+	floor_points.append(Vector2(cave_terrain_points[cave_terrain_points.size() - 1].x, vp_size.y + 20))
+	floor_points.append(Vector2(cave_terrain_points[0].x, vp_size.y + 20))
+
+	var floor_poly := Polygon2D.new()
+	floor_poly.polygon = floor_points
+	floor_poly.color = GROUND_COLOR
+	floor_poly.z_index = 1
+	add_child(floor_poly)
+
+	# Floor collision
+	var body := StaticBody2D.new()
+	body.collision_layer = 1
+	body.collision_mask = 0
+	add_child(body)
+	for i in range(cave_terrain_points.size() - 1):
+		var seg := CollisionShape2D.new()
+		var shape := SegmentShape2D.new()
+		shape.a = cave_terrain_points[i]
+		shape.b = cave_terrain_points[i + 1]
+		seg.shape = shape
+		body.add_child(seg)
+
+# --- Ceiling ---
+func _build_ceiling() -> void:
+	if cave_ceiling_points.size() < 2:
+		return
+
+	var ceil_points: PackedVector2Array = PackedVector2Array()
+	ceil_points.append(Vector2(cave_ceiling_points[0].x, -50))
+	for pt in cave_ceiling_points:
+		ceil_points.append(pt)
+	ceil_points.append(Vector2(cave_ceiling_points[cave_ceiling_points.size() - 1].x, -50))
+
+	var ceil_poly := Polygon2D.new()
+	ceil_poly.polygon = ceil_points
+	ceil_poly.color = CEILING_COLOR
+	ceil_poly.z_index = 5
+	add_child(ceil_poly)
+
+	# Ceiling collision
+	var body := StaticBody2D.new()
+	body.collision_layer = 1
+	body.collision_mask = 0
+	add_child(body)
+	for i in range(cave_ceiling_points.size() - 1):
+		var seg := CollisionShape2D.new()
+		var shape := SegmentShape2D.new()
+		shape.a = cave_ceiling_points[i]
+		shape.b = cave_ceiling_points[i + 1]
+		seg.shape = shape
+		body.add_child(seg)
+
+# --- Walls ---
+func _build_walls() -> void:
+	if cave_terrain_points.size() < 2 or cave_ceiling_points.size() < 2:
+		return
+
+	var left_x: float = cave_terrain_points[0].x
+	var left_wall_pts: PackedVector2Array = PackedVector2Array([
+		Vector2(left_x - 20, cave_ceiling_points[0].y - 10),
+		Vector2(left_x, cave_ceiling_points[0].y),
+		Vector2(left_x, cave_terrain_points[0].y),
+		Vector2(left_x - 20, cave_terrain_points[0].y + 10),
+	])
+	var left_wall := Polygon2D.new()
+	left_wall.polygon = left_wall_pts
+	left_wall.color = WALL_COLOR
+	left_wall.z_index = 4
+	add_child(left_wall)
+
+	var right_x: float = cave_terrain_points[cave_terrain_points.size() - 1].x
+	var right_wall_pts: PackedVector2Array = PackedVector2Array([
+		Vector2(right_x, cave_ceiling_points[cave_ceiling_points.size() - 1].y),
+		Vector2(right_x + 20, cave_ceiling_points[cave_ceiling_points.size() - 1].y - 10),
+		Vector2(right_x + 20, cave_terrain_points[cave_terrain_points.size() - 1].y + 10),
+		Vector2(right_x, cave_terrain_points[cave_terrain_points.size() - 1].y),
+	])
+	var right_wall := Polygon2D.new()
+	right_wall.polygon = right_wall_pts
+	right_wall.color = WALL_COLOR
+	right_wall.z_index = 4
+	add_child(right_wall)
+
+	var wall_body := StaticBody2D.new()
+	wall_body.collision_layer = 1
+	wall_body.collision_mask = 0
+	add_child(wall_body)
+
+	var left_seg := CollisionShape2D.new()
+	var left_shape := SegmentShape2D.new()
+	left_shape.a = Vector2(left_x, cave_ceiling_points[0].y)
+	left_shape.b = Vector2(left_x, cave_terrain_points[0].y)
+	left_seg.shape = left_shape
+	wall_body.add_child(left_seg)
+
+	var right_seg := CollisionShape2D.new()
+	var right_shape := SegmentShape2D.new()
+	right_shape.a = Vector2(right_x, cave_ceiling_points[cave_ceiling_points.size() - 1].y)
+	right_shape.b = Vector2(right_x, cave_terrain_points[cave_terrain_points.size() - 1].y)
+	right_seg.shape = right_shape
+	wall_body.add_child(right_seg)
+
+# --- Rock Layers ---
+func _build_rock_layers() -> void:
+	if cave_terrain_points.size() < 2 or cave_ceiling_points.size() < 2:
+		return
+
+	var vp_size: Vector2 = get_viewport_rect().size
+
+	# Floor mid-layer: offset 5px below floor contour
+	var mid_pts: PackedVector2Array = PackedVector2Array()
+	for pt in cave_terrain_points:
+		mid_pts.append(Vector2(pt.x, pt.y + 5))
+	mid_pts.append(Vector2(cave_terrain_points[cave_terrain_points.size() - 1].x, vp_size.y + 20))
+	mid_pts.append(Vector2(cave_terrain_points[0].x, vp_size.y + 20))
+	var mid_poly := Polygon2D.new()
+	mid_poly.polygon = mid_pts
+	mid_poly.color = Color(0.26, 0.18, 0.10)
+	mid_poly.z_index = 0
+	add_child(mid_poly)
+
+	# Floor sub-layer: offset 14px below
+	var sub_pts: PackedVector2Array = PackedVector2Array()
+	for pt in cave_terrain_points:
+		sub_pts.append(Vector2(pt.x, pt.y + 14))
+	sub_pts.append(Vector2(cave_terrain_points[cave_terrain_points.size() - 1].x, vp_size.y + 20))
+	sub_pts.append(Vector2(cave_terrain_points[0].x, vp_size.y + 20))
+	var sub_poly := Polygon2D.new()
+	sub_poly.polygon = sub_pts
+	sub_poly.color = Color(0.20, 0.14, 0.08)
+	sub_poly.z_index = -1
+	add_child(sub_poly)
+
+	# Floor stone patches
+	var left_x: float = cave_terrain_points[0].x
+	var right_x: float = cave_terrain_points[cave_terrain_points.size() - 1].x
+	for i in range(randi_range(8, 12)):
+		var px: float = randf_range(left_x + 20, right_x - 20)
+		var py: float = _get_cave_terrain_y_at(px)
+		var patch := ColorRect.new()
+		patch.size = Vector2(randf_range(8, 16), randf_range(2, 3))
+		patch.position = Vector2(px - patch.size.x * 0.5, py + randf_range(2, 8))
+		patch.color = Color(0.35, 0.28, 0.18, 0.5)
+		patch.z_index = 0
+		add_child(patch)
+
+	# Ceiling inner-layer
+	var ceil_inner_pts: PackedVector2Array = PackedVector2Array()
+	ceil_inner_pts.append(Vector2(cave_ceiling_points[0].x, -50))
+	for pt in cave_ceiling_points:
+		ceil_inner_pts.append(Vector2(pt.x, pt.y + 4))
+	ceil_inner_pts.append(Vector2(cave_ceiling_points[cave_ceiling_points.size() - 1].x, -50))
+	var ceil_inner := Polygon2D.new()
+	ceil_inner.polygon = ceil_inner_pts
+	ceil_inner.color = Color(0.24, 0.18, 0.12)
+	ceil_inner.z_index = 4
+	add_child(ceil_inner)
+
+	# Dirt specks along floor
+	for i in range(randi_range(30, 50)):
+		var sx: float = randf_range(left_x + 10, right_x - 10)
+		var sy: float = _get_cave_terrain_y_at(sx) + randf_range(-1, 2)
+		var speck := ColorRect.new()
+		speck.size = Vector2(randf_range(1, 2), randf_range(1, 2))
+		speck.position = Vector2(sx, sy)
+		speck.color = Color(
+			randf_range(0.22, 0.35),
+			randf_range(0.16, 0.25),
+			randf_range(0.10, 0.16),
+			randf_range(0.3, 0.6)
+		)
+		speck.z_index = 1
+		add_child(speck)
+
+# --- Stalactites (Polygon2D triangles) ---
+func _build_stalactites() -> void:
+	for i in range(cave_ceiling_points.size()):
+		if randf() < 0.5:
+			var pt: Vector2 = cave_ceiling_points[i]
+			var is_large: bool = randf() < 0.1
+			var w: float = randf_range(6, 10) if is_large else randf_range(3, 8)
+			var h: float = randf_range(20, 35) if is_large else randf_range(8, 24)
+			var tri := Polygon2D.new()
+			tri.polygon = PackedVector2Array([
+				Vector2(-w * 0.5, 0),
+				Vector2(w * 0.5, 0),
+				Vector2(randf_range(-1, 1), h),
+			])
+			tri.position = pt
+			tri.color = Color(
+				randf_range(0.25, 0.35),
+				randf_range(0.18, 0.25),
+				randf_range(0.12, 0.18)
+			)
+			tri.z_index = 4
+			add_child(tri)
+
+# --- Stalagmites (floor triangles) ---
+func _build_stalagmites() -> void:
+	var left_x: float = cave_terrain_points[0].x
+	var right_x: float = cave_terrain_points[cave_terrain_points.size() - 1].x
+	for i in range(randi_range(10, 15)):
+		var sx: float = randf_range(left_x + 40, right_x - 20)
+		var sy: float = _get_cave_terrain_y_at(sx)
+		var w: float = randf_range(3, 7)
+		var h: float = randf_range(6, 18)
+		var tri := Polygon2D.new()
+		tri.polygon = PackedVector2Array([
+			Vector2(-w * 0.5, 0),
+			Vector2(w * 0.5, 0),
+			Vector2(randf_range(-1, 1), -h),
+		])
+		tri.position = Vector2(sx, sy)
+		tri.color = Color(
+			randf_range(0.28, 0.38),
+			randf_range(0.20, 0.28),
+			randf_range(0.14, 0.20)
+		)
+		tri.z_index = 2
+		add_child(tri)
+
+# --- Glowing Crystals ---
+func _build_crystals() -> void:
+	var left_x: float = cave_terrain_points[0].x
+	var right_x: float = cave_terrain_points[cave_terrain_points.size() - 1].x
+	var num_clusters: int = randi_range(4, 8)
+	for i in range(num_clusters):
+		var on_ceiling: bool = randf() < 0.3
+		var cx: float = randf_range(left_x + 60, right_x - 40)
+		var cy: float
+		if on_ceiling:
+			cy = _get_cave_ceiling_y_at(cx) + randf_range(2, 6)
+		else:
+			cy = _get_cave_terrain_y_at(cx)
+
+		# 2-4 parallelogram crystals per cluster
+		var num_crystals: int = randi_range(2, 4)
+		for j in range(num_crystals):
+			var cw: float = randf_range(2, 5)
+			var ch: float = randf_range(6, 14)
+			var skew: float = randf_range(-2, 2)
+			var offset_x: float = randf_range(-6, 6)
+			var crystal := Polygon2D.new()
+			if on_ceiling:
+				crystal.polygon = PackedVector2Array([
+					Vector2(offset_x, 0),
+					Vector2(offset_x + cw, 0),
+					Vector2(offset_x + cw + skew, ch),
+					Vector2(offset_x + skew, ch),
+				])
+			else:
+				crystal.polygon = PackedVector2Array([
+					Vector2(offset_x, 0),
+					Vector2(offset_x + cw, 0),
+					Vector2(offset_x + cw + skew, -ch),
+					Vector2(offset_x + skew, -ch),
+				])
+			crystal.position = Vector2(cx, cy)
+			crystal.color = crystal_color.lightened(randf_range(-0.1, 0.2))
+			crystal.z_index = 3
+			add_child(crystal)
+
+		# PointLight2D per cluster
+		var light := PointLight2D.new()
+		light.position = Vector2(cx, cy + (6 if on_ceiling else -6))
+		light.color = crystal_color
+		light.blend_mode = PointLight2D.BLEND_MODE_ADD
+		light.energy = randf_range(0.5, 1.0)
+		light.shadow_enabled = false
+		var gradient := GradientTexture2D.new()
+		gradient.width = 128
+		gradient.height = 128
+		gradient.fill = GradientTexture2D.FILL_RADIAL
+		gradient.fill_from = Vector2(0.5, 0.5)
+		gradient.fill_to = Vector2(0.5, 0.0)
+		var grad := Gradient.new()
+		grad.set_offset(0, 0.0)
+		grad.set_color(0, Color(1, 1, 1, 1))
+		grad.set_offset(1, 1.0)
+		grad.set_color(1, Color(0, 0, 0, 0))
+		gradient.gradient = grad
+		light.texture = gradient
+		light.texture_scale = randf_range(0.2, 0.3)
+		add_child(light)
+		crystal_lights.append(light)
+		crystal_phases.append(randf() * TAU)
+
+# --- Moss & Lichen ---
+func _build_moss_lichen() -> void:
+	var left_x: float = cave_terrain_points[0].x
+	var right_x: float = cave_terrain_points[cave_terrain_points.size() - 1].x
+
+	# Wall moss patches
+	for i in range(randi_range(6, 10)):
+		var mx: float = randf_range(left_x + 10, right_x - 10)
+		var on_ceil: bool = randf() < 0.4
+		var my: float
+		if on_ceil:
+			my = _get_cave_ceiling_y_at(mx) + randf_range(1, 5)
+		else:
+			my = _get_cave_terrain_y_at(mx) - randf_range(1, 4)
+		var moss := ColorRect.new()
+		moss.size = Vector2(randf_range(4, 10), randf_range(3, 6))
+		moss.position = Vector2(mx - moss.size.x * 0.5, my)
+		moss.color = Color(0.15, 0.32, 0.12, 0.5)
+		moss.z_index = 2
+		add_child(moss)
+
+	# Ceiling moss with tendrils
+	for i in range(randi_range(4, 8)):
+		var mx: float = randf_range(left_x + 30, right_x - 30)
+		var my: float = _get_cave_ceiling_y_at(mx)
+		var moss := ColorRect.new()
+		moss.size = Vector2(randf_range(5, 10), randf_range(3, 5))
+		moss.position = Vector2(mx, my)
+		moss.color = Color(0.12, 0.28, 0.10, 0.45)
+		moss.z_index = 5
+		add_child(moss)
+		# Hanging tendrils
+		for t in range(randi_range(1, 2)):
+			var tendril := Line2D.new()
+			tendril.width = 1.0
+			tendril.default_color = Color(0.14, 0.30, 0.12, 0.4)
+			var tx: float = mx + randf_range(1, moss.size.x - 1)
+			tendril.add_point(Vector2(tx, my + moss.size.y))
+			tendril.add_point(Vector2(tx + randf_range(-2, 2), my + moss.size.y + randf_range(4, 10)))
+			tendril.z_index = 5
+			add_child(tendril)
+
+# --- Cave Floor Pools ---
+func _build_cave_floor_pools() -> void:
+	var left_x: float = cave_terrain_points[0].x
+	var right_x: float = cave_terrain_points[cave_terrain_points.size() - 1].x
+	for i in range(randi_range(2, 4)):
+		var px: float = randf_range(left_x + 50, right_x - 50)
+		var py: float = _get_cave_terrain_y_at(px)
+		var pw: float = randf_range(16, 30)
+		var ph: float = randf_range(3, 5)
+		var pool := ColorRect.new()
+		pool.size = Vector2(pw, ph)
+		pool.position = Vector2(px - pw * 0.5, py - ph)
+		pool.color = Color(0.15, 0.25, 0.35, 0.5)
+		pool.z_index = 1
+		add_child(pool)
+		# Highlight line on top
+		var hl := ColorRect.new()
+		hl.size = Vector2(pw - 2, 1)
+		hl.position = Vector2(px - pw * 0.5 + 1, py - ph)
+		hl.color = Color(0.3, 0.45, 0.55, 0.3)
+		hl.z_index = 1
+		add_child(hl)
+
+# --- Cracks & Fissures ---
+func _build_cracks() -> void:
+	var left_x: float = cave_terrain_points[0].x
+	var right_x: float = cave_terrain_points[cave_terrain_points.size() - 1].x
+	for i in range(randi_range(8, 15)):
+		var on_floor: bool = randf() < 0.6
+		var cx: float = randf_range(left_x + 20, right_x - 20)
+		var cy: float
+		if on_floor:
+			cy = _get_cave_terrain_y_at(cx) + randf_range(-1, 3)
+		else:
+			cy = _get_cave_ceiling_y_at(cx) + randf_range(0, 4)
+		var crack := Line2D.new()
+		crack.width = 1.0
+		crack.default_color = Color(0.08, 0.06, 0.04, 0.6)
+		var num_points: int = randi_range(2, 4)
+		var px: float = cx
+		var py: float = cy
+		for j in range(num_points):
+			crack.add_point(Vector2(px, py))
+			px += randf_range(-6, 6)
+			py += randf_range(-3, 3)
+		crack.z_index = 2
+		add_child(crack)
+		# Branch line
+		if randf() < 0.4 and num_points >= 3:
+			var branch := Line2D.new()
+			branch.width = 1.0
+			branch.default_color = Color(0.08, 0.06, 0.04, 0.4)
+			var bp: Vector2 = crack.get_point_position(1)
+			branch.add_point(bp)
+			branch.add_point(bp + Vector2(randf_range(-4, 4), randf_range(-3, 3)))
+			branch.z_index = 2
+			add_child(branch)
+
+# --- Roots & Cobwebs ---
+func _build_roots_cobwebs() -> void:
+	var left_x: float = cave_terrain_points[0].x
+	var right_x: float = cave_terrain_points[cave_terrain_points.size() - 1].x
+
+	# Roots near entrance (left side)
+	for i in range(randi_range(3, 6)):
+		var rx: float = randf_range(left_x + 10, left_x + 100)
+		var ry: float = _get_cave_ceiling_y_at(rx)
+		var root := Line2D.new()
+		root.width = randf_range(1.5, 2.0)
+		root.default_color = Color(0.3, 0.2, 0.1, 0.6)
+		var hang: float = randf_range(10, 25)
+		root.add_point(Vector2(rx, ry))
+		root.add_point(Vector2(rx + randf_range(-4, 4), ry + hang * 0.5))
+		root.add_point(Vector2(rx + randf_range(-6, 6), ry + hang))
+		root.z_index = 5
+		add_child(root)
+
+	# Cobwebs in corners
+	var corners: Array[Vector2] = [
+		Vector2(left_x + 5, cave_ceiling_points[0].y + 2),
+		Vector2(right_x - 5, cave_ceiling_points[cave_ceiling_points.size() - 1].y + 2),
+	]
+	if randf() < 0.6:
+		corners.append(Vector2(left_x + randf_range(200, 400), _get_cave_ceiling_y_at(left_x + 300) + 2))
+	for corner in corners:
+		if randf() < 0.6:
+			for j in range(randi_range(3, 5)):
+				var web := Line2D.new()
+				web.width = 1.0
+				web.default_color = Color(0.7, 0.7, 0.7, 0.15)
+				web.add_point(corner)
+				web.add_point(corner + Vector2(randf_range(-12, 12), randf_range(5, 18)))
+				web.z_index = 5
+				add_child(web)
+
+# --- Dust Motes ---
+func _build_dust_motes() -> void:
+	var left_x: float = cave_terrain_points[0].x
+	var right_x: float = cave_terrain_points[cave_terrain_points.size() - 1].x
+	var top_y: float = cave_ceiling_points[0].y
+	for pt in cave_ceiling_points:
+		if pt.y < top_y:
+			top_y = pt.y
+	var bottom_y: float = cave_terrain_points[0].y
+	for pt in cave_terrain_points:
+		if pt.y > bottom_y:
+			bottom_y = pt.y
+	for i in range(randi_range(8, 12)):
+		var mote := ColorRect.new()
+		mote.size = Vector2(1, 1)
+		mote.color = Color(0.6, 0.5, 0.3, 0.15)
+		var mx: float = randf_range(left_x + 20, right_x - 20)
+		var my: float = randf_range(top_y + 10, bottom_y - 10)
+		mote.position = Vector2(mx, my)
+		mote.z_index = 7
+		add_child(mote)
+		dust_motes.append({
+			"node": mote,
+			"base_x": mx,
+			"base_y": my,
+			"speed_x": randf_range(2, 6),
+			"phase": randf() * TAU,
+			"left_x": left_x + 20,
+			"right_x": right_x - 20,
+			"top_y": top_y + 10,
+			"bottom_y": bottom_y - 10,
+		})
+
+# --- Exit Zone ---
+func _build_exit_zone() -> void:
+	var left_x: float = cave_terrain_points[0].x
+	var exit_area := Area2D.new()
+	exit_area.position = Vector2(left_x + 10, (cave_ceiling_points[0].y + cave_terrain_points[0].y) * 0.5)
+	exit_area.collision_layer = 0
+	exit_area.collision_mask = 1
+	var coll := CollisionShape2D.new()
+	var shape := RectangleShape2D.new()
+	shape.size = Vector2(20, cave_terrain_points[0].y - cave_ceiling_points[0].y)
+	coll.shape = shape
+	exit_area.add_child(coll)
+	add_child(exit_area)
+	exit_area.body_entered.connect(_on_exit_body_entered)
+
+func _on_exit_body_entered(body: Node2D) -> void:
+	if body is CharacterBody2D:
+		SceneManager.transition_to_return()
+
+# --- Exit Glow (Enhanced) ---
+func _build_exit_glow() -> void:
+	var left_x: float = cave_terrain_points[0].x
+	var mid_y: float = (cave_ceiling_points[0].y + cave_terrain_points[0].y) * 0.5
+	var opening_h: float = cave_terrain_points[0].y - cave_ceiling_points[0].y
+	var glow := ColorRect.new()
+	glow.size = Vector2(16, opening_h + 10)
+	glow.position = Vector2(left_x - 4, cave_ceiling_points[0].y - 5)
+	glow.color = Color(0.5, 0.45, 0.35, 0.25)
+	glow.z_index = 3
+	add_child(glow)
+
+	# Light rays fanning from exit
+	for i in range(randi_range(3, 5)):
+		var ray := Line2D.new()
+		ray.width = randf_range(1.5, 3.0)
+		ray.default_color = Color(0.8, 0.7, 0.5, randf_range(0.05, 0.12))
+		var start_y: float = mid_y + randf_range(-opening_h * 0.3, opening_h * 0.3)
+		ray.add_point(Vector2(left_x, start_y))
+		ray.add_point(Vector2(left_x + randf_range(30, 60), start_y + randf_range(-10, 10)))
+		ray.z_index = 3
+		add_child(ray)
+
+	# PointLight2D for exit glow
+	var exit_light := PointLight2D.new()
+	exit_light.position = Vector2(left_x + 8, mid_y)
+	exit_light.color = Color(0.8, 0.75, 0.6)
+	exit_light.blend_mode = PointLight2D.BLEND_MODE_ADD
+	exit_light.energy = 2.0
+	exit_light.shadow_enabled = false
+	var gradient := GradientTexture2D.new()
+	gradient.width = 128
+	gradient.height = 128
+	gradient.fill = GradientTexture2D.FILL_RADIAL
+	gradient.fill_from = Vector2(0.5, 0.5)
+	gradient.fill_to = Vector2(0.5, 0.0)
+	var grad := Gradient.new()
+	grad.set_offset(0, 0.0)
+	grad.set_color(0, Color(1, 1, 1, 1))
+	grad.set_offset(1, 1.0)
+	grad.set_color(1, Color(0, 0, 0, 0))
+	gradient.gradient = grad
+	exit_light.texture = gradient
+	exit_light.texture_scale = 0.8
+	add_child(exit_light)
+
+# --- Player ---
+func _spawn_player() -> void:
+	player_ref = PLAYER_SCENE.instantiate()
+	var left_x: float = cave_terrain_points[0].x
+	var floor_y: float = cave_terrain_points[0].y
+	player_ref.position = Vector2(left_x + 24, floor_y - 20)
+	add_child(player_ref)
+
+# --- Camera ---
+func _setup_camera() -> void:
+	var cam := Camera2D.new()
+	cam.enabled = true
+	cam.zoom = Vector2(1, 1)
+	var left_x: float = cave_terrain_points[0].x
+	var right_x: float = cave_terrain_points[cave_terrain_points.size() - 1].x
+	var top_y: float = cave_ceiling_points[0].y
+	for pt in cave_ceiling_points:
+		if pt.y < top_y:
+			top_y = pt.y
+	var bottom_y: float = cave_terrain_points[0].y
+	for pt in cave_terrain_points:
+		if pt.y > bottom_y:
+			bottom_y = pt.y
+	cam.limit_left = int(left_x - 20)
+	cam.limit_right = int(right_x + 20)
+	cam.limit_top = int(top_y - 40)
+	cam.limit_bottom = int(bottom_y + 40)
+	cam.position_smoothing_enabled = true
+	cam.position_smoothing_speed = 5.0
+	if player_ref:
+		player_ref.add_child(cam)
+
+# --- Virtual: override in subclass ---
+func _setup_loot_and_lore() -> void:
+	pass
+
+# --- Ceiling Y helper ---
+func _get_cave_ceiling_y_at(x: float) -> float:
+	for i in range(cave_ceiling_points.size() - 1):
+		if x >= cave_ceiling_points[i].x and x <= cave_ceiling_points[i + 1].x:
+			var t: float = (x - cave_ceiling_points[i].x) / (cave_ceiling_points[i + 1].x - cave_ceiling_points[i].x + 0.001)
+			return lerpf(cave_ceiling_points[i].y, cave_ceiling_points[i + 1].y, t)
+	if x < cave_ceiling_points[0].x:
+		return cave_ceiling_points[0].y
+	return cave_ceiling_points[cave_ceiling_points.size() - 1].y
+
+# --- Process: Drips, Crystal pulses, Dust motes ---
+func _process(delta: float) -> void:
+	wave_time += delta
+
+	# Ambient drips
+	drip_timer += delta
+	if drip_timer >= 1.5:
+		drip_timer -= 1.5
+		_spawn_drip()
+
+	# Crystal light pulse
+	for i in range(crystal_lights.size()):
+		if is_instance_valid(crystal_lights[i]):
+			crystal_lights[i].energy = lerpf(0.5, 1.0, (sin(wave_time * 1.5 + crystal_phases[i]) + 1.0) * 0.5)
+
+	# Dust mote drift
+	for dm in dust_motes:
+		if not is_instance_valid(dm["node"]):
+			continue
+		var n: ColorRect = dm["node"]
+		var new_x: float = dm["base_x"] + wave_time * dm["speed_x"]
+		# Wrap at cave edges
+		var range_x: float = dm["right_x"] - dm["left_x"]
+		new_x = dm["left_x"] + fmod(new_x - dm["left_x"], range_x)
+		if new_x < dm["left_x"]:
+			new_x += range_x
+		var new_y: float = dm["base_y"] + sin(wave_time * 0.8 + dm["phase"]) * 4.0
+		n.position = Vector2(new_x, new_y)
+
+func _spawn_drip() -> void:
+	if cave_ceiling_points.size() == 0:
+		return
+	var idx: int = randi() % cave_ceiling_points.size()
+	var pt: Vector2 = cave_ceiling_points[idx]
+	var floor_y: float = _get_cave_terrain_y_at(pt.x)
+
+	var drip := ColorRect.new()
+	drip.size = Vector2(1, 3)
+	drip.color = Color(0.3, 0.45, 0.6, 0.6)
+	drip.position = pt
+	drip.z_index = 6
+	add_child(drip)
+
+	var fall_time: float = (floor_y - pt.y) / 120.0
+	var tw := create_tween()
+	tw.tween_property(drip, "position:y", floor_y, fall_time)
+	tw.tween_callback(func() -> void:
+		for j in range(2):
+			var splash := ColorRect.new()
+			splash.size = Vector2(2, 1)
+			splash.color = Color(0.3, 0.45, 0.6, 0.4)
+			splash.position = Vector2(pt.x + randf_range(-3, 3), floor_y)
+			splash.z_index = 6
+			add_child(splash)
+			var stw := create_tween()
+			stw.tween_property(splash, "position:y", floor_y - randf_range(2, 6), 0.3)
+			stw.parallel().tween_property(splash, "modulate:a", 0.0, 0.3)
+			stw.tween_callback(splash.queue_free)
+		drip.queue_free()
+	)
+
+func _get_cave_terrain_y_at(x: float) -> float:
+	for i in range(cave_terrain_points.size() - 1):
+		if x >= cave_terrain_points[i].x and x <= cave_terrain_points[i + 1].x:
+			var t: float = (x - cave_terrain_points[i].x) / (cave_terrain_points[i + 1].x - cave_terrain_points[i].x + 0.001)
+			return lerpf(cave_terrain_points[i].y, cave_terrain_points[i + 1].y, t)
+	if x < cave_terrain_points[0].x:
+		return cave_terrain_points[0].y
+	return cave_terrain_points[cave_terrain_points.size() - 1].y

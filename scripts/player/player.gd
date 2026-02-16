@@ -6,10 +6,16 @@ const SCOOP_COOLDOWN: float = 0.3
 const STAMINA_REGEN_DELAY_TIME: float = 0.0
 
 signal pump_requested()
+signal shop_requested()
+signal cave_entrance_requested(cave_id: String)
 
 var near_water: bool = false
 var near_swamp_index: int = -1
 var near_pump: bool = false
+var near_shop: bool = false
+var near_cave_entrance: bool = false
+var near_cave_id: String = ""
+var ui_panel_open: bool = false
 var scoop_cooldown_timer: float = 0.0
 var stamina_idle_timer: float = 0.0
 var facing_right: bool = true
@@ -238,22 +244,42 @@ func _physics_process(delta: float) -> void:
 	if stamina_idle_timer >= STAMINA_REGEN_DELAY_TIME:
 		GameManager.regen_stamina(delta)
 
-	# Manual scoop: single press
-	if Input.is_action_just_pressed("scoop") and scoop_cooldown_timer <= 0.0:
+	# Manual scoop: single press (skip if UI panel is open)
+	if Input.is_action_just_pressed("scoop") and scoop_cooldown_timer <= 0.0 and not ui_panel_open:
 		_handle_scoop()
 
-	# Auto-scoop on timer when near water (always active, upgrades speed it up)
+	# Auto-scoop: only near water, only when standing still for 3s, only scoops (never shop/pump/cave)
 	var auto_interval: float = GameManager.get_auto_scoop_interval()
-	if near_water and near_swamp_index >= 0:
+	if near_water and near_swamp_index >= 0 and not is_walking:
 		auto_scoop_timer += delta
-		if auto_scoop_timer >= auto_interval:
+		if auto_scoop_timer >= 3.0 + auto_interval:
 			auto_scoop_timer -= auto_interval
 			if scoop_cooldown_timer <= 0.0:
-				_handle_scoop()
+				_auto_scoop_water()
 	else:
 		auto_scoop_timer = 0.0
 
+func _auto_scoop_water() -> void:
+	# Auto-scoop only does water scooping — never triggers shop/pump/cave
+	if not near_water or near_swamp_index < 0:
+		return
+	if GameManager.current_tool_id == "hose":
+		GameManager.try_activate_hose(near_swamp_index)
+		return
+	if GameManager.try_scoop(near_swamp_index):
+		scoop_cooldown_timer = SCOOP_COOLDOWN
+		stamina_idle_timer = 0.0
+		_scoop_feedback()
+
 func _handle_scoop() -> void:
+	if near_cave_entrance and near_cave_id != "":
+		cave_entrance_requested.emit(near_cave_id)
+		scoop_cooldown_timer = SCOOP_COOLDOWN
+		return
+	if near_shop:
+		shop_requested.emit()
+		scoop_cooldown_timer = SCOOP_COOLDOWN
+		return
 	if near_pump:
 		pump_requested.emit()
 		scoop_cooldown_timer = SCOOP_COOLDOWN
@@ -600,6 +626,9 @@ func _spawn_floating_text(text: String, color: Color = Color(0.3, 1.0, 0.4)) -> 
 func set_near_pump(value: bool) -> void:
 	near_pump = value
 
+func set_near_shop(value: bool) -> void:
+	near_shop = value
+
 func set_near_water(value: bool, swamp_index: int = -1) -> void:
 	if value:
 		near_water = true
@@ -608,6 +637,15 @@ func set_near_water(value: bool, swamp_index: int = -1) -> void:
 		if swamp_index == near_swamp_index:
 			near_water = false
 			near_swamp_index = -1
+
+func set_near_cave_entrance(value: bool, cave_id: String = "") -> void:
+	if value:
+		near_cave_entrance = true
+		near_cave_id = cave_id
+	else:
+		if cave_id == near_cave_id:
+			near_cave_entrance = false
+			near_cave_id = ""
 
 func _setup_lantern() -> void:
 	# PointLight2D for warm glow

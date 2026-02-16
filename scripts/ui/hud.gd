@@ -7,11 +7,9 @@ extends CanvasLayer
 @onready var tool_label: Label = $MarginContainer/VBoxContainer/BottomBar/HBox/ToolLabel
 @onready var stamina_bar: ProgressBar = $MarginContainer/VBoxContainer/BottomBar/HBox/StaminaBar
 @onready var hose_label: Label = $MarginContainer/VBoxContainer/BottomBar/HBox/HoseLabel
-@onready var shop_button: Button = $MarginContainer/VBoxContainer/BottomBar/HBox/ShopButton
 @onready var stats_button: Button = $MarginContainer/VBoxContainer/BottomBar/HBox/StatsButton
 @onready var menu_button: Button = $MarginContainer/VBoxContainer/BottomBar/HBox/MenuButton
 
-signal shop_pressed
 signal stats_pressed
 signal menu_pressed
 
@@ -31,7 +29,6 @@ func _ready() -> void:
 	GameManager.water_carried_changed.connect(_on_water_carried_changed)
 	GameManager.day_changed.connect(_on_day_changed)
 
-	shop_button.pressed.connect(func() -> void: shop_pressed.emit())
 	stats_button.pressed.connect(func() -> void: stats_pressed.emit())
 	menu_button.pressed.connect(func() -> void: menu_pressed.emit())
 
