@@ -32,6 +32,10 @@ var drip_timer: float = 0.0
 # Phase 16: Speed lines
 var speed_line_timer: float = 0.0
 
+# Dev fly mode
+var fly_mode: bool = false
+const FLY_SPEED: float = 400.0
+
 # Lantern system
 var lantern_light: PointLight2D = null
 var lantern_node: Node2D = null
@@ -80,8 +84,26 @@ func _unhandled_input(event: InputEvent) -> void:
 				GameManager.money += 100000.0
 				GameManager.money_changed.emit(GameManager.money)
 				_spawn_floating_text("+$100,000", Color(1.0, 0.85, 0.2))
+			KEY_F5:
+				fly_mode = not fly_mode
+				if fly_mode:
+					_spawn_floating_text("FLY MODE ON", Color(0.4, 1.0, 0.4))
+				else:
+					_spawn_floating_text("FLY MODE OFF", Color(1.0, 0.4, 0.4))
 
 func _physics_process(delta: float) -> void:
+	# Fly mode: free movement, no gravity, no collision
+	if fly_mode:
+		var dir_x: float = Input.get_axis("move_left", "move_right")
+		var dir_y: float = Input.get_axis("ui_up", "ui_down")
+		var fly_speed: float = FLY_SPEED
+		if Input.is_key_pressed(KEY_SHIFT):
+			fly_speed *= 3.0
+		position += Vector2(dir_x, dir_y) * fly_speed * delta
+		velocity = Vector2.ZERO
+		is_walking = false
+		return
+
 	# Gravity
 	if not is_on_floor():
 		velocity.y += GRAVITY * delta

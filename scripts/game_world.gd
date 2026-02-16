@@ -507,6 +507,13 @@ func _build_parallax() -> void:
 # --- Sky & Atmosphere ---
 func _build_sky() -> void:
 	var world_w: float = terrain_points[terrain_points.size() - 1].x + 200.0
+	# Find deepest point to extend sky behind all terrain
+	var max_y: float = 0.0
+	for pt in terrain_points:
+		if pt.y > max_y:
+			max_y = pt.y
+	var sky_bottom: float = max_y + 200.0
+
 	# Three-band sky gradient
 	var sky_top := ColorRect.new()
 	sky_top.position = Vector2(-100, -80)
@@ -524,7 +531,7 @@ func _build_sky() -> void:
 
 	var sky_bot := ColorRect.new()
 	sky_bot.position = Vector2(-100, 96)
-	sky_bot.size = Vector2(world_w + 200, 100)
+	sky_bot.size = Vector2(world_w + 200, sky_bottom - 96)
 	sky_bot.color = SKY_COLOR_BOTTOM
 	sky_bot.z_index = -12
 	sky_layer.add_child(sky_bot)
@@ -680,13 +687,20 @@ func _build_treeline() -> void:
 	treeline_layer.add_child(treeline2)
 
 func _build_terrain() -> void:
+	# Find the deepest terrain point to set the fill bottom
+	var max_y: float = 0.0
+	for pt in terrain_points:
+		if pt.y > max_y:
+			max_y = pt.y
+	var fill_bottom: float = max_y + 100.0
+
 	# Main ground polygon
 	terrain_polygon = Polygon2D.new()
 	var ground_points: PackedVector2Array = PackedVector2Array()
 	for pt in terrain_points:
 		ground_points.append(pt)
-	ground_points.append(Vector2(terrain_points[-1].x, 480))
-	ground_points.append(Vector2(terrain_points[0].x, 480))
+	ground_points.append(Vector2(terrain_points[-1].x, fill_bottom))
+	ground_points.append(Vector2(terrain_points[0].x, fill_bottom))
 	terrain_polygon.polygon = ground_points
 	terrain_polygon.color = GROUND_COLOR
 	terrain_polygon.z_index = 0
@@ -697,8 +711,8 @@ func _build_terrain() -> void:
 	var mid_points: PackedVector2Array = PackedVector2Array()
 	for pt in terrain_points:
 		mid_points.append(Vector2(pt.x, pt.y + 10))
-	mid_points.append(Vector2(terrain_points[-1].x, 480))
-	mid_points.append(Vector2(terrain_points[0].x, 480))
+	mid_points.append(Vector2(terrain_points[-1].x, fill_bottom))
+	mid_points.append(Vector2(terrain_points[0].x, fill_bottom))
 	midsoil.polygon = mid_points
 	midsoil.color = GROUND_MID_COLOR
 	midsoil.z_index = -1
@@ -709,8 +723,8 @@ func _build_terrain() -> void:
 	var sub_points: PackedVector2Array = PackedVector2Array()
 	for pt in terrain_points:
 		sub_points.append(Vector2(pt.x, pt.y + 24))
-	sub_points.append(Vector2(terrain_points[-1].x, 480))
-	sub_points.append(Vector2(terrain_points[0].x, 480))
+	sub_points.append(Vector2(terrain_points[-1].x, fill_bottom))
+	sub_points.append(Vector2(terrain_points[0].x, fill_bottom))
 	subsoil.polygon = sub_points
 	subsoil.color = GROUND_DARK_COLOR
 	subsoil.z_index = -2
@@ -763,15 +777,16 @@ func _build_terrain() -> void:
 	var left_wall := CollisionShape2D.new()
 	var lw_shape := SegmentShape2D.new()
 	lw_shape.a = Vector2(-20, -100)
-	lw_shape.b = Vector2(-20, 480)
+	lw_shape.b = Vector2(-20, fill_bottom)
 	left_wall.shape = lw_shape
 	terrain_body.add_child(left_wall)
 
 	# Right wall
+	var right_x: float = terrain_points[-1].x + 40.0
 	var right_wall := CollisionShape2D.new()
 	var rw_shape := SegmentShape2D.new()
-	rw_shape.a = Vector2(1940, -100)
-	rw_shape.b = Vector2(1940, 480)
+	rw_shape.a = Vector2(right_x, -100)
+	rw_shape.b = Vector2(right_x, fill_bottom)
 	right_wall.shape = rw_shape
 	terrain_body.add_child(right_wall)
 
