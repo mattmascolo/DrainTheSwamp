@@ -15,7 +15,12 @@ signal menu_pressed
 var displayed_money: float = 0.0
 var money_tween: Tween = null
 
+# Phase 6A: Stamina gradient fill style
+var stamina_fill_style: StyleBoxFlat = null
+
 func _ready() -> void:
+	_build_hud_icons()
+	_setup_stamina_gradient()
 	GameManager.money_changed.connect(_on_money_changed)
 	GameManager.water_level_changed.connect(_on_water_level_changed)
 	GameManager.tool_changed.connect(func(_d: Dictionary) -> void: _update_tool_label())
@@ -107,6 +112,7 @@ func _update_tool_label() -> void:
 func _on_stamina_changed(current: float, maximum: float) -> void:
 	stamina_bar.max_value = maximum
 	stamina_bar.value = current
+	_update_stamina_color(current / maxf(maximum, 0.01))
 
 func _on_hose_state_changed(active: bool, time_remaining: float) -> void:
 	hose_label.visible = active
@@ -127,3 +133,94 @@ func _on_water_carried_changed(current: float, capacity: float) -> void:
 
 func _on_swamp_completed(swamp_index: int, _reward: float) -> void:
 	_update_water_label()
+
+# --- Phase 6A: HUD Icons & Stamina Gradient ---
+func _build_hud_icons() -> void:
+	# Money icon: yellow coin (circle approximation)
+	var coin_icon := _make_icon_container()
+	var coin_bg := ColorRect.new()
+	coin_bg.custom_minimum_size = Vector2(5, 5)
+	coin_bg.size = Vector2(5, 5)
+	coin_bg.color = Color(1.0, 0.85, 0.2, 0.9)
+	coin_icon.add_child(coin_bg)
+	var coin_dot := ColorRect.new()
+	coin_dot.custom_minimum_size = Vector2(1, 3)
+	coin_dot.size = Vector2(1, 3)
+	coin_dot.position = Vector2(2, 1)
+	coin_dot.color = Color(0.8, 0.65, 0.1)
+	coin_icon.add_child(coin_dot)
+	var top_hbox: HBoxContainer = money_label.get_parent() as HBoxContainer
+	top_hbox.add_child(coin_icon)
+	top_hbox.move_child(coin_icon, 0)
+
+	# Bag icon: brown square with flap
+	var bag_icon := _make_icon_container()
+	var bag_body := ColorRect.new()
+	bag_body.custom_minimum_size = Vector2(5, 5)
+	bag_body.size = Vector2(5, 5)
+	bag_body.color = Color(0.55, 0.35, 0.15)
+	bag_icon.add_child(bag_body)
+	var bag_flap := ColorRect.new()
+	bag_flap.custom_minimum_size = Vector2(5, 2)
+	bag_flap.size = Vector2(5, 2)
+	bag_flap.position = Vector2(0, 0)
+	bag_flap.color = Color(0.65, 0.42, 0.18)
+	bag_icon.add_child(bag_flap)
+	top_hbox.add_child(bag_icon)
+	var carry_idx: int = top_hbox.get_children().find(carry_label)
+	if carry_idx >= 0:
+		top_hbox.move_child(bag_icon, carry_idx)
+
+	# Stamina icon: green lightning bolt (3 rects forming a zigzag)
+	var bolt_icon := _make_icon_container()
+	var b1 := ColorRect.new()
+	b1.custom_minimum_size = Vector2(3, 2)
+	b1.size = Vector2(3, 2)
+	b1.position = Vector2(1, 0)
+	b1.color = Color(0.3, 0.85, 0.2)
+	bolt_icon.add_child(b1)
+	var b2 := ColorRect.new()
+	b2.custom_minimum_size = Vector2(3, 2)
+	b2.size = Vector2(3, 2)
+	b2.position = Vector2(0, 2)
+	b2.color = Color(0.3, 0.85, 0.2)
+	bolt_icon.add_child(b2)
+	var b3 := ColorRect.new()
+	b3.custom_minimum_size = Vector2(3, 2)
+	b3.size = Vector2(3, 2)
+	b3.position = Vector2(1, 4)
+	b3.color = Color(0.3, 0.85, 0.2)
+	bolt_icon.add_child(b3)
+	var bot_hbox: HBoxContainer = tool_label.get_parent() as HBoxContainer
+	bot_hbox.add_child(bolt_icon)
+	var stam_idx: int = bot_hbox.get_children().find(stamina_bar)
+	if stam_idx >= 0:
+		bot_hbox.move_child(bolt_icon, stam_idx)
+
+func _make_icon_container() -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(8, 8)
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return c
+
+func _setup_stamina_gradient() -> void:
+	# Clone the existing fill style so we can dynamically change color
+	var existing: StyleBoxFlat = stamina_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	if existing:
+		stamina_fill_style = existing.duplicate() as StyleBoxFlat
+		stamina_bar.add_theme_stylebox_override("fill", stamina_fill_style)
+
+func _update_stamina_color(fraction: float) -> void:
+	if not stamina_fill_style:
+		return
+	# Green → Yellow → Red gradient based on stamina fraction
+	var color: Color
+	if fraction > 0.5:
+		# Green to Yellow (1.0 → 0.5)
+		var f: float = (fraction - 0.5) / 0.5
+		color = Color(0.2, 0.75, 0.3).lerp(Color(0.85, 0.8, 0.2), 1.0 - f)
+	else:
+		# Yellow to Red (0.5 → 0.0)
+		var f: float = fraction / 0.5
+		color = Color(0.85, 0.2, 0.15).lerp(Color(0.85, 0.8, 0.2), f)
+	stamina_fill_style.bg_color = color

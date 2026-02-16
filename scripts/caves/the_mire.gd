@@ -4,67 +4,92 @@ func _init() -> void:
 	cave_id = "the_mire"
 	crystal_color = Color(0.2, 0.5, 0.15)  # Dark green
 
-	# ~2000px wide cave, tangled swamp underground
+	# Theme colors: dark green-brown
+	ground_color = Color(0.22, 0.28, 0.14)
+	ceiling_color = Color(0.16, 0.22, 0.10)
+	wall_color = Color(0.14, 0.18, 0.08)
+	rock_mid_color = Color(0.20, 0.24, 0.12)
+	rock_sub_color = Color(0.16, 0.20, 0.10)
+	rock_inner_ceil_color = Color(0.18, 0.24, 0.12)
+
+	# ~2000px wide cave, 2 valleys for 2 pools
+	# Valley 1: x=450-750, Valley 2: x=1200-1550
 	cave_terrain_points = [
-		Vector2(0, 238),
-		Vector2(130, 244),
-		Vector2(250, 236),
-		Vector2(380, 250),
-		Vector2(500, 240),
-		Vector2(620, 252),
-		Vector2(750, 238),
-		Vector2(870, 248),
-		Vector2(1000, 236),
-		Vector2(1130, 250),
-		Vector2(1260, 242),
-		Vector2(1400, 254),
-		Vector2(1530, 240),
-		Vector2(1650, 248),
-		Vector2(1780, 236),
-		Vector2(1900, 246),
-		Vector2(2000, 240),
+		Vector2(0, 220),
+		Vector2(120, 214),
+		Vector2(250, 208),
+		Vector2(380, 216),
+		Vector2(450, 234),    # slope into valley 1
+		Vector2(540, 260),    # valley 1 floor
+		Vector2(640, 268),    # valley 1 deepest
+		Vector2(720, 258),    # valley 1 floor
+		Vector2(800, 224),    # slope out
+		Vector2(900, 206),    # ridge
+		Vector2(1020, 200),   # ridge peak
+		Vector2(1120, 208),
+		Vector2(1200, 230),   # slope into valley 2
+		Vector2(1300, 262),   # valley 2 floor
+		Vector2(1400, 270),   # valley 2 deepest
+		Vector2(1500, 260),   # valley 2 floor
+		Vector2(1600, 226),   # slope out
+		Vector2(1720, 210),
+		Vector2(1850, 206),
+		Vector2(2000, 212),
 	]
 
 	cave_ceiling_points = [
 		Vector2(0, 90),
-		Vector2(200, 82),
-		Vector2(400, 88),
-		Vector2(600, 74),
-		Vector2(800, 84),
-		Vector2(1000, 76),
-		Vector2(1200, 86),
-		Vector2(1400, 78),
-		Vector2(1600, 84),
-		Vector2(1800, 76),
-		Vector2(2000, 82),
+		Vector2(200, 84),
+		Vector2(400, 76),
+		Vector2(550, 64),    # lower over valley 1
+		Vector2(750, 72),
+		Vector2(950, 80),    # higher over ridge
+		Vector2(1100, 76),
+		Vector2(1300, 62),   # lower over valley 2
+		Vector2(1550, 72),
+		Vector2(1800, 80),
+		Vector2(2000, 78),
+	]
+
+	# 2 pools
+	cave_pool_defs = [
+		{
+			"x_range": [450.0, 800.0],
+			"pool_index": 0,
+			"loot_data": {
+				"loot_id": "mire_pool_1",
+				"reward_money": 200000.0,
+				"reward_text": "The murky pool drains to reveal treasure! +$200,000",
+			},
+		},
+		{
+			"x_range": [1200.0, 1600.0],
+			"pool_index": 1,
+			"loot_data": {
+				"loot_id": "mire_pool_2",
+				"reward_stat_levels": {"drain_mastery": 5},
+				"reward_text": "An ancient relic pulses beneath the mire! Drain Mastery +5!",
+			},
+		},
 	]
 
 func _setup_loot_and_lore() -> void:
-	# Swamp treasure at x=500
+	# Mire lore on ridge at x=1000
+	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
+	lore1.lore_id = "mire_depths"
+	lore1.cave_id = cave_id
+	lore1.lore_text = "Twisted roots claw through the walls. The mire has been swallowing things for centuries. The deeper you go, the older it gets..."
+	lore1.position = Vector2(1000, _get_cave_terrain_y_at(1000))
+	add_child(lore1)
+
+	# Swamp treasure past pools at x=1800
 	var loot1 = preload("res://scripts/caves/loot_node.gd").new()
 	loot1.loot_id = "swamp_treasure"
 	loot1.cave_id = cave_id
 	loot1.reward_money = 500000.0
 	loot1.reward_text = "Found a chest buried in the muck! +$500,000"
-	loot1.position = Vector2(500, _get_cave_terrain_y_at(500))
+	loot1.position = Vector2(1800, _get_cave_terrain_y_at(1800))
 	add_child(loot1)
-
-	# Drain mastery relic at x=1300
-	var loot2 = preload("res://scripts/caves/loot_node.gd").new()
-	loot2.loot_id = "drain_relic"
-	loot2.cave_id = cave_id
-	loot2.reward_stat_levels = {"drain_mastery": 5}
-	loot2.reward_text = "An ancient drain relic pulses with power! Drain Mastery +5 levels!"
-	loot2.position = Vector2(1300, _get_cave_terrain_y_at(1300))
-	add_child(loot2)
-
-	# Mire lore at x=900
-	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
-	lore1.lore_id = "mire_depths"
-	lore1.cave_id = cave_id
-	lore1.lore_text = "Twisted roots claw through the walls. The mire has been swallowing things for centuries. The deeper you go, the older it gets..."
-	lore1.position = Vector2(900, _get_cave_terrain_y_at(900))
-	add_child(lore1)
 
 	# Tangled vines and hanging moss (mire theme)
 	for i in range(12):

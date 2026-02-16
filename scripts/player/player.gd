@@ -13,6 +13,9 @@ var near_swamp_index: int = -1
 var near_shop: bool = false
 var near_cave_entrance: bool = false
 var near_cave_id: String = ""
+var near_cave_pool: bool = false
+var cave_pool_cave_id: String = ""
+var cave_pool_index: int = -1
 var ui_panel_open: bool = false
 var scoop_cooldown_timer: float = 0.0
 var stamina_idle_timer: float = 0.0
@@ -95,7 +98,7 @@ func _physics_process(delta: float) -> void:
 	# Fly mode: free movement, no gravity, no collision
 	if fly_mode:
 		var dir_x: float = Input.get_axis("move_left", "move_right")
-		var dir_y: float = Input.get_axis("ui_up", "ui_down")
+		var dir_y: float = Input.get_axis("move_up", "move_down")
 		var fly_speed: float = FLY_SPEED
 		if Input.is_key_pressed(KEY_SHIFT):
 			fly_speed *= 3.0
@@ -268,9 +271,10 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("scoop") and scoop_cooldown_timer <= 0.0 and not ui_panel_open:
 		_handle_scoop()
 
-	# Auto-scoop: only near water, only when standing still for 3s, only scoops (never shop/pump/cave)
+	# Auto-scoop: only near water/cave pool, only when standing still for 3s, only scoops (never shop/pump/cave)
 	var auto_interval: float = GameManager.get_auto_scoop_interval()
-	if near_water and near_swamp_index >= 0 and not is_walking:
+	var can_auto_scoop: bool = (near_water and near_swamp_index >= 0) or (near_cave_pool and cave_pool_index >= 0)
+	if can_auto_scoop and not is_walking:
 		auto_scoop_timer += delta
 		if auto_scoop_timer >= 3.0 + auto_interval:
 			auto_scoop_timer -= auto_interval
@@ -280,7 +284,15 @@ func _physics_process(delta: float) -> void:
 		auto_scoop_timer = 0.0
 
 func _auto_scoop_water() -> void:
-	# Auto-scoop only does water scooping — never triggers shop/pump/cave
+	# Auto-scoop only does water scooping — never triggers shop/pump/cave entrance
+	# Cave pools
+	if near_cave_pool and cave_pool_index >= 0:
+		if GameManager.try_scoop_cave_pool(cave_pool_cave_id, cave_pool_index):
+			scoop_cooldown_timer = SCOOP_COOLDOWN
+			stamina_idle_timer = 0.0
+			_scoop_feedback()
+		return
+	# Overworld water
 	if not near_water or near_swamp_index < 0:
 		return
 	if GameManager.current_tool_id == "hose":
@@ -295,6 +307,15 @@ func _handle_scoop() -> void:
 	if near_cave_entrance and near_cave_id != "":
 		cave_entrance_requested.emit(near_cave_id)
 		scoop_cooldown_timer = SCOOP_COOLDOWN
+		return
+	if near_cave_pool and cave_pool_index >= 0:
+		if GameManager.try_scoop_cave_pool(cave_pool_cave_id, cave_pool_index):
+			scoop_cooldown_timer = SCOOP_COOLDOWN
+			stamina_idle_timer = 0.0
+			_scoop_feedback()
+		elif GameManager.current_stamina >= GameManager.get_stamina_cost() and GameManager.is_inventory_full():
+			_spawn_floating_text("FULL!", Color(1.0, 0.4, 0.3))
+			scoop_cooldown_timer = SCOOP_COOLDOWN
 		return
 	if near_shop:
 		shop_requested.emit()
@@ -632,10 +653,15 @@ func _spawn_floating_text(text: String, color: Color = Color(0.3, 1.0, 0.4)) -> 
 	label.add_theme_constant_override("shadow_offset_y", 1)
 	label.position = Vector2(-28, -48)
 	label.z_index = 10
+	label.pivot_offset = Vector2(28, 8)
+	label.scale = Vector2(0.5, 0.5)
 	add_child(label)
 
 	var tween := create_tween()
-	tween.tween_property(label, "position:y", label.position.y - 32, 0.8)
+	# Pop-in scale: 0.5 → 1.2 → 1.0
+	tween.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1).set_ease(Tween.EASE_IN_OUT)
+	tween.parallel().tween_property(label, "position:y", label.position.y - 32, 0.8)
 	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.8)
 	tween.tween_callback(label.queue_free)
 
@@ -659,6 +685,17 @@ func set_near_cave_entrance(value: bool, cave_id: String = "") -> void:
 		if cave_id == near_cave_id:
 			near_cave_entrance = false
 			near_cave_id = ""
+
+func set_near_cave_pool(value: bool, cave_id: String = "", pool_index: int = -1) -> void:
+	if value:
+		near_cave_pool = true
+		cave_pool_cave_id = cave_id
+		cave_pool_index = pool_index
+	else:
+		if cave_id == cave_pool_cave_id and pool_index == cave_pool_index:
+			near_cave_pool = false
+			cave_pool_cave_id = ""
+			cave_pool_index = -1
 
 func _setup_lantern() -> void:
 	# PointLight2D for warm glow

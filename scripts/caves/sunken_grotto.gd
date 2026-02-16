@@ -4,68 +4,93 @@ func _init() -> void:
 	cave_id = "sunken_grotto"
 	crystal_color = Color(0.2, 0.65, 0.6)  # Teal
 
-	# ~2200px wide cave, flooded and dripping
+	# Theme colors: teal-grey
+	ground_color = Color(0.22, 0.30, 0.32)
+	ceiling_color = Color(0.16, 0.24, 0.26)
+	wall_color = Color(0.14, 0.20, 0.22)
+	rock_mid_color = Color(0.20, 0.26, 0.28)
+	rock_sub_color = Color(0.16, 0.22, 0.24)
+	rock_inner_ceil_color = Color(0.18, 0.26, 0.28)
+
+	# ~2200px wide cave, 2 valleys for 2 pools
+	# Valley 1: x=500-800, Valley 2: x=1350-1700
 	cave_terrain_points = [
-		Vector2(0, 242),
-		Vector2(140, 248),
-		Vector2(270, 238),
-		Vector2(400, 252),
-		Vector2(530, 244),
-		Vector2(660, 256),
-		Vector2(790, 240),
-		Vector2(920, 250),
-		Vector2(1050, 238),
-		Vector2(1180, 254),
-		Vector2(1310, 244),
-		Vector2(1440, 258),
-		Vector2(1570, 242),
-		Vector2(1700, 252),
-		Vector2(1830, 236),
-		Vector2(1960, 248),
-		Vector2(2080, 240),
-		Vector2(2200, 246),
+		Vector2(0, 220),
+		Vector2(120, 214),
+		Vector2(250, 206),
+		Vector2(380, 200),
+		Vector2(460, 214),    # slope into valley 1
+		Vector2(560, 248),    # valley 1 floor
+		Vector2(660, 256),    # valley 1 deepest
+		Vector2(760, 246),    # valley 1 floor
+		Vector2(850, 212),    # slope out
+		Vector2(960, 198),    # ridge
+		Vector2(1080, 192),   # ridge peak
+		Vector2(1200, 196),
+		Vector2(1310, 210),   # slope into valley 2
+		Vector2(1420, 250),   # valley 2 floor
+		Vector2(1530, 260),   # valley 2 deepest
+		Vector2(1640, 248),   # valley 2 floor
+		Vector2(1740, 214),   # slope out
+		Vector2(1860, 200),
+		Vector2(1980, 196),
+		Vector2(2100, 202),
+		Vector2(2200, 198),
 	]
 
 	cave_ceiling_points = [
 		Vector2(0, 86),
 		Vector2(220, 78),
-		Vector2(440, 84),
-		Vector2(660, 72),
-		Vector2(880, 80),
-		Vector2(1100, 74),
-		Vector2(1320, 82),
-		Vector2(1540, 76),
-		Vector2(1760, 84),
-		Vector2(1980, 78),
-		Vector2(2200, 82),
+		Vector2(440, 74),
+		Vector2(600, 62),    # lower over valley 1
+		Vector2(800, 72),
+		Vector2(1000, 80),   # higher over ridge
+		Vector2(1200, 76),
+		Vector2(1450, 60),   # lower over valley 2
+		Vector2(1700, 72),
+		Vector2(1950, 80),
+		Vector2(2200, 78),
+	]
+
+	# 2 pools
+	cave_pool_defs = [
+		{
+			"x_range": [460.0, 850.0],
+			"pool_index": 0,
+			"loot_data": {
+				"loot_id": "grotto_pool_1",
+				"reward_money": 2000000.0,
+				"reward_text": "Sunken riches emerge from the grotto! +$2,000,000",
+			},
+		},
+		{
+			"x_range": [1310.0, 1740.0],
+			"pool_index": 1,
+			"loot_data": {
+				"loot_id": "grotto_pool_2",
+				"reward_stat_levels": {"carrying_capacity": 8},
+				"reward_text": "A waterlogged relic expands your capacity! Carrying Capacity +8!",
+			},
+		},
 	]
 
 func _setup_loot_and_lore() -> void:
-	# Sunken riches at x=600
-	var loot1 = preload("res://scripts/caves/loot_node.gd").new()
-	loot1.loot_id = "sunken_riches"
-	loot1.cave_id = cave_id
-	loot1.reward_money = 2000000.0
-	loot1.reward_text = "Found sunken riches in the grotto! +$2,000,000"
-	loot1.position = Vector2(600, _get_cave_terrain_y_at(600))
-	add_child(loot1)
-
-	# Capacity relic at x=1500
-	var loot2 = preload("res://scripts/caves/loot_node.gd").new()
-	loot2.loot_id = "capacity_relic"
-	loot2.cave_id = cave_id
-	loot2.reward_stat_levels = {"carrying_capacity": 8}
-	loot2.reward_text = "A waterlogged relic expands your capacity! Carrying Capacity +8 levels!"
-	loot2.position = Vector2(1500, _get_cave_terrain_y_at(1500))
-	add_child(loot2)
-
-	# Grotto lore at x=1000
+	# Grotto lore on ridge at x=1100
 	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
 	lore1.lore_id = "grotto_secrets"
 	lore1.cave_id = cave_id
 	lore1.lore_text = "Water drips endlessly from every surface. This grotto was once part of an underground river. The water remembers its path..."
-	lore1.position = Vector2(1000, _get_cave_terrain_y_at(1000))
+	lore1.position = Vector2(1100, _get_cave_terrain_y_at(1100))
 	add_child(lore1)
+
+	# Extra loot past pools at x=2050
+	var loot1 = preload("res://scripts/caves/loot_node.gd").new()
+	loot1.loot_id = "sunken_riches_extra"
+	loot1.cave_id = cave_id
+	loot1.reward_money = 500000.0
+	loot1.reward_text = "Found extra sunken riches! +$500,000"
+	loot1.position = Vector2(2050, _get_cave_terrain_y_at(2050))
+	add_child(loot1)
 
 	# Dripping water features (grotto theme)
 	for i in range(15):
@@ -79,15 +104,20 @@ func _setup_loot_and_lore() -> void:
 		drip_line.z_index = 5
 		add_child(drip_line)
 
-	# Shallow floor pools (more than usual for flooded theme)
+	# Flowstone formations on ridges
 	for i in range(6):
-		var px: float = randf_range(100, 2100)
-		var py: float = _get_cave_terrain_y_at(px)
-		var pw: float = randf_range(20, 40)
-		var ph: float = randf_range(3, 6)
-		var pool := ColorRect.new()
-		pool.size = Vector2(pw, ph)
-		pool.position = Vector2(px - pw * 0.5, py - ph)
-		pool.color = Color(0.15, 0.35, 0.45, 0.5)
-		pool.z_index = 1
-		add_child(pool)
+		var fx: float = randf_range(880, 1280)
+		var fy: float = _get_cave_terrain_y_at(fx)
+		var flowstone := Polygon2D.new()
+		var fw: float = randf_range(8, 16)
+		var fh: float = randf_range(6, 14)
+		flowstone.polygon = PackedVector2Array([
+			Vector2(-fw * 0.5, 0),
+			Vector2(fw * 0.5, 0),
+			Vector2(fw * 0.3, -fh),
+			Vector2(-fw * 0.3, -fh * 0.8),
+		])
+		flowstone.position = Vector2(fx, fy)
+		flowstone.color = Color(0.28, 0.35, 0.36, 0.6)
+		flowstone.z_index = 2
+		add_child(flowstone)

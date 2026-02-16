@@ -237,6 +237,7 @@ const SWAMP_RANGES: Array = [
 const SWAMP_COUNT: int = 10
 const WATER_SHADER = preload("res://shaders/water.gdshader")
 const POST_PROCESS_SHADER = preload("res://shaders/post_process.gdshader")
+const TERRAIN_SHADER = preload("res://shaders/terrain.gdshader")
 
 # Visual nodes created procedurally
 var water_polygons: Array[Polygon2D] = []
@@ -260,11 +261,12 @@ var mud_patches: Array[Dictionary] = []
 var player_in_shop_area: bool = false
 var shop_player_ref: Node2D = null
 var camels: Array[Dictionary] = []
+var elephant_data: Dictionary = {}
 
 # Second pass visuals
 var moon: Node2D = null
-var moon_glow: ColorRect = null
-var moon_body: ColorRect = null
+var moon_glow: Polygon2D = null
+var moon_body: Polygon2D = null
 var bubbles: Array[Dictionary] = []
 var bubble_timer: float = 0.0
 var foam_lines: Array[Line2D] = []
@@ -288,6 +290,11 @@ var shooting_stars: Array[Dictionary] = []
 var shooting_star_timer: float = 0.0
 var turtles: Array[Dictionary] = []
 var tadpoles: Array[Dictionary] = []
+var crickets: Array[Dictionary] = []
+
+# Distance fog (Phase 4C)
+var distance_fog_layer: CanvasLayer = null
+var distance_fog_rect: ColorRect = null
 
 # Shader effects
 var post_process_layer: CanvasLayer = null
@@ -311,6 +318,7 @@ var rain_particles: CPUParticles2D = null
 var lightning_rect: ColorRect = null
 
 # Enhanced vegetation
+var grass_blades: Array[Line2D] = []
 var ferns_list: Array[Node2D] = []
 var wind_direction: float = 1.0
 var wind_timer: float = 0.0
@@ -337,6 +345,24 @@ const CAVE_IDS: Array = ["muddy_hollow", "gator_den", "the_sinkhole", "collapsed
 
 # Dynamic shadows (Phase 13c)
 var player_shadow: ColorRect = null
+
+# Pool glow lights (Phase 4A)
+var pool_glow_lights: Array[PointLight2D] = []
+
+# Drained pool beds (Phase 8C)
+var pool_bed_nodes: Array[Node2D] = []
+
+# Waterfall drips (Phase 3B)
+var drip_nodes: Array[Dictionary] = []  # [{line, timer, phase, side, pool_idx, base_pos}]
+
+# Pool drain milestones (Phase 8B)
+var pool_milestones_triggered: Dictionary = {}  # {swamp_idx: {50: bool, 25: bool}}
+
+# Gradient sky (Phase 2A)
+var sky_texture_rect: TextureRect = null
+var sky_gradient: GradientTexture2D = null
+var sky_gradient_res: Gradient = null
+var horizon_glow: Line2D = null
 
 # Colors
 const SKY_COLOR_TOP := Color(0.22, 0.38, 0.72)
@@ -470,12 +496,17 @@ func _ready() -> void:
 	_build_seaweed()
 	_build_turtles()
 	_build_tadpoles()
+	_build_crickets()
 	_build_pool_features()
+	_build_pool_glow_lights()
 	_build_left_boundary()
 	_build_right_boundary()
 	_build_post_processing()
+	_build_distance_fog()
 	_build_weather()
 	_build_drain_reveals()
+	_build_drained_pool_beds()
+	_build_waterfall_drips()
 	_build_atmosphere()
 	_build_player_shadow()
 	_build_cave_entrances()
@@ -484,8 +515,11 @@ func _ready() -> void:
 	GameManager.water_level_changed.connect(_on_water_level_changed)
 	GameManager.cave_unlocked.connect(_on_cave_unlocked)
 	GameManager.swamp_completed.connect(_on_swamp_completed)
+	GameManager.scoop_performed.connect(_on_scoop_performed)
 	GameManager.camel_changed.connect(_on_camel_changed)
 	_build_camels()
+	GameManager.elephant_changed.connect(_on_elephant_changed)
+	_build_elephant()
 
 # --- Parallax ---
 func _build_parallax() -> void:
@@ -505,36 +539,60 @@ func _build_parallax() -> void:
 	parallax_bg.add_child(treeline_layer)
 
 # --- Sky & Atmosphere ---
+# Sky gradient presets: [top, mid, bottom] for each time of day
+const SKY_DAWN: Array[Color] = [Color(0.35, 0.25, 0.50), Color(0.72, 0.45, 0.38), Color(0.90, 0.65, 0.45)]
+const SKY_DAY: Array[Color] = [Color(0.22, 0.38, 0.72), Color(0.45, 0.62, 0.88), Color(0.62, 0.78, 0.92)]
+const SKY_DUSK: Array[Color] = [Color(0.28, 0.18, 0.42), Color(0.75, 0.38, 0.28), Color(0.88, 0.55, 0.35)]
+const SKY_NIGHT: Array[Color] = [Color(0.04, 0.05, 0.12), Color(0.06, 0.08, 0.18), Color(0.08, 0.10, 0.22)]
+
 func _build_sky() -> void:
 	var world_w: float = terrain_points[terrain_points.size() - 1].x + 200.0
-	# Find deepest point to extend sky behind all terrain
 	var max_y: float = 0.0
 	for pt in terrain_points:
 		if pt.y > max_y:
 			max_y = pt.y
 	var sky_bottom: float = max_y + 200.0
 
-	# Three-band sky gradient
-	var sky_top := ColorRect.new()
-	sky_top.position = Vector2(-100, -80)
-	sky_top.size = Vector2(world_w + 200, 100)
-	sky_top.color = SKY_COLOR_TOP
-	sky_top.z_index = -12
-	sky_layer.add_child(sky_top)
+	# Smooth gradient sky using GradientTexture2D
+	sky_gradient_res = Gradient.new()
+	sky_gradient_res.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
+	sky_gradient_res.colors = PackedColorArray([SKY_DAY[0], SKY_DAY[1], SKY_DAY[2]])
 
-	var sky_mid := ColorRect.new()
-	sky_mid.position = Vector2(-100, 20)
-	sky_mid.size = Vector2(world_w + 200, 80)
-	sky_mid.color = SKY_COLOR_MID
-	sky_mid.z_index = -12
-	sky_layer.add_child(sky_mid)
+	sky_gradient = GradientTexture2D.new()
+	sky_gradient.gradient = sky_gradient_res
+	sky_gradient.width = 1
+	sky_gradient.height = 128
+	sky_gradient.fill = GradientTexture2D.FILL_LINEAR
+	sky_gradient.fill_from = Vector2(0.0, 0.0)
+	sky_gradient.fill_to = Vector2(0.0, 1.0)
 
-	var sky_bot := ColorRect.new()
-	sky_bot.position = Vector2(-100, 96)
-	sky_bot.size = Vector2(world_w + 200, sky_bottom - 96)
-	sky_bot.color = SKY_COLOR_BOTTOM
-	sky_bot.z_index = -12
-	sky_layer.add_child(sky_bot)
+	sky_texture_rect = TextureRect.new()
+	sky_texture_rect.texture = sky_gradient
+	sky_texture_rect.position = Vector2(-100, -80)
+	sky_texture_rect.size = Vector2(world_w + 200, sky_bottom + 80)
+	sky_texture_rect.stretch_mode = TextureRect.STRETCH_SCALE
+	sky_texture_rect.z_index = -12
+	sky_layer.add_child(sky_texture_rect)
+
+	# Horizon glow line (intensifies at dawn/dusk)
+	horizon_glow = Line2D.new()
+	horizon_glow.width = 8.0
+	horizon_glow.default_color = Color(1.0, 0.75, 0.4, 0.0)
+	horizon_glow.z_index = -11
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	horizon_glow.material = mat
+	var half_vp: float = get_viewport_rect().size.x / 2.0
+	horizon_glow.add_point(Vector2(-200, 86))
+	horizon_glow.add_point(Vector2(world_w + 200, 86))
+	sky_layer.add_child(horizon_glow)
+
+func _make_octagon(radius: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in range(8):
+		var angle: float = float(i) / 8.0 * TAU - PI / 8.0
+		pts.append(Vector2(cos(angle) * radius, sin(angle) * radius))
+	return pts
 
 func _build_sun() -> void:
 	sun_node = Node2D.new()
@@ -542,35 +600,56 @@ func _build_sun() -> void:
 	sun_node.visible = false
 	add_child(sun_node)
 
-	# Outer glow
-	var glow := ColorRect.new()
-	glow.size = Vector2(48, 48)
-	glow.position = Vector2(-24, -24)
-	glow.color = Color(1, 0.95, 0.6, 0.12)
-	sun_node.add_child(glow)
+	# Outer glow (large semi-transparent octagon)
+	var glow_poly := Polygon2D.new()
+	glow_poly.polygon = _make_octagon(24.0)
+	glow_poly.color = Color(1.0, 0.95, 0.6, 0.12)
+	sun_node.add_child(glow_poly)
 
-	# Sun body
-	var body := ColorRect.new()
-	body.size = Vector2(24, 24)
-	body.position = Vector2(-12, -12)
-	body.color = Color(1, 0.95, 0.55)
-	sun_node.add_child(body)
+	# PointLight2D for dynamic sun glow
+	var sun_light := PointLight2D.new()
+	sun_light.color = Color(1.0, 0.95, 0.7)
+	sun_light.energy = 0.4
+	sun_light.texture = _make_light_texture()
+	sun_light.texture_scale = 3.0
+	sun_light.blend_mode = PointLight2D.BLEND_MODE_ADD
+	sun_node.add_child(sun_light)
 
-	# Sun core
-	var core := ColorRect.new()
-	core.size = Vector2(14, 14)
-	core.position = Vector2(-7, -7)
-	core.color = Color(1, 1, 0.85)
-	sun_node.add_child(core)
+	# Sun body (octagon)
+	var body_poly := Polygon2D.new()
+	body_poly.polygon = _make_octagon(12.0)
+	body_poly.color = Color(1.0, 0.95, 0.55)
+	sun_node.add_child(body_poly)
 
-	# Sun rays (4 small rects for sparkle)
-	for angle_i in range(4):
-		var ray := ColorRect.new()
-		ray.size = Vector2(2, 6)
-		ray.position = Vector2(-1, -20 if angle_i < 2 else 14)
-		ray.rotation = angle_i * PI / 4.0
-		ray.color = Color(1, 0.95, 0.6, 0.3)
+	# Sun core (smaller octagon)
+	var core_poly := Polygon2D.new()
+	core_poly.polygon = _make_octagon(7.0)
+	core_poly.color = Color(1.0, 1.0, 0.85)
+	sun_node.add_child(core_poly)
+
+	# Ray beams (6 Line2D rays radiating outward)
+	for ri in range(6):
+		var ray := Line2D.new()
+		ray.width = 2.0
+		var angle: float = float(ri) / 6.0 * TAU
+		ray.add_point(Vector2(cos(angle) * 14.0, sin(angle) * 14.0))
+		ray.add_point(Vector2(cos(angle) * 22.0, sin(angle) * 22.0))
+		ray.default_color = Color(1.0, 0.95, 0.6, 0.3)
+		ray.name = "SunRay%d" % ri
 		sun_node.add_child(ray)
+
+func _make_light_texture() -> GradientTexture2D:
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, 1.0])
+	grad.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.width = 64
+	tex.height = 64
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(0.5, 0.0)
+	return tex
 
 func _build_clouds() -> void:
 	var cloud_data: Array = [
@@ -587,34 +666,62 @@ func _build_clouds() -> void:
 		cloud_group.position = Vector2(cd["x"], cd["y"])
 		add_child(cloud_group)
 
-		# Main cloud body (local coords relative to group)
-		var main := ColorRect.new()
-		main.size = Vector2(cd["w"], cd["h"])
-		main.color = Color(0.92, 0.94, 0.98, 0.7)
-		cloud_group.add_child(main)
+		var w: float = cd["w"]
+		var h: float = cd["h"]
+		# Organic cloud body (Polygon2D with puffy outline)
+		var main_poly := Polygon2D.new()
+		var pts: PackedVector2Array = _make_cloud_shape(w, h)
+		main_poly.polygon = pts
+		main_poly.color = Color(0.92, 0.94, 0.98, 0.65)
+		cloud_group.add_child(main_poly)
 
-		# Cloud puff left
-		var puff_l := ColorRect.new()
-		puff_l.position = Vector2(-8, 4)
-		puff_l.size = Vector2(16, cd["h"] - 4)
-		puff_l.color = Color(0.88, 0.92, 0.96, 0.5)
-		cloud_group.add_child(puff_l)
+		# Inner shadow (slightly offset, darker)
+		var shadow_poly := Polygon2D.new()
+		var shadow_pts := PackedVector2Array()
+		for pt in pts:
+			shadow_pts.append(Vector2(pt.x + 1, pt.y + 2))
+		shadow_poly.polygon = shadow_pts
+		shadow_poly.color = Color(0.78, 0.82, 0.90, 0.25)
+		cloud_group.add_child(shadow_poly)
+		cloud_group.move_child(shadow_poly, 0)
 
-		# Cloud puff right
-		var puff_r := ColorRect.new()
-		puff_r.position = Vector2(cd["w"] - 8, 4)
-		puff_r.size = Vector2(16, cd["h"] - 4)
-		puff_r.color = Color(0.88, 0.92, 0.96, 0.5)
-		cloud_group.add_child(puff_r)
-
-		# Cloud highlight top
-		var highlight := ColorRect.new()
-		highlight.position = Vector2(6, -4)
-		highlight.size = Vector2(cd["w"] - 12, 6)
-		highlight.color = Color(0.96, 0.97, 1.0, 0.5)
-		cloud_group.add_child(highlight)
+		# Bright highlight rim on top
+		var hl_poly := Polygon2D.new()
+		var hl_pts := PackedVector2Array()
+		for pi in range(pts.size()):
+			var p: Vector2 = pts[pi]
+			if p.y < h * 0.4:
+				hl_pts.append(Vector2(p.x, p.y - 1))
+		if hl_pts.size() >= 3:
+			hl_pts.append(Vector2(hl_pts[hl_pts.size() - 1].x, h * 0.35))
+			hl_pts.append(Vector2(hl_pts[0].x, h * 0.35))
+			hl_poly.polygon = hl_pts
+			hl_poly.color = Color(0.97, 0.98, 1.0, 0.4)
+			cloud_group.add_child(hl_poly)
 
 		clouds.append(cloud_group)
+
+func _make_cloud_shape(w: float, h: float) -> PackedVector2Array:
+	# Generate a puffy cloud outline (8-12 point organic shape)
+	var pts := PackedVector2Array()
+	var cx: float = w * 0.5
+	var cy: float = h * 0.5
+	# Bottom edge (flat-ish)
+	pts.append(Vector2(w * 0.1, h * 0.8))
+	pts.append(Vector2(w * 0.35, h * 0.9))
+	pts.append(Vector2(w * 0.65, h * 0.9))
+	pts.append(Vector2(w * 0.9, h * 0.8))
+	# Right puff
+	pts.append(Vector2(w * 1.05, h * 0.5))
+	pts.append(Vector2(w * 0.95, h * 0.15))
+	# Top puffs (the puffy bumps)
+	pts.append(Vector2(w * 0.72, h * -0.1))
+	pts.append(Vector2(w * 0.5, h * -0.15))
+	pts.append(Vector2(w * 0.28, h * -0.05))
+	# Left puff
+	pts.append(Vector2(w * 0.05, h * 0.2))
+	pts.append(Vector2(w * -0.05, h * 0.55))
+	return pts
 
 func _build_distant_hills() -> void:
 	var world_w: float = terrain_points[terrain_points.size() - 1].x + 100.0
@@ -704,6 +811,9 @@ func _build_terrain() -> void:
 	terrain_polygon.polygon = ground_points
 	terrain_polygon.color = GROUND_COLOR
 	terrain_polygon.z_index = 0
+	var terrain_mat := ShaderMaterial.new()
+	terrain_mat.shader = TERRAIN_SHADER
+	terrain_polygon.material = terrain_mat
 	add_child(terrain_polygon)
 
 	# Mid soil layer
@@ -984,6 +1094,8 @@ func _build_terrain_zones() -> void:
 	_build_ridge_details()
 	# Basin slope erosion marks
 	_build_slope_erosion()
+	# Phase 1A: Basin striation layers, roots, pebbles
+	_build_basin_striation()
 
 func _build_ridge_details() -> void:
 	# Ridges are between pools: exit_top of pool N through entry_top of pool N+1
@@ -1070,6 +1182,83 @@ func _build_slope_erosion() -> void:
 				lerpf(basin_right.y, exit_top.y, t2) + offset
 			))
 			add_child(erosion)
+
+func _get_basin_bottom_y(geo: Dictionary) -> float:
+	var max_y: float = geo["basin_left"].y
+	for pt in geo["all_points"]:
+		if pt.y > max_y:
+			max_y = pt.y
+	return max_y
+
+func _build_basin_striation() -> void:
+	# Phase 1A: Geological striation layers in pool basins
+	for i in range(SWAMP_COUNT):
+		var geo: Dictionary = _get_swamp_geometry(i)
+		var left_x: float = geo["basin_left"].x
+		var right_x: float = geo["basin_right"].x
+		var bottom_y: float = _get_basin_bottom_y(geo)
+		var entry_y: float = geo["entry_top"].y
+		var depth: float = bottom_y - entry_y
+		if depth < 10:
+			continue
+		# 3-5 thin striation bands at different depths
+		var band_count: int = randi_range(3, 5)
+		for b in range(band_count):
+			var t: float = float(b + 1) / float(band_count + 1)
+			var band_y: float = entry_y + depth * t
+			var band := Line2D.new()
+			band.width = randf_range(0.5, 1.5)
+			band.default_color = Color(
+				GROUND_COLOR.r + randf_range(-0.06, 0.06),
+				GROUND_COLOR.g + randf_range(-0.05, 0.05),
+				GROUND_COLOR.b + randf_range(-0.04, 0.04),
+				randf_range(0.25, 0.45)
+			)
+			band.z_index = 0
+			# Horizontal band across basin
+			var bx: float = left_x + 4
+			while bx < right_x - 4:
+				band.add_point(Vector2(bx, band_y + randf_range(-1.5, 1.5)))
+				bx += randf_range(6, 14)
+			add_child(band)
+		# Root tendrils on slopes near water
+		for side in range(2):
+			var slope_x: float = left_x if side == 0 else right_x
+			var slope_dir: float = 1.0 if side == 0 else -1.0
+			for r in range(randi_range(1, 3)):
+				var root_y: float = entry_y + randf_range(3, depth * 0.6)
+				var root := Line2D.new()
+				root.width = 1.0
+				root.default_color = Color(0.25, 0.15, 0.08, randf_range(0.3, 0.5))
+				root.z_index = 1
+				var rx: float = slope_x
+				var ry: float = root_y
+				root.add_point(Vector2(rx, ry))
+				for seg in range(randi_range(2, 4)):
+					rx += slope_dir * randf_range(2, 6)
+					ry += randf_range(-2, 3)
+					root.add_point(Vector2(rx, ry))
+				add_child(root)
+	# Pebble scatter on ridges
+	for i in range(terrain_points.size() - 1):
+		var p1: Vector2 = terrain_points[i]
+		var p2: Vector2 = terrain_points[i + 1]
+		var slope: float = absf(p2.y - p1.y) / maxf(absf(p2.x - p1.x), 1.0)
+		if slope < 0.15:  # Flat enough for pebbles
+			for _p in range(randi_range(0, 2)):
+				var px: float = randf_range(p1.x, p2.x)
+				var py: float = _get_terrain_y_at(px) - randf_range(0, 1)
+				var peb := ColorRect.new()
+				peb.size = Vector2(randf_range(1, 2), 1)
+				peb.color = Color(
+					randf_range(0.35, 0.55),
+					randf_range(0.28, 0.42),
+					randf_range(0.18, 0.30),
+					randf_range(0.4, 0.7)
+				)
+				peb.position = Vector2(px, py)
+				peb.z_index = 1
+				add_child(peb)
 
 func _build_vegetation() -> void:
 	# Cattails near water edges
@@ -1175,10 +1364,20 @@ func _place_cattail(pos: Vector2) -> void:
 	cattails.append(cattail)
 
 func _place_grass_tuft(pos: Vector2) -> void:
+	# Color zone: darker near water, lighter on dry ridges
+	var near_water: float = 0.0
+	for si in range(SWAMP_COUNT):
+		var geo: Dictionary = _get_swamp_geometry(si)
+		var pool_cx: float = (geo["entry_top"].x + geo["exit_top"].x) * 0.5
+		var dist: float = absf(pos.x - pool_cx)
+		var pool_w: float = (geo["exit_top"].x - geo["entry_top"].x) * 0.6
+		if dist < pool_w:
+			near_water = maxf(near_water, 1.0 - dist / pool_w)
+	var base_color: Color = GRASS_LIGHT_COLOR.lerp(Color(0.18, 0.42, 0.12), near_water)
 	for k in range(randi_range(2, 4)):
 		var blade := Line2D.new()
 		blade.width = 1.6
-		blade.default_color = GRASS_COLOR.lerp(GRASS_LIGHT_COLOR, randf())
+		blade.default_color = base_color.lerp(GRASS_LIGHT_COLOR, randf() * 0.3)
 		blade.default_color.a = randf_range(0.6, 1.0)
 		var blade_h: float = randf_range(6, 12)
 		var blade_lean: float = randf_range(-4, 4)
@@ -1186,6 +1385,7 @@ func _place_grass_tuft(pos: Vector2) -> void:
 		blade.add_point(Vector2(pos.x + blade_lean, pos.y - blade_h))
 		blade.z_index = 1
 		add_child(blade)
+		grass_blades.append(blade)
 
 # --- Stars ---
 func _build_stars() -> void:
@@ -1209,7 +1409,8 @@ func _build_fireflies() -> void:
 		fly.color = Color(0.8, 1.0, 0.3, 0.0)
 		fly.z_index = 6
 		var base_x: float = randf_range(50, terrain_points[terrain_points.size() - 1].x - 30)
-		var base_y: float = minf(randf_range(60, 130), _get_terrain_y_at(base_x) - 15.0)
+		var terrain_at_ff: float = _get_terrain_y_at(base_x)
+		var base_y: float = terrain_at_ff - randf_range(10, 45)
 		fly.position = Vector2(base_x, base_y)
 		add_child(fly)
 		# Additive glow pool under each firefly
@@ -1517,30 +1718,41 @@ func _build_moon() -> void:
 	moon = Node2D.new()
 	moon.z_index = -11
 	add_child(moon)
-	# Moon glow
-	moon_glow = ColorRect.new()
-	moon_glow.size = Vector2(40, 40)
-	moon_glow.position = Vector2(-20, -20)
+	# Moon glow (large semi-transparent octagon)
+	moon_glow = Polygon2D.new()
+	moon_glow.polygon = _make_octagon(20.0)
 	moon_glow.color = Color(0.7, 0.75, 0.9, 0.0)
 	moon.add_child(moon_glow)
-	# Moon body
-	moon_body = ColorRect.new()
-	moon_body.size = Vector2(16, 16)
-	moon_body.position = Vector2(-8, -8)
+	# PointLight2D for moonlight
+	var moon_light := PointLight2D.new()
+	moon_light.color = Color(0.7, 0.75, 0.95)
+	moon_light.energy = 0.2
+	moon_light.texture = _make_light_texture()
+	moon_light.texture_scale = 2.5
+	moon_light.blend_mode = PointLight2D.BLEND_MODE_ADD
+	moon.add_child(moon_light)
+	# Moon body (octagon)
+	moon_body = Polygon2D.new()
+	moon_body.polygon = _make_octagon(8.0)
 	moon_body.color = Color(0.9, 0.92, 1.0, 0.0)
 	moon.add_child(moon_body)
-	# Moon highlight (crescent effect)
-	var moon_hl := ColorRect.new()
-	moon_hl.size = Vector2(10, 12)
-	moon_hl.position = Vector2(-4, -6)
+	# Moon highlight (smaller crescent octagon)
+	var moon_hl := Polygon2D.new()
+	moon_hl.polygon = _make_octagon(5.0)
+	moon_hl.position = Vector2(-2, -1)
 	moon_hl.color = Color(1.0, 1.0, 1.0, 0.0)
 	moon.add_child(moon_hl)
-	# Moon crater
-	var crater := ColorRect.new()
-	crater.size = Vector2(3, 3)
-	crater.position = Vector2(1, -2)
-	crater.color = Color(0.75, 0.78, 0.88, 0.0)
-	moon.add_child(crater)
+	# Craters (2 tiny darker octagon dots)
+	var crater1 := Polygon2D.new()
+	crater1.polygon = _make_octagon(1.5)
+	crater1.position = Vector2(2, -1)
+	crater1.color = Color(0.75, 0.78, 0.88, 0.0)
+	moon.add_child(crater1)
+	var crater2 := Polygon2D.new()
+	crater2.polygon = _make_octagon(1.0)
+	crater2.position = Vector2(-2, 3)
+	crater2.color = Color(0.78, 0.80, 0.90, 0.0)
+	moon.add_child(crater2)
 	moon.position = Vector2(1500, 30)
 
 # --- Foam Lines (Shore Froth) ---
@@ -1629,7 +1841,8 @@ func _build_dragonflies() -> void:
 		wing_r.color = Color(0.8, 0.9, 1.0, 0.4)
 		df.add_child(wing_r)
 		var base_x: float = randf_range(80, terrain_points[terrain_points.size() - 1].x - 60)
-		var base_y: float = minf(randf_range(60, 130), _get_terrain_y_at(base_x) - 20.0)
+		var terrain_at_df: float = _get_terrain_y_at(base_x)
+		var base_y: float = terrain_at_df - randf_range(15, 50)
 		df.position = Vector2(base_x, base_y)
 		dragonflies.append({
 			"node": df,
@@ -1665,6 +1878,32 @@ func _build_water_highlights() -> void:
 				"phase": randf() * TAU,
 			})
 
+# --- Pool Glow Lights (Phase 4A) ---
+func _build_pool_glow_lights() -> void:
+	for i in range(SWAMP_COUNT):
+		var geo: Dictionary = _get_swamp_geometry(i)
+		var bl: Vector2 = geo["basin_left"]
+		var br: Vector2 = geo["basin_right"]
+		var center_x: float = (bl.x + br.x) * 0.5
+		var center_y: float = maxf(bl.y, br.y) - 4.0
+		var light := PointLight2D.new()
+		light.position = Vector2(center_x, center_y)
+		light.color = SWAMP_WATER_COLORS[i]
+		light.energy = 0.0
+		light.texture = _make_light_texture()
+		light.texture_scale = 1.5 + float(i) * 0.3
+		light.blend_mode = PointLight2D.BLEND_MODE_ADD
+		light.z_index = 2
+		add_child(light)
+		pool_glow_lights.append(light)
+
+func _update_pool_glow_lights() -> void:
+	for i in range(pool_glow_lights.size()):
+		var fill: float = GameManager.get_swamp_fill_fraction(i)
+		var base_energy: float = fill * 0.3
+		var pulse: float = sin(wave_time * 0.8 + float(i) * 1.5) * 0.05
+		pool_glow_lights[i].energy = maxf(base_energy + pulse, 0.0)
+
 # --- Bubble Spawner ---
 func _spawn_bubble(swamp_index: int) -> void:
 	if bubbles.size() >= 12:
@@ -1694,35 +1933,50 @@ func _spawn_bubble(swamp_index: int) -> void:
 
 # --- Bird Spawner ---
 func _spawn_bird() -> void:
-	if birds.size() >= 3:
+	if birds.size() >= 8:
 		return
-	var bird := Node2D.new()
-	bird.z_index = -7
-	add_child(bird)
-	# Simple V-shape silhouette
-	var wing_l := Line2D.new()
-	wing_l.width = 1.5
-	wing_l.default_color = Color(0.1, 0.1, 0.15, 0.6)
-	wing_l.add_point(Vector2(-4, 2))
-	wing_l.add_point(Vector2(0, 0))
-	bird.add_child(wing_l)
-	var wing_r := Line2D.new()
-	wing_r.width = 1.5
-	wing_r.default_color = Color(0.1, 0.1, 0.15, 0.6)
-	wing_r.add_point(Vector2(0, 0))
-	wing_r.add_point(Vector2(4, 2))
-	bird.add_child(wing_r)
-	var start_x: float = -20
-	var start_y: float = randf_range(20, 90)
-	bird.position = Vector2(start_x, start_y)
-	birds.append({
-		"node": bird,
-		"wing_l": wing_l,
-		"wing_r": wing_r,
-		"speed": randf_range(30, 55),
-		"flap_speed": randf_range(4.0, 7.0),
-		"y_drift": randf_range(-0.3, 0.3),
-	})
+	# 40% chance to spawn a flock of 3-5, otherwise single bird
+	var flock_count: int = 1
+	if randf() < 0.4:
+		flock_count = randi_range(3, 5)
+	var cam_bird: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	var cam_cy: float = cam_bird.get_screen_center_position().y if cam_bird else 90.0
+	var cam_cx: float = cam_bird.get_screen_center_position().x if cam_bird else 320.0
+	var base_x: float = cam_cx - 350
+	var terrain_at_spawn: float = _get_terrain_y_at(base_x)
+	var base_y: float = terrain_at_spawn - randf_range(30, 80)
+	var base_speed: float = randf_range(30, 55)
+	var base_flap: float = randf_range(4.0, 7.0)
+	for fi in range(flock_count):
+		if birds.size() >= 8:
+			break
+		var bird := Node2D.new()
+		bird.z_index = -7
+		add_child(bird)
+		var wing_l := Line2D.new()
+		wing_l.width = 1.5
+		wing_l.default_color = Color(0.1, 0.1, 0.15, 0.6)
+		wing_l.add_point(Vector2(-4, 2))
+		wing_l.add_point(Vector2(0, 0))
+		bird.add_child(wing_l)
+		var wing_r := Line2D.new()
+		wing_r.width = 1.5
+		wing_r.default_color = Color(0.1, 0.1, 0.15, 0.6)
+		wing_r.add_point(Vector2(0, 0))
+		wing_r.add_point(Vector2(4, 2))
+		bird.add_child(wing_r)
+		# V-formation offset: leader at front, followers behind and to sides
+		var offset_x: float = -float(fi) * randf_range(8, 14)
+		var offset_y: float = float(fi) * (4.0 if fi % 2 == 0 else -4.0) * randf_range(0.5, 1.0)
+		bird.position = Vector2(base_x + offset_x, base_y + offset_y)
+		birds.append({
+			"node": bird,
+			"wing_l": wing_l,
+			"wing_r": wing_r,
+			"speed": base_speed + randf_range(-3, 3),
+			"flap_speed": base_flap + randf_range(-0.5, 0.5),
+			"y_drift": randf_range(-0.3, 0.3),
+		})
 
 # --- Pollen Spawner ---
 func _spawn_pollen() -> void:
@@ -1820,7 +2074,8 @@ func _spawn_butterfly() -> void:
 	bf_node.add_child(ant_r)
 
 	var bx: float = cam_x + randf_range(-350, 350)
-	var by: float = randf_range(20, 105)
+	var terrain_at_bf: float = _get_terrain_y_at(bx)
+	var by: float = terrain_at_bf - randf_range(10, 40)
 	bf_node.position = Vector2(bx, by)
 	butterflies.append({
 		"node": bf_node,
@@ -1834,6 +2089,51 @@ func _spawn_butterfly() -> void:
 		"lifetime": 0.0,
 		"max_life": randf_range(8, 18),
 	})
+
+# --- Crickets (nighttime ambient) ---
+func _build_crickets() -> void:
+	for i in range(SWAMP_COUNT):
+		var geo: Dictionary = _get_swamp_geometry(i)
+		var entry: Vector2 = geo["entry_top"]
+		var exit_pt: Vector2 = geo["exit_top"]
+		# Place 1-2 crickets on ridges near each pool
+		for k in range(randi_range(1, 2)):
+			var side: bool = k == 0
+			var cx: float = entry.x - randf_range(5, 25) if side else exit_pt.x + randf_range(5, 25)
+			var cy: float = _get_terrain_y_at(cx) - 1.0
+			var cricket_node := Node2D.new()
+			cricket_node.z_index = 3
+			cricket_node.visible = false
+			add_child(cricket_node)
+			var body := ColorRect.new()
+			body.size = Vector2(3, 2)
+			body.position = Vector2(-1.5, -2)
+			body.color = Color(0.12, 0.10, 0.06, 0.85)
+			cricket_node.add_child(body)
+			var leg_l := ColorRect.new()
+			leg_l.size = Vector2(2, 1)
+			leg_l.position = Vector2(-3, -1)
+			leg_l.color = Color(0.15, 0.12, 0.07, 0.7)
+			cricket_node.add_child(leg_l)
+			var leg_r := ColorRect.new()
+			leg_r.size = Vector2(2, 1)
+			leg_r.position = Vector2(1.5, -1)
+			leg_r.color = Color(0.15, 0.12, 0.07, 0.7)
+			cricket_node.add_child(leg_r)
+			# Chirp flash pixel
+			var chirp := ColorRect.new()
+			chirp.size = Vector2(2, 2)
+			chirp.position = Vector2(-1, -4)
+			chirp.color = Color(1.0, 0.95, 0.4, 0.0)
+			cricket_node.add_child(chirp)
+			cricket_node.position = Vector2(cx, cy)
+			crickets.append({
+				"node": cricket_node,
+				"chirp_ref": chirp,
+				"chirp_timer": randf_range(2.0, 8.0),
+				"chirping": false,
+				"chirp_flash": 0.0,
+			})
 
 func _spawn_shooting_star() -> void:
 	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
@@ -1903,6 +2203,14 @@ func _build_fish() -> void:
 			belly.position = Vector2(-2, 0.5)
 			belly.color = Color(0.9, 0.85, 0.7, 0.5)
 			fish_node.add_child(belly)
+			# Dorsal fin (Line2D triangle)
+			var fin := Line2D.new()
+			fin.width = 1.0
+			fin.default_color = Color.from_hsv(fish_hue, 0.55, 0.55, 0.8)
+			fin.add_point(Vector2(-1, -1.5))
+			fin.add_point(Vector2(0, -4))
+			fin.add_point(Vector2(2, -1.5))
+			fish_node.add_child(fin)
 
 			var fx: float = basin_left.x + randf_range(12, basin_w - 12)
 			fish.append({
@@ -1974,6 +2282,17 @@ func _build_frogs() -> void:
 		belly.position = Vector2(-1.5, -4)
 		belly.color = Color(0.55, 0.7, 0.35, 0.7)
 		frog_node.add_child(belly)
+		# Rear legs (angled behind body)
+		var leg_l := ColorRect.new()
+		leg_l.size = Vector2(3, 2)
+		leg_l.position = Vector2(-4, -3)
+		leg_l.color = Color(0.18, 0.45, 0.12, 0.9)
+		frog_node.add_child(leg_l)
+		var leg_r := ColorRect.new()
+		leg_r.size = Vector2(3, 2)
+		leg_r.position = Vector2(2, -3)
+		leg_r.color = Color(0.18, 0.45, 0.12, 0.9)
+		frog_node.add_child(leg_r)
 
 		frogs.append({
 			"node": frog_node,
@@ -2152,6 +2471,13 @@ func _build_turtles() -> void:
 			leg.position = Vector2(tx + lx - 1, ty - 1)
 			leg.color = Color(0.3, 0.42, 0.18, 0.9)
 			turtle_node.add_child(leg)
+		# Tail (small Line2D)
+		var tail := Line2D.new()
+		tail.width = 1.0
+		tail.default_color = Color(0.32, 0.42, 0.18, 0.8)
+		tail.add_point(Vector2(tx - 4, ty - 3))
+		tail.add_point(Vector2(tx - 7, ty - 2))
+		turtle_node.add_child(tail)
 		turtles.append({
 			"node": turtle_node,
 			"swamp": i,
@@ -3073,12 +3399,26 @@ func _build_camels() -> void:
 		tail.color = Color(0.62, 0.48, 0.28)
 		camel_node.add_child(tail)
 
+		# Saddle/harness band across hump
+		var saddle := ColorRect.new()
+		saddle.size = Vector2(12, 3)
+		saddle.position = Vector2(-4, -24)
+		saddle.color = Color(0.6, 0.25, 0.15)
+		camel_node.add_child(saddle)
+
 		# Saddlebag (shows water fill)
 		var bag := ColorRect.new()
 		bag.size = Vector2(10, 6)
 		bag.position = Vector2(-7, -18)
 		bag.color = Color(0.5, 0.38, 0.2)
 		camel_node.add_child(bag)
+
+		# Water fill indicator (blue tint overlay on bag)
+		var water_fill := ColorRect.new()
+		water_fill.size = Vector2(8, 4)
+		water_fill.position = Vector2(-6, -17)
+		water_fill.color = Color(0.3, 0.55, 0.85, 0.0)
+		camel_node.add_child(water_fill)
 
 		add_child(camel_node)
 		camels.append({
@@ -3094,8 +3434,10 @@ func _build_camels() -> void:
 			"tail": tail,
 			"bag": bag,
 			"eye": eye,
+			"water_fill": water_fill,
 			"walk_time": 0.0,
-			"facing_right": true
+			"facing_right": true,
+			"dust_timer": 0.0,
 		})
 
 func _update_camels(delta: float) -> void:
@@ -3189,7 +3531,7 @@ func _update_camels(delta: float) -> void:
 				cd["dust_timer"] = 0.0
 				_spawn_camel_dust(cs["x"], node.position.y)
 
-		# Update saddlebag color based on water fill
+		# Update saddlebag color + water fill indicator based on water
 		var bag: ColorRect = cd["bag"]
 		var fill_frac: float = 0.0
 		if camel_cap > 0.0:
@@ -3198,6 +3540,11 @@ func _update_camels(delta: float) -> void:
 			bag.color = Color(0.5, 0.38, 0.2).lerp(Color(0.25, 0.45, 0.7), fill_frac)
 		else:
 			bag.color = Color(0.5, 0.38, 0.2)
+		# Water fill overlay indicator
+		if cd.has("water_fill"):
+			var wf: ColorRect = cd["water_fill"]
+			wf.color.a = fill_frac * 0.5
+			wf.size.y = fill_frac * 4.0
 
 func _animate_camel_walk(cd: Dictionary) -> void:
 	var wt: float = cd["walk_time"]
@@ -3261,12 +3608,362 @@ func _spawn_camel_sell_text(x: float, y: float, earned: float) -> void:
 	label.add_theme_constant_override("shadow_offset_y", 1)
 	label.position = Vector2(x - 20, y)
 	label.z_index = 10
+	label.pivot_offset = Vector2(20, 8)
+	label.scale = Vector2(0.5, 0.5)
 	add_child(label)
 
 	var tween := create_tween()
-	tween.tween_property(label, "position:y", label.position.y - 32, 0.8)
+	tween.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1).set_ease(Tween.EASE_IN_OUT)
+	tween.parallel().tween_property(label, "position:y", label.position.y - 32, 0.8)
 	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.8)
 	tween.tween_callback(label.queue_free)
+
+# --- Elephant ---
+func _on_elephant_changed() -> void:
+	_build_elephant()
+
+func _build_elephant() -> void:
+	# Remove existing elephant node
+	if elephant_data.has("node") and is_instance_valid(elephant_data["node"]):
+		elephant_data["node"].queue_free()
+	elephant_data.clear()
+
+	if not GameManager.elephant_owned:
+		return
+
+	var el_node := Node2D.new()
+	el_node.z_index = 3
+
+	var start_x: float = GameManager.elephant_state["x"]
+	el_node.position = Vector2(start_x, _get_terrain_y_at(start_x))
+
+	# Body (chunky gray)
+	var body := ColorRect.new()
+	body.size = Vector2(12, 10)
+	body.position = Vector2(-6, -16)
+	body.color = Color(0.55, 0.55, 0.58)
+	el_node.add_child(body)
+
+	# Head (slightly lighter)
+	var head := ColorRect.new()
+	head.size = Vector2(6, 6)
+	head.position = Vector2(5, -20)
+	head.color = Color(0.6, 0.6, 0.63)
+	el_node.add_child(head)
+
+	# Left ear
+	var ear_l := ColorRect.new()
+	ear_l.size = Vector2(4, 5)
+	ear_l.position = Vector2(-2, -22)
+	ear_l.color = Color(0.48, 0.48, 0.52)
+	el_node.add_child(ear_l)
+
+	# Right ear
+	var ear_r := ColorRect.new()
+	ear_r.size = Vector2(4, 5)
+	ear_r.position = Vector2(9, -22)
+	ear_r.color = Color(0.48, 0.48, 0.52)
+	el_node.add_child(ear_r)
+
+	# Front legs
+	var leg_fl := ColorRect.new()
+	leg_fl.size = Vector2(2, 4)
+	leg_fl.position = Vector2(2, -6)
+	leg_fl.color = Color(0.5, 0.5, 0.53)
+	el_node.add_child(leg_fl)
+
+	var leg_fr := ColorRect.new()
+	leg_fr.size = Vector2(2, 4)
+	leg_fr.position = Vector2(5, -6)
+	leg_fr.color = Color(0.47, 0.47, 0.5)
+	el_node.add_child(leg_fr)
+
+	# Back legs
+	var leg_bl := ColorRect.new()
+	leg_bl.size = Vector2(2, 4)
+	leg_bl.position = Vector2(-5, -6)
+	leg_bl.color = Color(0.5, 0.5, 0.53)
+	el_node.add_child(leg_bl)
+
+	var leg_br := ColorRect.new()
+	leg_br.size = Vector2(2, 4)
+	leg_br.position = Vector2(-2, -6)
+	leg_br.color = Color(0.47, 0.47, 0.5)
+	el_node.add_child(leg_br)
+
+	# Trunk (Line2D, 2px wide, 3 points)
+	var trunk := Line2D.new()
+	trunk.width = 2.0
+	trunk.default_color = Color(0.58, 0.58, 0.61)
+	trunk.add_point(Vector2(8, -17))   # base at head
+	trunk.add_point(Vector2(10, -12))  # mid
+	trunk.add_point(Vector2(9, -7))    # tip hangs down
+	el_node.add_child(trunk)
+
+	# Tail
+	var tail := ColorRect.new()
+	tail.size = Vector2(1, 6)
+	tail.position = Vector2(-7, -14)
+	tail.color = Color(0.5, 0.5, 0.53)
+	el_node.add_child(tail)
+
+	# Eye
+	var eye := ColorRect.new()
+	eye.size = Vector2(1, 1)
+	eye.position = Vector2(9, -19)
+	eye.color = Color(0.12, 0.1, 0.08)
+	el_node.add_child(eye)
+
+	add_child(el_node)
+	elephant_data = {
+		"node": el_node,
+		"body": body,
+		"head": head,
+		"ear_l": ear_l,
+		"ear_r": ear_r,
+		"leg_fl": leg_fl,
+		"leg_fr": leg_fr,
+		"leg_bl": leg_bl,
+		"leg_br": leg_br,
+		"trunk": trunk,
+		"tail": tail,
+		"eye": eye,
+		"walk_time": 0.0,
+		"facing_right": true,
+		"dust_timer": 0.0,
+	}
+
+func _update_elephant(delta: float) -> void:
+	if elephant_data.is_empty():
+		return
+	var es: Dictionary = GameManager.elephant_state
+	var ed: Dictionary = elephant_data
+	var node: Node2D = ed["node"]
+	var trunk_cap: float = GameManager.get_elephant_trunk_capacity()
+	var trot_speed: float = GameManager.get_elephant_trot_speed()
+	var trunk_str: float = GameManager.get_elephant_trunk_strength()
+
+	match es["state"]:
+		"idle":
+			_animate_elephant_idle(ed)
+			# Find nearest undrained pool
+			var best_idx: int = -1
+			var best_dist: float = 999999.0
+			for i in range(SWAMP_COUNT):
+				if GameManager.is_swamp_completed(i):
+					continue
+				if GameManager.get_swamp_fill_fraction(i) <= 0.001:
+					continue
+				var geo: Dictionary = _get_swamp_geometry(i)
+				var pool_center_x: float = (geo["entry_top"].x + geo["exit_top"].x) * 0.5
+				var dist: float = absf(es["x"] - pool_center_x)
+				if dist < best_dist:
+					best_dist = dist
+					best_idx = i
+			if best_idx >= 0:
+				es["target_swamp"] = best_idx
+				es["state"] = "to_water"
+				es["state_timer"] = 0.0
+
+		"to_water":
+			var target_idx: int = es["target_swamp"]
+			if target_idx < 0 or target_idx >= SWAMP_COUNT or GameManager.is_swamp_completed(target_idx):
+				es["state"] = "idle"
+				es["state_timer"] = 0.0
+			else:
+				var geo: Dictionary = _get_swamp_geometry(target_idx)
+				# Walk to entry side of pool
+				var target_x: float = geo["entry_top"].x + 10.0
+				var dx: float = target_x - es["x"]
+				if absf(dx) > 8.0:
+					var dir: float = signf(dx)
+					es["x"] += dir * trot_speed * delta
+					ed["facing_right"] = dir > 0.0
+					ed["walk_time"] += delta * 6.0
+					_animate_elephant_walk(ed)
+				else:
+					es["state"] = "scooping"
+					es["source_swamp"] = target_idx
+					es["scoop_timer"] = 0.0
+					es["state_timer"] = 0.0
+
+		"scooping":
+			_animate_elephant_scoop(ed, es["scoop_timer"])
+			es["scoop_timer"] += delta
+			if es["scoop_timer"] >= GameManager.ELEPHANT_SCOOP_INTERVAL:
+				es["scoop_timer"] -= GameManager.ELEPHANT_SCOOP_INTERVAL
+				var remaining_space: float = trunk_cap - es["water_carried"]
+				if remaining_space <= 0.001:
+					# Trunk full -> go sell
+					es["state"] = "to_shop"
+					es["state_timer"] = 0.0
+				else:
+					var scoop_amount: float = minf(trunk_str, remaining_space)
+					var actual: float = GameManager.elephant_scoop_water(es["source_swamp"], scoop_amount)
+					if actual > 0.0:
+						es["water_carried"] += actual
+						_spawn_elephant_scoop_splash(es["x"] + 10, _get_terrain_y_at(es["x"] + 10))
+					else:
+						# Pool empty
+						if es["water_carried"] > 0.001:
+							es["state"] = "to_shop"
+							es["state_timer"] = 0.0
+						else:
+							es["state"] = "idle"
+							es["state_timer"] = 0.0
+
+		"to_shop":
+			var shop_x: float = 30.0
+			var dx2: float = shop_x - es["x"]
+			if absf(dx2) > 5.0:
+				var dir2: float = signf(dx2)
+				es["x"] += dir2 * trot_speed * delta
+				ed["facing_right"] = dir2 > 0.0
+				ed["walk_time"] += delta * 6.0
+				_animate_elephant_walk(ed)
+			else:
+				es["state"] = "selling"
+				es["state_timer"] = 0.0
+				_animate_elephant_idle(ed)
+
+		"selling":
+			_animate_elephant_idle(ed)
+			es["state_timer"] += delta
+			if es["state_timer"] >= 0.5:
+				var earned: float = GameManager.elephant_sell_water()
+				if earned > 0.01:
+					_spawn_elephant_sell_text(es["x"], _get_terrain_y_at(es["x"]) - 30, earned)
+				es["state"] = "idle"
+				es["state_timer"] = 0.0
+
+	# Update position on terrain
+	var terrain_y: float = _get_terrain_y_at(es["x"])
+	if terrain_y > 0:
+		node.position = Vector2(es["x"], terrain_y)
+	else:
+		node.position.x = es["x"]
+
+	# Flip direction
+	node.scale.x = 1.0 if ed["facing_right"] else -1.0
+
+	# Dust trail when walking
+	var is_walking: bool = (es["state"] == "to_water" or es["state"] == "to_shop")
+	if is_walking:
+		ed["dust_timer"] += delta
+		if ed["dust_timer"] >= 0.35:
+			ed["dust_timer"] = 0.0
+			_spawn_elephant_dust(es["x"], node.position.y)
+
+	# Trunk visual: curl up when carrying water
+	var trunk_line: Line2D = ed["trunk"]
+	var fill_frac: float = 0.0
+	if trunk_cap > 0.0:
+		fill_frac = clampf(es["water_carried"] / trunk_cap, 0.0, 1.0)
+	if fill_frac > 0.01:
+		# Trunk curls up when carrying
+		trunk_line.set_point_position(1, Vector2(10, -14 - fill_frac * 3))
+		trunk_line.set_point_position(2, Vector2(12, -16 - fill_frac * 4))
+		trunk_line.default_color = Color(0.58, 0.58, 0.61).lerp(Color(0.35, 0.55, 0.75), fill_frac * 0.5)
+	else:
+		# Trunk hangs down idle
+		trunk_line.set_point_position(1, Vector2(10, -12))
+		trunk_line.set_point_position(2, Vector2(9, -7))
+		trunk_line.default_color = Color(0.58, 0.58, 0.61)
+
+func _animate_elephant_walk(ed: Dictionary) -> void:
+	var wt: float = ed["walk_time"]
+	var leg_offset: float = sin(wt) * 2.0
+	ed["leg_fl"].position.y = -6.0 + leg_offset
+	ed["leg_fr"].position.y = -6.0 - leg_offset
+	ed["leg_bl"].position.y = -6.0 - leg_offset
+	ed["leg_br"].position.y = -6.0 + leg_offset
+	# Body bob
+	var bob: float = sin(wt * 2.0) * 0.8
+	ed["body"].position.y = -16.0 + bob
+	ed["head"].position.y = -20.0 + bob
+	ed["eye"].position.y = -19.0 + bob
+	# Ear flop
+	var ear_flop: float = sin(wt * 2.5) * 1.5
+	ed["ear_l"].position.y = -22.0 + ear_flop
+	ed["ear_r"].position.y = -22.0 - ear_flop
+	# Tail swing
+	var tail_swing: float = sin(wt * 1.5) * 1.5
+	ed["tail"].position.x = -7.0 + tail_swing
+
+func _animate_elephant_idle(ed: Dictionary) -> void:
+	var breath: float = sin(Time.get_ticks_msec() * 0.002) * 0.4
+	ed["body"].position.y = -16.0 + breath
+	ed["head"].position.y = -20.0 + breath * 0.5
+	ed["eye"].position.y = -19.0 + breath * 0.5
+	ed["ear_l"].position.y = -22.0 + breath * 0.3
+	ed["ear_r"].position.y = -22.0 + breath * 0.3
+	# Reset legs
+	ed["leg_fl"].position.y = -6.0
+	ed["leg_fr"].position.y = -6.0
+	ed["leg_bl"].position.y = -6.0
+	ed["leg_br"].position.y = -6.0
+	ed["tail"].position.x = -7.0
+
+func _animate_elephant_scoop(ed: Dictionary, timer: float) -> void:
+	# Trunk dips down during scoop cycle
+	var trunk_line: Line2D = ed["trunk"]
+	var progress: float = fmod(timer, GameManager.ELEPHANT_SCOOP_INTERVAL) / GameManager.ELEPHANT_SCOOP_INTERVAL
+	var dip: float = sin(progress * PI) * 5.0
+	trunk_line.set_point_position(1, Vector2(10, -12 + dip * 0.5))
+	trunk_line.set_point_position(2, Vector2(9, -7 + dip))
+	# Idle body
+	_animate_elephant_idle(ed)
+
+func _spawn_elephant_dust(x: float, y: float) -> void:
+	for i in range(2):
+		var dust := ColorRect.new()
+		dust.size = Vector2(2, 2)
+		dust.color = Color(0.5, 0.5, 0.55, 0.35)
+		dust.position = Vector2(x + randf_range(-3, 3), y + randf_range(-2, 0))
+		dust.z_index = -1
+		add_child(dust)
+		var tw := create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(dust, "position", dust.position + Vector2(randf_range(-5, 5), randf_range(-5, -2)), 0.5)
+		tw.tween_property(dust, "modulate:a", 0.0, 0.5)
+		tw.set_parallel(false)
+		tw.tween_callback(dust.queue_free)
+
+func _spawn_elephant_scoop_splash(x: float, y: float) -> void:
+	for i in range(3):
+		var splash := ColorRect.new()
+		splash.size = Vector2(2, 2)
+		splash.color = Color(0.3, 0.6, 0.9, 0.6)
+		splash.position = Vector2(x + randf_range(-4, 4), y + randf_range(-3, 0))
+		splash.z_index = 4
+		add_child(splash)
+		var tw := create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(splash, "position", splash.position + Vector2(randf_range(-8, 8), randf_range(-12, -4)), 0.4)
+		tw.tween_property(splash, "modulate:a", 0.0, 0.4)
+		tw.set_parallel(false)
+		tw.tween_callback(splash.queue_free)
+
+func _spawn_elephant_sell_text(x: float, y: float, earned: float) -> void:
+	var label := Label.new()
+	label.text = "+%s" % Economy.format_money(earned)
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", Color(0.4, 1.0, 0.5))
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.7))
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	label.position = Vector2(x - 20, y)
+	label.z_index = 10
+	label.pivot_offset = Vector2(20, 8)
+	label.scale = Vector2(0.5, 0.5)
+	add_child(label)
+	var tw := create_tween()
+	tw.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1).set_ease(Tween.EASE_OUT)
+	tw.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1).set_ease(Tween.EASE_IN_OUT)
+	tw.parallel().tween_property(label, "position:y", label.position.y - 28, 0.8)
+	tw.parallel().tween_property(label, "modulate:a", 0.0, 0.8)
+	tw.tween_callback(label.queue_free)
 
 func _on_water_level_changed(swamp_index: int, _percent: float) -> void:
 	if swamp_index >= 0 and swamp_index < SWAMP_COUNT:
@@ -3278,6 +3975,8 @@ func _on_water_level_changed(swamp_index: int, _percent: float) -> void:
 			var pct: float = GameManager.get_swamp_water_percent(swamp_index)
 			swamp_percent_labels[swamp_index].text = "%.1f%%" % pct
 		_check_cave_entrance_updates(swamp_index)
+		# Phase 8B: Pool drain milestones
+		_check_pool_milestones(swamp_index)
 
 func _on_swamp_completed(swamp_index: int, _reward: float) -> void:
 	if swamp_index >= 0 and swamp_index < swamp_labels.size():
@@ -3530,14 +4229,16 @@ func _build_drain_reveals() -> void:
 		# 50% - exposed rocks
 		var rock1 := ColorRect.new()
 		rock1.size = Vector2(5, 4)
-		rock1.position = Vector2(cx - 15, by - 3)
+		var rock1_x: float = cx - 15
+		rock1.position = Vector2(rock1_x, _get_terrain_y_at(rock1_x) - 4)
 		rock1.color = Color(0.42, 0.4, 0.38, 0.85)
 		rock1.z_index = 1
 		rock1.visible = false
 		add_child(rock1)
 		var rock2 := ColorRect.new()
 		rock2.size = Vector2(4, 3)
-		rock2.position = Vector2(cx + 10, by - 2)
+		var rock2_x: float = cx + 10
+		rock2.position = Vector2(rock2_x, _get_terrain_y_at(rock2_x) - 3)
 		rock2.color = Color(0.38, 0.36, 0.34, 0.85)
 		rock2.z_index = 1
 		rock2.visible = false
@@ -3643,6 +4344,268 @@ func _milestone_flash() -> void:
 			stw.parallel().tween_property(spark, "modulate:a", 0.0, 0.5)
 			stw.tween_callback(spark.queue_free)
 
+# --- Pool Drain Milestones (Phase 8B) ---
+func _check_pool_milestones(swamp_index: int) -> void:
+	var fill: float = GameManager.get_swamp_fill_fraction(swamp_index)
+	var si_key: String = str(swamp_index)
+	if not pool_milestones_triggered.has(si_key):
+		pool_milestones_triggered[si_key] = {}
+	var triggered: Dictionary = pool_milestones_triggered[si_key]
+	# Milestone thresholds: 75%, 50%, 25%, 10%
+	var thresholds: Array[float] = [0.75, 0.50, 0.25, 0.10]
+	for threshold in thresholds:
+		var key: String = str(int(threshold * 100))
+		if triggered.has(key):
+			continue
+		if fill <= threshold:
+			triggered[key] = true
+			_trigger_pool_milestone(swamp_index, threshold)
+
+func _trigger_pool_milestone(swamp_index: int, threshold: float) -> void:
+	var pool_name: String = GameManager.swamp_definitions[swamp_index]["name"]
+	var pct_label: String = str(int(threshold * 100)) + "%"
+	match threshold:
+		0.75:
+			_screen_shake(1.5, 0.15)
+			SceneManager.show_popup(pool_name + " down to " + pct_label + "! Waves intensifying...", 2.5)
+		0.50:
+			_screen_shake(2.5, 0.2)
+			SceneManager.show_popup(pool_name + " half drained! Pool bed emerging...", 3.0)
+			_spawn_pool_debris(swamp_index)
+		0.25:
+			_screen_shake(3.0, 0.25)
+			SceneManager.flash_white(0.2)
+			SceneManager.show_popup(pool_name + " nearly gone! Cracked earth showing...", 3.0)
+			_spawn_pool_cracks(swamp_index)
+		0.10:
+			_screen_shake(4.0, 0.3)
+			SceneManager.flash_white(0.25)
+			SceneManager.show_popup(pool_name + " almost drained! Just a puddle left!", 3.0)
+
+func _spawn_pool_debris(swamp_index: int) -> void:
+	# Scatter small rocks/debris on exposed pool floor
+	var geo: Dictionary = _get_swamp_geometry(swamp_index)
+	var left_x: float = geo["basin_left"].x
+	var right_x: float = geo["basin_right"].x
+	var bottom_y: float = _get_basin_bottom_y(geo)
+	for j in range(randi_range(4, 7)):
+		var rx: float = randf_range(left_x + 10, right_x - 10)
+		var ry: float = _get_terrain_y_at(rx)
+		var rock := ColorRect.new()
+		var rock_h: float = randf_range(1, 3)
+		rock.size = Vector2(randf_range(2, 5), rock_h)
+		ry -= rock_h  # Sit on top of terrain surface
+		rock.color = Color(
+			randf_range(0.3, 0.5),
+			randf_range(0.25, 0.4),
+			randf_range(0.15, 0.3),
+			0.7
+		)
+		rock.position = Vector2(rx, ry)
+		rock.z_index = 1
+		add_child(rock)
+
+func _spawn_pool_cracks(swamp_index: int) -> void:
+	# Draw cracked earth lines on exposed pool edges
+	var geo: Dictionary = _get_swamp_geometry(swamp_index)
+	var left_x: float = geo["basin_left"].x
+	var right_x: float = geo["basin_right"].x
+	var bottom_y: float = _get_basin_bottom_y(geo)
+	for j in range(randi_range(5, 9)):
+		var cx: float = randf_range(left_x + 5, right_x - 5)
+		var cy: float = randf_range(bottom_y - 8, bottom_y + 4)
+		var crack := Line2D.new()
+		crack.width = 1.0
+		crack.default_color = Color(0.25, 0.18, 0.10, 0.6)
+		crack.z_index = 1
+		var pts: int = randi_range(3, 5)
+		var px: float = cx
+		var py: float = cy
+		for k in range(pts):
+			crack.add_point(Vector2(px, py))
+			px += randf_range(-6, 6)
+			py += randf_range(-4, 4)
+		add_child(crack)
+
+# --- Scoop Splash & Juice (Phase 3C, 5D) ---
+func _on_scoop_performed(swamp_index: int, gallons: float, _money: float) -> void:
+	if GameManager.in_cave:
+		return
+	var player_node: Node2D = get_tree().get_first_node_in_group("player") as Node2D
+	if not player_node:
+		return
+	var px: float = player_node.global_position.x
+	var py: float = player_node.global_position.y
+	# Splash particles at water surface
+	var water_y: float = _get_pool_water_y(swamp_index) if swamp_index >= 0 and swamp_index < SWAMP_COUNT else py
+	_spawn_scoop_splash(px, water_y, gallons)
+	# Scoop impact juice: camera nudge for bigger scoops
+	if gallons > 0.01:
+		_screen_shake(clampf(gallons * 0.3, 0.5, 2.0), 0.08)
+
+func _spawn_scoop_splash(x: float, y: float, gallons: float) -> void:
+	var count: int = clampi(int(4 + gallons * 2), 4, 10)
+	for i in range(count):
+		var drop := ColorRect.new()
+		drop.size = Vector2(2, 2)
+		drop.color = Color(0.4, 0.7, 1.0, 0.8)
+		drop.position = Vector2(x + randf_range(-6, 6), y)
+		drop.z_index = 8
+		add_child(drop)
+		# Arc upward then fall
+		var peak_y: float = y - randf_range(8, 20) - gallons * 3.0
+		var end_x: float = x + randf_range(-16, 16)
+		var lifetime: float = randf_range(0.3, 0.5)
+		var tw := create_tween()
+		tw.set_ease(Tween.EASE_OUT)
+		tw.set_trans(Tween.TRANS_QUAD)
+		tw.tween_property(drop, "position", Vector2(end_x, peak_y), lifetime * 0.4)
+		tw.set_ease(Tween.EASE_IN)
+		tw.set_trans(Tween.TRANS_QUAD)
+		tw.tween_property(drop, "position", Vector2(end_x, y + randf_range(0, 4)), lifetime * 0.6)
+		tw.parallel().tween_property(drop, "modulate:a", 0.0, lifetime * 0.3)
+		tw.tween_callback(drop.queue_free)
+	# Ripple ring on water surface
+	var ripple := Line2D.new()
+	ripple.width = 1.0
+	ripple.default_color = Color(0.6, 0.8, 1.0, 0.5)
+	ripple.z_index = 7
+	# Small circle of points
+	for j in range(13):
+		var angle: float = float(j) / 12.0 * TAU
+		ripple.add_point(Vector2(x + cos(angle) * 2.0, y + sin(angle) * 1.0))
+	add_child(ripple)
+	var rtw := create_tween()
+	rtw.tween_property(ripple, "scale", Vector2(8.0, 4.0), 0.4)
+	rtw.parallel().tween_property(ripple, "modulate:a", 0.0, 0.4)
+	rtw.tween_callback(ripple.queue_free)
+
+# --- Drained Pool Beds (Phase 8C) ---
+func _build_drained_pool_beds() -> void:
+	for i in range(SWAMP_COUNT):
+		var bed := Node2D.new()
+		bed.z_index = 1
+		bed.visible = false
+		add_child(bed)
+		pool_bed_nodes.append(bed)
+		# Generate mud crack pattern
+		var geo: Dictionary = _get_swamp_geometry(i)
+		var bl: Vector2 = geo["basin_left"]
+		var br: Vector2 = geo["basin_right"]
+		var bw: float = br.x - bl.x
+		var basin_y: float = maxf(bl.y, br.y)
+		# Crack lines
+		var crack_count: int = clampi(int(bw / 12.0), 4, 20)
+		for j in range(crack_count):
+			var cx: float = bl.x + randf_range(4, bw - 4)
+			var cy: float = basin_y - randf_range(1, 6)
+			var crack := Line2D.new()
+			crack.width = randf_range(0.8, 1.5)
+			crack.default_color = Color(0.22, 0.16, 0.08, 0.6)
+			# Random crack segments
+			var pts: int = randi_range(2, 4)
+			crack.add_point(Vector2(cx, cy))
+			for k in range(pts):
+				cx += randf_range(-8, 8)
+				cy += randf_range(-4, 4)
+				cx = clampf(cx, bl.x + 2, br.x - 2)
+				crack.add_point(Vector2(cx, cy))
+			bed.add_child(crack)
+		# Scattered debris (tiny colored rects)
+		var debris_count: int = clampi(int(bw / 20.0), 2, 8)
+		for j in range(debris_count):
+			var dx: float = bl.x + randf_range(6, bw - 6)
+			var dy: float = basin_y - randf_range(1, 5)
+			var debris := ColorRect.new()
+			var dsz: float = randf_range(1.5, 3.0)
+			debris.size = Vector2(dsz, dsz * randf_range(0.5, 1.0))
+			debris.position = Vector2(dx, dy)
+			var pick: int = randi() % 3
+			if pick == 0:
+				debris.color = Color(0.35, 0.30, 0.20, 0.5)  # dull brown
+			elif pick == 1:
+				debris.color = Color(0.50, 0.48, 0.42, 0.45)  # pale stone
+			else:
+				debris.color = Color(0.30, 0.38, 0.22, 0.4)  # dried plant
+			bed.add_child(debris)
+
+func _update_pool_beds() -> void:
+	for i in range(pool_bed_nodes.size()):
+		var fill: float = GameManager.get_swamp_fill_fraction(i)
+		pool_bed_nodes[i].visible = fill < 0.05
+
+# --- Waterfall Drips (Phase 3B) ---
+func _build_waterfall_drips() -> void:
+	for i in range(SWAMP_COUNT):
+		var geo: Dictionary = _get_swamp_geometry(i)
+		var entry: Vector2 = geo["entry_top"]
+		var bl: Vector2 = geo["basin_left"]
+		var exit_pt: Vector2 = geo["exit_top"]
+		var br: Vector2 = geo["basin_right"]
+		# 2-3 drip points per pool edge (left side and right side)
+		for side in range(2):
+			var top_pt: Vector2 = entry if side == 0 else exit_pt
+			var bot_pt: Vector2 = bl if side == 0 else br
+			var num_drips: int = randi_range(2, 3)
+			for d in range(num_drips):
+				var t: float = randf_range(0.2, 0.7)
+				var drip_x: float = lerpf(top_pt.x, bot_pt.x, t)
+				var drip_y: float = lerpf(top_pt.y, bot_pt.y, t)
+				var drip_line := Line2D.new()
+				drip_line.width = 1.0
+				drip_line.default_color = SWAMP_WATER_COLORS[i]
+				drip_line.z_index = 3
+				drip_line.visible = false
+				drip_line.add_point(Vector2(drip_x, drip_y))
+				drip_line.add_point(Vector2(drip_x, drip_y + 3))
+				add_child(drip_line)
+				drip_nodes.append({
+					"line": drip_line,
+					"timer": randf_range(0.0, 2.0),
+					"phase": 0,  # 0=extend, 1=drip, 2=reset
+					"side": side,
+					"pool_idx": i,
+					"base_y": drip_y,
+					"base_x": drip_x,
+				})
+
+func _update_waterfall_drips(delta: float) -> void:
+	for dd in drip_nodes:
+		var fill: float = GameManager.get_swamp_fill_fraction(dd["pool_idx"])
+		if fill < 0.80:
+			dd["line"].visible = false
+			continue
+		dd["line"].visible = true
+		dd["timer"] += delta
+		var line: Line2D = dd["line"]
+		var by: float = dd["base_y"]
+		var bx: float = dd["base_x"]
+		var phase: int = dd["phase"]
+		if phase == 0:
+			# Extend drip downward
+			var ext: float = minf(dd["timer"] * 6.0, 4.0)
+			line.set_point_position(0, Vector2(bx, by))
+			line.set_point_position(1, Vector2(bx, by + ext))
+			line.modulate.a = 0.7
+			if ext >= 4.0:
+				dd["phase"] = 1
+				dd["timer"] = 0.0
+		elif phase == 1:
+			# Drip falls - detached droplet
+			var fall_y: float = dd["timer"] * 30.0
+			line.set_point_position(0, Vector2(bx, by + 4.0 + fall_y))
+			line.set_point_position(1, Vector2(bx, by + 6.0 + fall_y))
+			line.modulate.a = maxf(0.7 - dd["timer"] * 0.8, 0.0)
+			if dd["timer"] > 0.6:
+				dd["phase"] = 2
+				dd["timer"] = 0.0
+		elif phase == 2:
+			# Reset pause
+			line.visible = false
+			if dd["timer"] > randf_range(0.3, 1.0):
+				dd["phase"] = 0
+				dd["timer"] = 0.0
+
 # --- Atmosphere (Phase 17) ---
 func _build_atmosphere() -> void:
 	# Morning mist wisps (dawn-specific)
@@ -3655,24 +4618,27 @@ func _build_atmosphere() -> void:
 		add_child(mist)
 		morning_mist_rects.append(mist)
 
-	# Aurora borealis lines (rare night event)
-	for i in range(5):
+	# Aurora borealis lines (rare night event) — 8 lines with width variation
+	var aurora_colors: Array[Color] = [
+		Color(0.2, 0.9, 0.4, 0.0),
+		Color(0.3, 0.5, 0.9, 0.0),
+		Color(0.6, 0.2, 0.8, 0.0),
+		Color(0.2, 0.8, 0.7, 0.0),
+		Color(0.4, 0.3, 0.9, 0.0),
+		Color(0.1, 0.7, 0.9, 0.0),
+		Color(0.5, 0.9, 0.3, 0.0),
+		Color(0.3, 0.4, 0.8, 0.0),
+	]
+	for i in range(8):
 		var aline := Line2D.new()
-		aline.width = 3.0
+		aline.width = randf_range(2.0, 4.5)
 		aline.z_index = 2
-		var aurora_colors: Array[Color] = [
-			Color(0.2, 0.9, 0.4, 0.0),
-			Color(0.3, 0.5, 0.9, 0.0),
-			Color(0.6, 0.2, 0.8, 0.0),
-			Color(0.2, 0.8, 0.7, 0.0),
-			Color(0.4, 0.3, 0.9, 0.0),
-		]
 		aline.default_color = aurora_colors[i]
 		var mat := CanvasItemMaterial.new()
 		mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 		aline.material = mat
 		add_child(aline)
-		aurora_lines.append({"line": aline, "base_y": 15.0 + i * 8.0, "speed": randf_range(0.3, 0.6), "phase": randf() * TAU})
+		aurora_lines.append({"line": aline, "base_y": 10.0 + i * 6.0, "speed": randf_range(0.3, 0.6), "phase": randf() * TAU, "pulse_phase": randf() * TAU})
 
 	# Owl (perched in treeline at night)
 	owl_node = Node2D.new()
@@ -3792,6 +4758,18 @@ func _build_post_processing() -> void:
 	post_process_rect.material = mat
 	post_process_layer.add_child(post_process_rect)
 
+func _build_distance_fog() -> void:
+	# Phase 4C: Atmospheric perspective fog that increases with camera distance
+	distance_fog_layer = CanvasLayer.new()
+	distance_fog_layer.layer = 80
+	add_child(distance_fog_layer)
+	distance_fog_rect = ColorRect.new()
+	var vp_size := get_viewport_rect().size
+	distance_fog_rect.size = vp_size
+	distance_fog_rect.color = Color(0.6, 0.65, 0.75, 0.0)
+	distance_fog_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	distance_fog_layer.add_child(distance_fog_rect)
+
 # --- Day/Night Cycle & Animation ---
 func _process(delta: float) -> void:
 	# Continuous sell while player stands in shop area
@@ -3805,6 +4783,10 @@ func _process(delta: float) -> void:
 	if GameManager.camel_count > 0:
 		_update_camels(delta)
 
+	# Update elephant
+	if GameManager.elephant_owned:
+		_update_elephant(delta)
+
 	cycle_time += delta
 	if cycle_time >= CYCLE_DURATION:
 		cycle_time -= CYCLE_DURATION
@@ -3817,9 +4799,27 @@ func _process(delta: float) -> void:
 	canvas_modulate.color = tint
 
 	# Update shader uniforms
-	for wp in water_polygons:
+	var daytime_val: float = 0.0
+	if t > 0.25 and t < 0.65:
+		daytime_val = 1.0
+	elif t >= 0.20 and t <= 0.25:
+		daytime_val = (t - 0.20) / 0.05
+	elif t >= 0.65 and t <= 0.72:
+		daytime_val = 1.0 - (t - 0.65) / 0.07
+	for wi in range(water_polygons.size()):
+		var wp: Polygon2D = water_polygons[wi]
 		if wp.material:
-			(wp.material as ShaderMaterial).set_shader_parameter("time", wave_time)
+			var wmat: ShaderMaterial = wp.material as ShaderMaterial
+			wmat.set_shader_parameter("time", wave_time)
+			wmat.set_shader_parameter("daytime", daytime_val)
+			# Phase 8B: Modulate shader params based on drain level
+			if wi < SWAMP_COUNT:
+				var pool_fill: float = GameManager.get_swamp_fill_fraction(wi)
+				var drain_f: float = 1.0 - pool_fill  # 0=full, 1=empty
+				var base_chop: float = POOL_SHADER_PARAMS[wi][2]
+				var base_wave: float = POOL_SHADER_PARAMS[wi][0]
+				wmat.set_shader_parameter("choppiness", base_chop + drain_f * 1.5)
+				wmat.set_shader_parameter("wave_strength", base_wave + drain_f * 0.8)
 	# World progression: drain progress (used by multiple systems)
 	var total_drained: float = 0.0
 	var total_capacity: float = 0.0
@@ -3850,6 +4850,65 @@ func _process(delta: float) -> void:
 			warmth = -0.02
 		pp_mat.set_shader_parameter("warmth", warmth)
 		pp_mat.set_shader_parameter("saturation", lerpf(0.75, 1.05, drain_progress))
+		# Night blue shift factor
+		var night_f: float = 0.0
+		if t > 0.72 or t < 0.12:
+			night_f = 1.0
+		elif t >= 0.65 and t <= 0.72:
+			night_f = (t - 0.65) / 0.07
+		elif t >= 0.12 and t <= 0.2:
+			night_f = 1.0 - (t - 0.12) / 0.08
+		pp_mat.set_shader_parameter("night_factor", night_f)
+		# Chromatic aberration increases slightly during lightning
+		var ca_val: float = 0.5
+		if weather_state == "rain":
+			ca_val = 1.2
+		pp_mat.set_shader_parameter("chromatic_aberration", ca_val)
+
+	# Environmental storytelling: ground color shifts with drain progress
+	if terrain_polygon:
+		var healthy_ground := Color(0.52, 0.40, 0.22)
+		terrain_polygon.color = GROUND_COLOR.lerp(healthy_ground, drain_progress * 0.6)
+
+	# Update sky gradient colors based on time of day
+	if sky_gradient_res:
+		var sky_a: Array[Color]
+		var sky_b: Array[Color]
+		var sky_blend: float
+		if t < 0.15:
+			# Night
+			sky_a = SKY_NIGHT; sky_b = SKY_NIGHT; sky_blend = 0.0
+		elif t < 0.22:
+			# Night → Dawn
+			sky_a = SKY_NIGHT; sky_b = SKY_DAWN; sky_blend = (t - 0.15) / 0.07
+		elif t < 0.30:
+			# Dawn → Day
+			sky_a = SKY_DAWN; sky_b = SKY_DAY; sky_blend = (t - 0.22) / 0.08
+		elif t < 0.60:
+			# Day
+			sky_a = SKY_DAY; sky_b = SKY_DAY; sky_blend = 0.0
+		elif t < 0.68:
+			# Day → Dusk
+			sky_a = SKY_DAY; sky_b = SKY_DUSK; sky_blend = (t - 0.60) / 0.08
+		elif t < 0.75:
+			# Dusk → Night
+			sky_a = SKY_DUSK; sky_b = SKY_NIGHT; sky_blend = (t - 0.68) / 0.07
+		else:
+			# Night
+			sky_a = SKY_NIGHT; sky_b = SKY_NIGHT; sky_blend = 0.0
+		sky_gradient_res.colors = PackedColorArray([
+			sky_a[0].lerp(sky_b[0], sky_blend),
+			sky_a[1].lerp(sky_b[1], sky_blend),
+			sky_a[2].lerp(sky_b[2], sky_blend),
+		])
+	# Horizon glow (bright at dawn/dusk, invisible otherwise)
+	if horizon_glow:
+		var glow_a: float = 0.0
+		if t >= 0.15 and t < 0.25:
+			glow_a = sin((t - 0.15) / 0.10 * PI) * 0.25
+		elif t >= 0.62 and t < 0.72:
+			glow_a = sin((t - 0.62) / 0.10 * PI) * 0.25
+		horizon_glow.default_color.a = glow_a
 
 	# Water glow pulse
 	var glow_base_alpha: float = 0.08
@@ -3955,11 +5014,14 @@ func _process(delta: float) -> void:
 		aline.clear_points()
 		if aurora_fade > 0.01:
 			var half_vp: float = get_viewport_rect().size.x / 2.0
-			for s in range(20):
-				var ax: float = cam_x_au - half_vp + s * (half_vp * 2.0 / 19.0)
-				var ay: float = al["base_y"] + sin(wave_time * al["speed"] + s * 0.5 + al["phase"]) * 6.0
+			for s in range(24):
+				var ax: float = cam_x_au - half_vp + s * (half_vp * 2.0 / 23.0)
+				var ay: float = al["base_y"] + sin(wave_time * al["speed"] + s * 0.5 + al["phase"]) * 8.0
 				aline.add_point(Vector2(ax, ay))
-			aline.default_color.a = aurora_fade * 0.3
+			var pulse_val: float = 1.0
+			if al.has("pulse_phase"):
+				pulse_val = 0.7 + 0.3 * sin(wave_time * 0.4 + al["pulse_phase"])
+			aline.default_color.a = aurora_fade * 0.45 * pulse_val
 
 	# Owl (nighttime perched, Phase 17d)
 	if owl_node:
@@ -4107,6 +5169,11 @@ func _process(delta: float) -> void:
 		else:
 			foam_lines[i].clear_points()
 
+	# Drained pool bed visibility + pool glow lights + waterfall drips
+	_update_pool_beds()
+	_update_pool_glow_lights()
+	_update_waterfall_drips(delta)
+
 	# Sun arc across sky (sunrise t=0.15 to sunset t=0.70)
 	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
 	var cam_x: float = cam.get_screen_center_position().x if cam else 320.0
@@ -4121,6 +5188,10 @@ func _process(delta: float) -> void:
 		elif sun_progress > 0.9:
 			sun_alpha = (1.0 - sun_progress) / 0.1
 		sun_node.modulate.a = sun_alpha
+		# Slowly rotate sun rays
+		for child in sun_node.get_children():
+			if child is Line2D and child.name.begins_with("SunRay"):
+				child.rotation = wave_time * 0.1
 	else:
 		sun_node.visible = false
 
@@ -4140,12 +5211,16 @@ func _process(delta: float) -> void:
 		elif moon_progress > 0.9:
 			moon_alpha = (1.0 - moon_progress) / 0.1
 		for child in moon.get_children():
-			if child is ColorRect:
+			if child is Polygon2D:
 				child.color.a = moon_alpha * (0.6 if child == moon_glow else 0.9)
+			elif child is PointLight2D:
+				child.energy = moon_alpha * 0.2
 	else:
 		for child in moon.get_children():
-			if child is ColorRect:
+			if child is Polygon2D:
 				child.color.a = 0.0
+			elif child is PointLight2D:
+				child.energy = 0.0
 
 	# Swamp gas bubbles
 	bubble_timer += delta
@@ -4222,6 +5297,26 @@ func _process(delta: float) -> void:
 		var fnode: ColorRect = fp["node"]
 		fnode.position.x = fp["base_x"] + sin(wave_time * 0.3 + fp["phase"]) * 8.0
 		fnode.color.a = fog_alpha * (0.6 + sin(wave_time * 0.5 + fp["phase"]) * 0.4)
+
+	# Phase 4C: Distance fog — atmospheric perspective based on camera position
+	if distance_fog_rect:
+		var cam_4c: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+		if cam_4c:
+			var cam_pos_x: float = cam_4c.global_position.x
+			# Fog increases as camera moves right (max at x=5500)
+			var dist_factor: float = clampf(cam_pos_x / 5500.0, 0.0, 1.0)
+			var fog_a: float = dist_factor * 0.08  # Max 8% opacity
+			# Color shifts with time of day
+			var fog_col: Color
+			if t > 0.65 or t < 0.15:
+				fog_col = Color(0.15, 0.18, 0.30, fog_a)  # Blue at night
+			elif t >= 0.15 and t < 0.25:
+				fog_col = Color(0.55, 0.45, 0.35, fog_a)  # Warm at dawn
+			elif t >= 0.55 and t <= 0.65:
+				fog_col = Color(0.60, 0.40, 0.30, fog_a)  # Warm at dusk
+			else:
+				fog_col = Color(0.55, 0.60, 0.70, fog_a)  # Hazy blue at day
+			distance_fog_rect.color = fog_col
 
 	# Pollen motes: daytime only
 	var pollen_alpha: float = 0.0
@@ -4506,7 +5601,8 @@ func _process(delta: float) -> void:
 		var bf_node: Node2D = bd["node"]
 		bd["phase"] += delta * bd["flutter_speed"]
 		bf_node.position.x += bd["drift_x"] * delta
-		bf_node.position.y = minf(bd["base_y"] + sin(bd["phase"] * 0.4) * bd["bob_amp"], 120.0)
+		var bf_bob_y: float = bd["base_y"] + sin(bd["phase"] * 0.4) * bd["bob_amp"]
+		bf_node.position.y = minf(bf_bob_y, _get_terrain_y_at(bf_node.position.x) - 8.0)
 		# Wing flap
 		var wing_scale: float = absf(sin(bd["phase"]))
 		bd["wing_l"].scale.x = wing_scale
@@ -4572,6 +5668,29 @@ func _process(delta: float) -> void:
 		var tt_head: ColorRect = tt["head_ref"]
 		var head_bob: float = sin(wave_time * 0.8 + tt["phase"]) * 0.5
 		tt_head.position.y += head_bob * 0.02
+
+	# Cricket chirp flashes (nighttime only)
+	for cr in crickets:
+		cr["node"].visible = night_alpha > 0.3
+		if not cr["node"].visible:
+			continue
+		cr["chirp_timer"] -= delta
+		if cr["chirp_timer"] <= 0.0 and not cr["chirping"]:
+			cr["chirping"] = true
+			cr["chirp_flash"] = 0.0
+		if cr["chirping"]:
+			cr["chirp_flash"] += delta
+			var chirp_ref: ColorRect = cr["chirp_ref"]
+			if cr["chirp_flash"] < 0.08:
+				chirp_ref.color.a = 0.8
+			elif cr["chirp_flash"] < 0.15:
+				chirp_ref.color.a = 0.0
+			elif cr["chirp_flash"] < 0.22:
+				chirp_ref.color.a = 0.6
+			else:
+				chirp_ref.color.a = 0.0
+				cr["chirping"] = false
+				cr["chirp_timer"] = randf_range(3.0, 8.0)
 
 	# Cave entrance glow pulsing
 	for ce in cave_entrances:

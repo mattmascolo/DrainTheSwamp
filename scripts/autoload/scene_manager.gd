@@ -110,13 +110,16 @@ func _on_lore_read(_cave_id: String, _lore_id: String) -> void:
 	pass  # lore_wall calls show_popup directly with its text
 
 # --- Scene Transitions ---
-func transition_to_scene(scene_path: String) -> void:
+func transition_to_scene(scene_path: String, use_pixelate: bool = false) -> void:
 	if is_transitioning:
 		return
 	is_transitioning = true
-	var tw := create_tween()
-	tw.tween_property(fade_rect, "color:a", 1.0, 0.4)
-	tw.tween_callback(_do_scene_change.bind(scene_path))
+	if use_pixelate:
+		_pixelate_out(func() -> void: _do_scene_change(scene_path))
+	else:
+		var tw := create_tween()
+		tw.tween_property(fade_rect, "color:a", 1.0, 0.4)
+		tw.tween_callback(_do_scene_change.bind(scene_path))
 
 func _do_scene_change(scene_path: String) -> void:
 	get_tree().change_scene_to_file(scene_path)
@@ -128,9 +131,7 @@ func transition_to_return() -> void:
 	if is_transitioning:
 		return
 	is_transitioning = true
-	var tw := create_tween()
-	tw.tween_property(fade_rect, "color:a", 1.0, 0.4)
-	tw.tween_callback(_do_scene_change.bind(return_scene_path))
+	_pixelate_out(func() -> void: _do_scene_change(return_scene_path))
 
 func fade_in() -> void:
 	_fade_in()
@@ -139,3 +140,23 @@ func _fade_in() -> void:
 	var tw := create_tween()
 	tw.tween_property(fade_rect, "color:a", 0.0, 0.4)
 	tw.tween_callback(func() -> void: is_transitioning = false)
+
+func _pixelate_out(on_complete: Callable) -> void:
+	# Quick fade with brief white flash, then black
+	var tw := create_tween()
+	fade_rect.color = Color(1, 1, 1, 0)
+	tw.tween_property(fade_rect, "color:a", 0.7, 0.1)
+	tw.tween_callback(func() -> void: fade_rect.color = Color(0, 0, 0, 0.7))
+	tw.tween_property(fade_rect, "color:a", 1.0, 0.2)
+	tw.tween_callback(func() -> void: on_complete.call())
+
+func flash_white(duration: float = 0.15) -> void:
+	# Brief white flash for celebrations (pool completion, etc.)
+	var flash := ColorRect.new()
+	flash.color = Color(1, 1, 1, 0.6)
+	flash.anchors_preset = Control.PRESET_FULL_RECT
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fade_layer.add_child(flash)
+	var tw := create_tween()
+	tw.tween_property(flash, "color:a", 0.0, duration)
+	tw.tween_callback(flash.queue_free)

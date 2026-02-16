@@ -13,12 +13,15 @@ signal swamp_completed(swamp_index: int, reward: float)
 signal water_carried_changed(current: float, capacity: float)
 signal day_changed(day: int)
 signal camel_changed()
+signal elephant_changed()
 signal upgrade_changed
 signal cave_unlocked(cave_id: String)
 signal cave_entered(cave_id: String)
 signal cave_exited(cave_id: String)
 signal loot_collected(cave_id: String, loot_id: String, reward_text: String)
 signal lore_read(cave_id: String, lore_id: String)
+signal cave_pool_level_changed(cave_id: String, pool_index: int, fill_fraction: float)
+signal cave_pool_completed(cave_id: String, pool_index: int)
 
 # --- Swamp Definitions ---
 var swamp_definitions: Array = [
@@ -223,6 +226,27 @@ var camel_capacity_level: int = 0
 var camel_speed_level: int = 0
 var camel_states: Array = []  # [{state, x, water_carried, source_swamp, state_timer}]
 
+# Elephant constants
+const ELEPHANT_BASE_COST: float = 75000.0
+const ELEPHANT_TRUNK_CAP_BASE: float = 100000.0
+const ELEPHANT_TROT_SPEED_BASE: float = 100000.0
+const ELEPHANT_TRUNK_STR_BASE: float = 150000.0
+const ELEPHANT_CAP_EXPONENT: float = 1.30
+const ELEPHANT_SPEED_EXPONENT: float = 1.30
+const ELEPHANT_STR_EXPONENT: float = 1.35
+const ELEPHANT_SCOOP_INTERVAL: float = 0.5
+
+# Elephant state
+var elephant_owned: bool = false
+var elephant_trunk_capacity_level: int = 0
+var elephant_trot_speed_level: int = 0
+var elephant_trunk_strength_level: int = 0
+var elephant_state: Dictionary = {
+	"state": "idle", "x": 30.0, "water_carried": 0.0,
+	"source_swamp": 0, "state_timer": 0.0, "scoop_timer": 0.0,
+	"target_swamp": -1
+}
+
 # Upgrade definitions
 var upgrade_definitions: Dictionary = {
 	"rain_collector": {
@@ -287,16 +311,16 @@ var upgrades_owned: Dictionary = {
 
 # --- Cave Definitions ---
 const CAVE_DEFINITIONS: Dictionary = {
-	"muddy_hollow": {"name": "Muddy Hollow", "swamp_index": 0, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/muddy_hollow.tscn", "order": 0},
-	"gator_den": {"name": "Gator Den", "swamp_index": 1, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/gator_den.tscn", "order": 1},
-	"the_sinkhole": {"name": "The Sinkhole", "swamp_index": 2, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/the_sinkhole.tscn", "order": 2},
-	"collapsed_mine": {"name": "Collapsed Mine", "swamp_index": 3, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/collapsed_mine.tscn", "order": 3},
-	"the_mire": {"name": "The Mire", "swamp_index": 4, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/the_mire.tscn", "order": 4},
-	"sunken_grotto": {"name": "Sunken Grotto", "swamp_index": 5, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/sunken_grotto.tscn", "order": 5},
-	"the_cistern": {"name": "The Cistern", "swamp_index": 6, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/the_cistern.tscn", "order": 6},
-	"coral_cavern": {"name": "Coral Cavern", "swamp_index": 7, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/coral_cavern.tscn", "order": 7},
-	"the_underdark": {"name": "The Underdark", "swamp_index": 8, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/the_underdark.tscn", "order": 8},
-	"mariana_trench": {"name": "Mariana Trench", "swamp_index": 9, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/mariana_trench.tscn", "order": 9},
+	"muddy_hollow": {"name": "Muddy Hollow", "swamp_index": 0, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/muddy_hollow.tscn", "order": 0},
+	"gator_den": {"name": "Gator Den", "swamp_index": 1, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/gator_den.tscn", "order": 1},
+	"the_sinkhole": {"name": "The Sinkhole", "swamp_index": 2, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/the_sinkhole.tscn", "order": 2},
+	"collapsed_mine": {"name": "Collapsed Mine", "swamp_index": 3, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/collapsed_mine.tscn", "order": 3},
+	"the_mire": {"name": "The Mire", "swamp_index": 4, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/the_mire.tscn", "order": 4},
+	"sunken_grotto": {"name": "Sunken Grotto", "swamp_index": 5, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/sunken_grotto.tscn", "order": 5},
+	"the_cistern": {"name": "The Cistern", "swamp_index": 6, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/the_cistern.tscn", "order": 6},
+	"coral_cavern": {"name": "Coral Cavern", "swamp_index": 7, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/coral_cavern.tscn", "order": 7},
+	"the_underdark": {"name": "The Underdark", "swamp_index": 8, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/the_underdark.tscn", "order": 8},
+	"mariana_trench": {"name": "Mariana Trench", "swamp_index": 9, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/mariana_trench.tscn", "order": 9},
 }
 
 # Cave state
@@ -315,12 +339,63 @@ var cave_data: Dictionary = {
 	"mariana_trench": {"unlocked": false, "entered": false, "loot_collected": {}},
 }
 
+# --- Cave Pool Definitions ---
+# Each cave has pools that block progression; drain them to reveal loot
+var cave_pool_definitions: Dictionary = {
+	"muddy_hollow": [
+		{"total_gallons": 2.0, "loot_id": "pool_treasure_1"},
+	],
+	"gator_den": [
+		{"total_gallons": 15.0, "loot_id": "pool_treasure_1"},
+	],
+	"the_sinkhole": [
+		{"total_gallons": 80.0, "loot_id": "pool_treasure_1"},
+		{"total_gallons": 80.0, "loot_id": "pool_treasure_2"},
+	],
+	"collapsed_mine": [
+		{"total_gallons": 500.0, "loot_id": "pool_treasure_1"},
+		{"total_gallons": 500.0, "loot_id": "pool_treasure_2"},
+	],
+	"the_mire": [
+		{"total_gallons": 3000.0, "loot_id": "pool_treasure_1"},
+		{"total_gallons": 3000.0, "loot_id": "pool_treasure_2"},
+	],
+	"sunken_grotto": [
+		{"total_gallons": 20000.0, "loot_id": "pool_treasure_1"},
+		{"total_gallons": 20000.0, "loot_id": "pool_treasure_2"},
+	],
+	"the_cistern": [
+		{"total_gallons": 150000.0, "loot_id": "pool_treasure_1"},
+		{"total_gallons": 150000.0, "loot_id": "pool_treasure_2"},
+		{"total_gallons": 150000.0, "loot_id": "pool_treasure_3"},
+	],
+	"coral_cavern": [
+		{"total_gallons": 1000000.0, "loot_id": "pool_treasure_1"},
+		{"total_gallons": 1000000.0, "loot_id": "pool_treasure_2"},
+		{"total_gallons": 1000000.0, "loot_id": "pool_treasure_3"},
+	],
+	"the_underdark": [
+		{"total_gallons": 8000000.0, "loot_id": "pool_treasure_1"},
+		{"total_gallons": 8000000.0, "loot_id": "pool_treasure_2"},
+		{"total_gallons": 8000000.0, "loot_id": "pool_treasure_3"},
+	],
+	"mariana_trench": [
+		{"total_gallons": 50000000.0, "loot_id": "pool_treasure_1"},
+		{"total_gallons": 50000000.0, "loot_id": "pool_treasure_2"},
+		{"total_gallons": 50000000.0, "loot_id": "pool_treasure_3"},
+	],
+}
+
+# Cave pool runtime state: {cave_id: [{gallons_drained, completed}]}
+var cave_pool_states: Dictionary = {}
+
 # Day tracking
 var current_day: int = 1
 var cycle_progress: float = 0.2
 
 func _ready() -> void:
 	_init_swamp_states()
+	_init_cave_pool_states()
 
 func _init_swamp_states() -> void:
 	swamp_states.clear()
@@ -575,6 +650,28 @@ func get_camel_capacity_upgrade_cost() -> float:
 func get_camel_speed_upgrade_cost() -> float:
 	return CAMEL_SPEED_UPGRADE_BASE * pow(CAMEL_UPGRADE_EXPONENT, camel_speed_level)
 
+# --- Elephant computed ---
+func get_elephant_cost() -> float:
+	return ELEPHANT_BASE_COST
+
+func get_elephant_trunk_capacity() -> float:
+	return 1.0 * pow(1.25, elephant_trunk_capacity_level)
+
+func get_elephant_trot_speed() -> float:
+	return 30.0 * pow(1.20, elephant_trot_speed_level)
+
+func get_elephant_trunk_strength() -> float:
+	return 0.02 * pow(1.30, elephant_trunk_strength_level)
+
+func get_elephant_trunk_capacity_upgrade_cost() -> float:
+	return ELEPHANT_TRUNK_CAP_BASE * pow(ELEPHANT_CAP_EXPONENT, elephant_trunk_capacity_level)
+
+func get_elephant_trot_speed_upgrade_cost() -> float:
+	return ELEPHANT_TROT_SPEED_BASE * pow(ELEPHANT_SPEED_EXPONENT, elephant_trot_speed_level)
+
+func get_elephant_trunk_strength_upgrade_cost() -> float:
+	return ELEPHANT_TRUNK_STR_BASE * pow(ELEPHANT_STR_EXPONENT, elephant_trunk_strength_level)
+
 # --- Upgrade computed ---
 func get_upgrade_cost(upgrade_id: String) -> float:
 	var defn: Dictionary = upgrade_definitions[upgrade_id]
@@ -725,6 +822,76 @@ func _init_camel_states() -> void:
 	for i in range(camel_count):
 		camel_states.append({"state": "to_player", "x": 30.0, "water_carried": 0.0, "source_swamp": 0, "state_timer": 0.0})
 
+# --- Elephant actions ---
+func buy_elephant() -> bool:
+	if elephant_owned:
+		return false
+	var cost: float = get_elephant_cost()
+	if money < cost:
+		return false
+	money -= cost
+	elephant_owned = true
+	elephant_state = {
+		"state": "idle", "x": 30.0, "water_carried": 0.0,
+		"source_swamp": 0, "state_timer": 0.0, "scoop_timer": 0.0,
+		"target_swamp": -1
+	}
+	money_changed.emit(money)
+	elephant_changed.emit()
+	return true
+
+func upgrade_elephant_trunk_capacity() -> bool:
+	if not elephant_owned:
+		return false
+	var cost: float = get_elephant_trunk_capacity_upgrade_cost()
+	if money < cost:
+		return false
+	money -= cost
+	elephant_trunk_capacity_level += 1
+	money_changed.emit(money)
+	elephant_changed.emit()
+	return true
+
+func upgrade_elephant_trot_speed() -> bool:
+	if not elephant_owned:
+		return false
+	var cost: float = get_elephant_trot_speed_upgrade_cost()
+	if money < cost:
+		return false
+	money -= cost
+	elephant_trot_speed_level += 1
+	money_changed.emit(money)
+	elephant_changed.emit()
+	return true
+
+func upgrade_elephant_trunk_strength() -> bool:
+	if not elephant_owned:
+		return false
+	var cost: float = get_elephant_trunk_strength_upgrade_cost()
+	if money < cost:
+		return false
+	money -= cost
+	elephant_trunk_strength_level += 1
+	money_changed.emit(money)
+	elephant_changed.emit()
+	return true
+
+func elephant_scoop_water(swamp_index: int, gallons: float) -> float:
+	return _drain_swamp(swamp_index, gallons)
+
+func elephant_sell_water() -> float:
+	var carried: float = elephant_state["water_carried"]
+	if carried <= 0.0001:
+		return 0.0
+	var swamp_idx: int = elephant_state["source_swamp"]
+	var base_mpg: float = swamp_definitions[swamp_idx]["money_per_gallon"]
+	var mpg: float = base_mpg * get_money_multiplier()
+	var earned: float = carried * mpg
+	money += earned
+	elephant_state["water_carried"] = 0.0
+	money_changed.emit(money)
+	return earned
+
 # --- Cave Functions ---
 func check_cave_unlocks(swamp_index: int = -1) -> void:
 	for cave_id: String in CAVE_DEFINITIONS:
@@ -765,6 +932,91 @@ func is_loot_collected(cave_id: String, loot_id: String) -> bool:
 		return false
 	return cave_data[cave_id]["loot_collected"].get(loot_id, false)
 
+# --- Cave Pool Functions ---
+func _init_cave_pool_states() -> void:
+	cave_pool_states.clear()
+	for cave_id: String in cave_pool_definitions:
+		var pools: Array = cave_pool_definitions[cave_id]
+		var states: Array = []
+		for i in range(pools.size()):
+			states.append({"gallons_drained": 0.0, "completed": false})
+		cave_pool_states[cave_id] = states
+
+func get_cave_pool_fill_fraction(cave_id: String, pool_index: int) -> float:
+	if not cave_pool_definitions.has(cave_id):
+		return 0.0
+	var pools: Array = cave_pool_definitions[cave_id]
+	if pool_index < 0 or pool_index >= pools.size():
+		return 0.0
+	var total: float = pools[pool_index]["total_gallons"]
+	var drained: float = cave_pool_states[cave_id][pool_index]["gallons_drained"]
+	return clampf((total - drained) / total, 0.0, 1.0)
+
+func is_cave_pool_completed(cave_id: String, pool_index: int) -> bool:
+	if not cave_pool_states.has(cave_id):
+		return false
+	if pool_index < 0 or pool_index >= cave_pool_states[cave_id].size():
+		return false
+	return cave_pool_states[cave_id][pool_index]["completed"]
+
+func _drain_cave_pool(cave_id: String, pool_index: int, gallons: float) -> float:
+	if gallons <= 0.0:
+		return 0.0
+	if not cave_pool_definitions.has(cave_id):
+		return 0.0
+	var pools: Array = cave_pool_definitions[cave_id]
+	if pool_index < 0 or pool_index >= pools.size():
+		return 0.0
+	if cave_pool_states[cave_id][pool_index]["completed"]:
+		return 0.0
+	var total: float = pools[pool_index]["total_gallons"]
+	var remaining: float = total - cave_pool_states[cave_id][pool_index]["gallons_drained"]
+	var actual: float = minf(gallons, remaining)
+	if actual <= 0.0:
+		return 0.0
+	cave_pool_states[cave_id][pool_index]["gallons_drained"] += actual
+	var fill: float = get_cave_pool_fill_fraction(cave_id, pool_index)
+	cave_pool_level_changed.emit(cave_id, pool_index, fill)
+	if cave_pool_states[cave_id][pool_index]["gallons_drained"] >= total:
+		cave_pool_states[cave_id][pool_index]["completed"] = true
+		cave_pool_completed.emit(cave_id, pool_index)
+	return actual
+
+func try_scoop_cave_pool(cave_id: String, pool_index: int) -> bool:
+	var stamina_cost: float = get_stamina_cost()
+	if current_stamina < stamina_cost:
+		return false
+	if not cave_pool_definitions.has(cave_id):
+		return false
+	var pools: Array = cave_pool_definitions[cave_id]
+	if pool_index < 0 or pool_index >= pools.size():
+		return false
+	if cave_pool_states[cave_id][pool_index]["completed"]:
+		return false
+	if tool_definitions[current_tool_id]["type"] == "semi_auto":
+		return false
+
+	var capacity: float = get_stat_value("carrying_capacity")
+	var remaining_space: float = capacity - water_carried
+	if remaining_space <= 0.001:
+		return false
+
+	var tool_output: float = get_tool_output(current_tool_id)
+	var scoop_amount: float = minf(tool_output, remaining_space)
+
+	current_stamina -= stamina_cost
+	stamina_changed.emit(current_stamina, get_max_stamina())
+
+	var actual: float = _drain_cave_pool(cave_id, pool_index, scoop_amount)
+	if actual > 0.0:
+		water_carried += actual
+		# Use the associated overworld pool's money_per_gallon rate
+		var swamp_index: int = CAVE_DEFINITIONS[cave_id]["swamp_index"]
+		last_scoop_swamp = swamp_index
+		water_carried_changed.emit(water_carried, capacity)
+		scoop_performed.emit(swamp_index, actual, 0.0)
+	return actual > 0.0
+
 func reset_game() -> void:
 	money = 0.0
 	current_tool_id = "hands"
@@ -798,6 +1050,15 @@ func reset_game() -> void:
 	camel_capacity_level = 0
 	camel_speed_level = 0
 	camel_states.clear()
+	elephant_owned = false
+	elephant_trunk_capacity_level = 0
+	elephant_trot_speed_level = 0
+	elephant_trunk_strength_level = 0
+	elephant_state = {
+		"state": "idle", "x": 30.0, "water_carried": 0.0,
+		"source_swamp": 0, "state_timer": 0.0, "scoop_timer": 0.0,
+		"target_swamp": -1
+	}
 	upgrades_owned = {
 		"rain_collector": 0,
 		"splash_guard": 0,
@@ -823,6 +1084,7 @@ func reset_game() -> void:
 		"mariana_trench": {"unlocked": false, "entered": false, "loot_collected": {}},
 	}
 	_init_swamp_states()
+	_init_cave_pool_states()
 
 	# Emit all signals to update UI
 	money_changed.emit(money)
@@ -833,6 +1095,7 @@ func reset_game() -> void:
 	hose_state_changed.emit(false, 0.0)
 	water_carried_changed.emit(0.0, get_stat_value("carrying_capacity"))
 	camel_changed.emit()
+	elephant_changed.emit()
 	upgrade_changed.emit()
 	day_changed.emit(current_day)
 
@@ -890,8 +1153,15 @@ func get_save_data() -> Dictionary:
 	var swamp_save: Array = []
 	for state in swamp_states:
 		swamp_save.append({"gallons_drained": state["gallons_drained"], "completed": state["completed"]})
+	var cave_pool_save: Dictionary = {}
+	for cave_id: String in cave_pool_states:
+		var pools: Array = []
+		for state in cave_pool_states[cave_id]:
+			pools.append({"gallons_drained": state["gallons_drained"], "completed": state["completed"]})
+		cave_pool_save[cave_id] = pools
+
 	return {
-		"version": 14,
+		"version": 15,
 		"money": money,
 		"current_tool_id": current_tool_id,
 		"tools_owned": tools_owned.duplicate(true),
@@ -905,7 +1175,13 @@ func get_save_data() -> Dictionary:
 		"camel_capacity_level": camel_capacity_level,
 		"camel_speed_level": camel_speed_level,
 		"upgrades_owned": upgrades_owned.duplicate(true),
-		"cave_data": cave_data.duplicate(true)
+		"cave_data": cave_data.duplicate(true),
+		"cave_pool_states": cave_pool_save,
+		"elephant_owned": elephant_owned,
+		"elephant_trunk_capacity_level": elephant_trunk_capacity_level,
+		"elephant_trot_speed_level": elephant_trot_speed_level,
+		"elephant_trunk_strength_level": elephant_trunk_strength_level,
+		"elephant_state": elephant_state.duplicate(true)
 	}
 
 func load_save_data(data: Dictionary) -> void:
@@ -945,6 +1221,29 @@ func load_save_data(data: Dictionary) -> void:
 	camel_speed_level = int(data.get("camel_speed_level", 0))
 	_init_camel_states()
 
+	# Elephant
+	elephant_owned = data.get("elephant_owned", false)
+	elephant_trunk_capacity_level = int(data.get("elephant_trunk_capacity_level", 0))
+	elephant_trot_speed_level = int(data.get("elephant_trot_speed_level", 0))
+	elephant_trunk_strength_level = int(data.get("elephant_trunk_strength_level", 0))
+	if data.has("elephant_state"):
+		var es: Dictionary = data["elephant_state"]
+		elephant_state = {
+			"state": es.get("state", "idle"),
+			"x": float(es.get("x", 30.0)),
+			"water_carried": float(es.get("water_carried", 0.0)),
+			"source_swamp": int(es.get("source_swamp", 0)),
+			"state_timer": float(es.get("state_timer", 0.0)),
+			"scoop_timer": float(es.get("scoop_timer", 0.0)),
+			"target_swamp": int(es.get("target_swamp", -1))
+		}
+	else:
+		elephant_state = {
+			"state": "idle", "x": 30.0, "water_carried": 0.0,
+			"source_swamp": 0, "state_timer": 0.0, "scoop_timer": 0.0,
+			"target_swamp": -1
+		}
+
 	# Upgrades
 	if data.has("upgrades_owned"):
 		for key in data["upgrades_owned"]:
@@ -962,6 +1261,16 @@ func load_save_data(data: Dictionary) -> void:
 				cave_data[k]["entered"] = saved.get("entered", false)
 				if saved.has("loot_collected"):
 					cave_data[k]["loot_collected"] = saved["loot_collected"].duplicate()
+
+	# Cave pool states
+	if data.has("cave_pool_states"):
+		for key in data["cave_pool_states"]:
+			var k: String = key
+			if cave_pool_states.has(k):
+				var saved_pools: Array = data["cave_pool_states"][k]
+				for i in range(mini(saved_pools.size(), cave_pool_states[k].size())):
+					cave_pool_states[k][i]["gallons_drained"] = saved_pools[i].get("gallons_drained", 0.0)
+					cave_pool_states[k][i]["completed"] = saved_pools[i].get("completed", false)
 
 	# Version migration
 	var save_version: int = int(data.get("version", 1))
@@ -988,4 +1297,5 @@ func load_save_data(data: Dictionary) -> void:
 	tool_changed.emit(tool_definitions[current_tool_id])
 	water_carried_changed.emit(water_carried, get_stat_value("carrying_capacity"))
 	camel_changed.emit()
+	elephant_changed.emit()
 	upgrade_changed.emit()

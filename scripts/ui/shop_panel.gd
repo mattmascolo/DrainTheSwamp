@@ -17,6 +17,7 @@ func _ready() -> void:
 	GameManager.tool_upgraded.connect(func(_t: String, _l: int) -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	GameManager.tool_changed.connect(func(_d: Dictionary) -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	GameManager.camel_changed.connect(func() -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
+	GameManager.elephant_changed.connect(func() -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	GameManager.upgrade_changed.connect(func() -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	GameManager.stat_upgraded.connect(func(_s: String, _l: int) -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	visible = false
@@ -360,6 +361,157 @@ func _build_tools_tab() -> void:
 		upgrade_panel.add_child(up_row)
 		tool_list.add_child(upgrade_panel)
 
+	# --- Elephant Section ---
+	var el_sep := HSeparator.new()
+	el_sep.add_theme_constant_override("separation", 8)
+	tool_list.add_child(el_sep)
+
+	var el_header := Label.new()
+	el_header.text = "-- Elephant Worker --"
+	el_header.add_theme_font_size_override("font_size", 14)
+	el_header.add_theme_color_override("font_color", Color(0.65, 0.65, 0.68))
+	el_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tool_list.add_child(el_header)
+
+	var el_buy_panel := PanelContainer.new()
+	var el_buy_style := StyleBoxFlat.new()
+	el_buy_style.bg_color = Color(0.1, 0.1, 0.14, 0.6)
+	el_buy_style.corner_radius_top_left = 4
+	el_buy_style.corner_radius_top_right = 4
+	el_buy_style.corner_radius_bottom_left = 4
+	el_buy_style.corner_radius_bottom_right = 4
+	el_buy_style.content_margin_left = 8
+	el_buy_style.content_margin_right = 8
+	el_buy_style.content_margin_top = 4
+	el_buy_style.content_margin_bottom = 4
+	el_buy_panel.add_theme_stylebox_override("panel", el_buy_style)
+
+	var el_buy_row := HBoxContainer.new()
+	el_buy_row.add_theme_constant_override("separation", 8)
+
+	var el_info := Label.new()
+	el_info.add_theme_font_size_override("font_size", 14)
+	el_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	el_info.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+	el_info.add_theme_constant_override("shadow_offset_x", 2)
+	el_info.add_theme_constant_override("shadow_offset_y", 2)
+	if GameManager.elephant_owned:
+		el_info.text = "Elephant (Cap: %.1fg, Spd: %.0f, Str: %.3f)" % [GameManager.get_elephant_trunk_capacity(), GameManager.get_elephant_trot_speed(), GameManager.get_elephant_trunk_strength()]
+		el_info.add_theme_color_override("font_color", Color(0.65, 0.65, 0.68))
+	else:
+		el_info.text = "Elephant (auto-scoop worker)"
+		el_info.add_theme_color_override("font_color", Color(0.5, 0.5, 0.55))
+	el_buy_row.add_child(el_info)
+
+	if GameManager.elephant_owned:
+		var el_owned_label := Label.new()
+		el_owned_label.text = "[OWNED]"
+		el_owned_label.add_theme_font_size_override("font_size", 14)
+		el_owned_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
+		el_buy_row.add_child(el_owned_label)
+	else:
+		var buy_el_btn := Button.new()
+		buy_el_btn.add_theme_font_size_override("font_size", 14)
+		var el_cost: float = GameManager.get_elephant_cost()
+		buy_el_btn.text = "Buy %s" % Economy.format_money(el_cost)
+		buy_el_btn.custom_minimum_size = Vector2(110, 0)
+		if GameManager.money < el_cost:
+			buy_el_btn.disabled = true
+		else:
+			buy_el_btn.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7))
+			buy_el_btn.pressed.connect(func() -> void: GameManager.buy_elephant())
+		_style_button(buy_el_btn, Color(0.12, 0.12, 0.16))
+		el_buy_row.add_child(buy_el_btn)
+
+	var el_tip: String = "Elephant Worker - Auto-scoop\n"
+	if not GameManager.elephant_owned:
+		el_tip += "Walks to pools, scoops water,\ncarries it to shop and sells.\n"
+		el_tip += "Fully autonomous income!\n"
+		el_tip += "Cost: %s" % Economy.format_money(GameManager.get_elephant_cost())
+	else:
+		el_tip += "Capacity: %.1f gal | Speed: %.0f px/s\n" % [GameManager.get_elephant_trunk_capacity(), GameManager.get_elephant_trot_speed()]
+		el_tip += "Strength: %.3f gal/scoop" % GameManager.get_elephant_trunk_strength()
+	el_buy_panel.tooltip_text = el_tip
+	el_buy_panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	el_buy_panel.add_child(el_buy_row)
+	tool_list.add_child(el_buy_panel)
+
+	# Elephant upgrades (only if owned)
+	if GameManager.elephant_owned:
+		var el_up_panel := PanelContainer.new()
+		var el_up_style := StyleBoxFlat.new()
+		el_up_style.bg_color = Color(0.1, 0.1, 0.13, 0.6)
+		el_up_style.corner_radius_top_left = 4
+		el_up_style.corner_radius_top_right = 4
+		el_up_style.corner_radius_bottom_left = 4
+		el_up_style.corner_radius_bottom_right = 4
+		el_up_style.content_margin_left = 8
+		el_up_style.content_margin_right = 8
+		el_up_style.content_margin_top = 4
+		el_up_style.content_margin_bottom = 4
+		el_up_panel.add_theme_stylebox_override("panel", el_up_style)
+
+		var el_up_row := HBoxContainer.new()
+		el_up_row.add_theme_constant_override("separation", 8)
+
+		var el_spacer := Control.new()
+		el_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		el_up_row.add_child(el_spacer)
+
+		# Trunk Capacity upgrade
+		var tcap_btn := Button.new()
+		tcap_btn.add_theme_font_size_override("font_size", 14)
+		var tcap_cost: float = GameManager.get_elephant_trunk_capacity_upgrade_cost()
+		tcap_btn.text = "Cap Lv%d %s" % [GameManager.elephant_trunk_capacity_level + 1, Economy.format_money(tcap_cost)]
+		tcap_btn.custom_minimum_size = Vector2(130, 0)
+		var cur_tcap: float = GameManager.get_elephant_trunk_capacity()
+		var next_tcap: float = 1.0 * pow(1.25, GameManager.elephant_trunk_capacity_level + 1)
+		tcap_btn.tooltip_text = "Trunk Capacity Lv%d\nCurrent: %.1f gal\nNext: %.1f gal (+25%%)\nCost: %s" % [GameManager.elephant_trunk_capacity_level, cur_tcap, next_tcap, Economy.format_money(tcap_cost)]
+		if GameManager.money < tcap_cost:
+			tcap_btn.disabled = true
+		else:
+			tcap_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
+			tcap_btn.pressed.connect(func() -> void: GameManager.upgrade_elephant_trunk_capacity())
+		_style_button(tcap_btn, Color(0.1, 0.12, 0.18))
+		el_up_row.add_child(tcap_btn)
+
+		# Trot Speed upgrade
+		var tspd_btn := Button.new()
+		tspd_btn.add_theme_font_size_override("font_size", 14)
+		var tspd_cost: float = GameManager.get_elephant_trot_speed_upgrade_cost()
+		tspd_btn.text = "Spd Lv%d %s" % [GameManager.elephant_trot_speed_level + 1, Economy.format_money(tspd_cost)]
+		tspd_btn.custom_minimum_size = Vector2(130, 0)
+		var cur_tspd: float = GameManager.get_elephant_trot_speed()
+		var next_tspd: float = 30.0 * pow(1.20, GameManager.elephant_trot_speed_level + 1)
+		tspd_btn.tooltip_text = "Trot Speed Lv%d\nCurrent: %.0f px/s\nNext: %.0f px/s (+20%%)\nCost: %s" % [GameManager.elephant_trot_speed_level, cur_tspd, next_tspd, Economy.format_money(tspd_cost)]
+		if GameManager.money < tspd_cost:
+			tspd_btn.disabled = true
+		else:
+			tspd_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
+			tspd_btn.pressed.connect(func() -> void: GameManager.upgrade_elephant_trot_speed())
+		_style_button(tspd_btn, Color(0.1, 0.12, 0.18))
+		el_up_row.add_child(tspd_btn)
+
+		# Trunk Strength upgrade
+		var tstr_btn := Button.new()
+		tstr_btn.add_theme_font_size_override("font_size", 14)
+		var tstr_cost: float = GameManager.get_elephant_trunk_strength_upgrade_cost()
+		tstr_btn.text = "Str Lv%d %s" % [GameManager.elephant_trunk_strength_level + 1, Economy.format_money(tstr_cost)]
+		tstr_btn.custom_minimum_size = Vector2(130, 0)
+		var cur_tstr: float = GameManager.get_elephant_trunk_strength()
+		var next_tstr: float = 0.02 * pow(1.30, GameManager.elephant_trunk_strength_level + 1)
+		tstr_btn.tooltip_text = "Trunk Strength Lv%d\nCurrent: %.3f gal/scoop\nNext: %.3f gal/scoop (+30%%)\nCost: %s" % [GameManager.elephant_trunk_strength_level, cur_tstr, next_tstr, Economy.format_money(tstr_cost)]
+		if GameManager.money < tstr_cost:
+			tstr_btn.disabled = true
+		else:
+			tstr_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
+			tstr_btn.pressed.connect(func() -> void: GameManager.upgrade_elephant_trunk_strength())
+		_style_button(tstr_btn, Color(0.1, 0.12, 0.18))
+		el_up_row.add_child(tstr_btn)
+
+		el_up_panel.add_child(el_up_row)
+		tool_list.add_child(el_up_panel)
+
 # =============================================================================
 # STATS TAB
 # =============================================================================
@@ -660,7 +812,7 @@ func _get_tool_tooltip(tid: String, defn: Dictionary, owned_data: Dictionary) ->
 		tip += "\nCost: %s" % Economy.format_money(defn["cost"])
 	return tip
 
-func _style_button(btn: Button, bg_color: Color) -> void:
+func _style_button(btn: Button, bg_color: Color, affordable: bool = true) -> void:
 	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	var style := StyleBoxFlat.new()
 	style.bg_color = bg_color
@@ -668,7 +820,12 @@ func _style_button(btn: Button, bg_color: Color) -> void:
 	style.border_width_top = 2
 	style.border_width_right = 2
 	style.border_width_bottom = 2
-	style.border_color = bg_color.lightened(0.4)
+	# Affordance: green-tinted border if player can afford, muted otherwise
+	if affordable:
+		style.border_color = bg_color.lightened(0.4).lerp(Color(0.3, 0.8, 0.4), 0.25)
+	else:
+		style.border_color = bg_color.lightened(0.2)
+		style.bg_color = bg_color.lerp(Color(0.1, 0.1, 0.12), 0.3)
 	style.corner_radius_top_left = 4
 	style.corner_radius_top_right = 4
 	style.corner_radius_bottom_left = 4
@@ -679,15 +836,16 @@ func _style_button(btn: Button, bg_color: Color) -> void:
 	style.content_margin_bottom = 2
 	btn.add_theme_stylebox_override("normal", style)
 
-	var hover_style := style.duplicate()
-	hover_style.bg_color = bg_color.lightened(0.15)
+	var hover_style: StyleBoxFlat = style.duplicate()
+	hover_style.bg_color = bg_color.lightened(0.2)
+	hover_style.border_color = bg_color.lightened(0.5)
 	btn.add_theme_stylebox_override("hover", hover_style)
 
-	var pressed_style := style.duplicate()
+	var pressed_style: StyleBoxFlat = style.duplicate()
 	pressed_style.bg_color = bg_color.darkened(0.1)
 	btn.add_theme_stylebox_override("pressed", pressed_style)
 
-	var disabled_style := style.duplicate()
+	var disabled_style: StyleBoxFlat = style.duplicate()
 	disabled_style.bg_color = Color(0.08, 0.08, 0.1, 0.5)
 	disabled_style.border_color = Color(0.15, 0.15, 0.18, 0.4)
 	btn.add_theme_stylebox_override("disabled", disabled_style)

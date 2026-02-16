@@ -6,6 +6,18 @@ var cave_terrain_points: Array[Vector2] = []
 var cave_ceiling_points: Array[Vector2] = []
 var crystal_color: Color = Color(0.8, 0.6, 0.2)  # Override in subclass
 
+# Theme colors — override in subclass _init()
+var ground_color: Color = Color(0.3, 0.22, 0.12)
+var ceiling_color: Color = Color(0.2, 0.15, 0.1)
+var wall_color: Color = Color(0.18, 0.12, 0.08)
+var rock_mid_color: Color = Color(0.26, 0.18, 0.10)
+var rock_sub_color: Color = Color(0.20, 0.14, 0.08)
+var rock_inner_ceil_color: Color = Color(0.24, 0.18, 0.12)
+
+# Cave pool definitions — set in subclass _init()
+# Each entry: {"x_range": [start_x, end_x], "pool_index": int, "loot_data": {...}}
+var cave_pool_defs: Array = []
+
 # Internal state
 var player_ref: CharacterBody2D = null
 var drip_timer: float = 0.0
@@ -13,11 +25,12 @@ var wave_time: float = 0.0
 var crystal_lights: Array[PointLight2D] = []
 var crystal_phases: Array[float] = []
 var dust_motes: Array[Dictionary] = []
+var moisture_gleams: Array[Dictionary] = []  # Phase 9B: shimmer pixels on wet walls
+
+# Cave pool runtime references
+var cave_pool_refs: Array[Dictionary] = []  # [{water_poly, wall_body, glow_light, loot_ref, detect_area}]
 
 const PLAYER_SCENE = preload("res://scenes/player/player.tscn")
-const GROUND_COLOR := Color(0.3, 0.22, 0.12)
-const CEILING_COLOR := Color(0.2, 0.15, 0.1)
-const WALL_COLOR := Color(0.18, 0.12, 0.08)
 
 func _ready() -> void:
 	_setup_cave()
@@ -36,15 +49,22 @@ func _setup_cave() -> void:
 	_build_stalagmites()
 	_build_crystals()
 	_build_moss_lichen()
-	_build_cave_floor_pools()
+	_build_cave_pools()
 	_build_cracks()
 	_build_roots_cobwebs()
 	_build_dust_motes()
+	_build_moisture_gleams()
+	_build_light_shafts()
+	_build_parallax_bg()
 	_build_exit_zone()
 	_build_exit_glow()
 	_spawn_player()
 	_setup_camera()
 	_setup_loot_and_lore()
+
+	# Connect cave pool signals
+	GameManager.cave_pool_level_changed.connect(_on_cave_pool_level_changed)
+	GameManager.cave_pool_completed.connect(_on_cave_pool_completed)
 
 # --- Floor ---
 func _build_floor() -> void:
@@ -60,7 +80,7 @@ func _build_floor() -> void:
 
 	var floor_poly := Polygon2D.new()
 	floor_poly.polygon = floor_points
-	floor_poly.color = GROUND_COLOR
+	floor_poly.color = ground_color
 	floor_poly.z_index = 1
 	add_child(floor_poly)
 
@@ -90,7 +110,7 @@ func _build_ceiling() -> void:
 
 	var ceil_poly := Polygon2D.new()
 	ceil_poly.polygon = ceil_points
-	ceil_poly.color = CEILING_COLOR
+	ceil_poly.color = ceiling_color
 	ceil_poly.z_index = 5
 	add_child(ceil_poly)
 
@@ -121,7 +141,7 @@ func _build_walls() -> void:
 	])
 	var left_wall := Polygon2D.new()
 	left_wall.polygon = left_wall_pts
-	left_wall.color = WALL_COLOR
+	left_wall.color = wall_color
 	left_wall.z_index = 4
 	add_child(left_wall)
 
@@ -134,7 +154,7 @@ func _build_walls() -> void:
 	])
 	var right_wall := Polygon2D.new()
 	right_wall.polygon = right_wall_pts
-	right_wall.color = WALL_COLOR
+	right_wall.color = wall_color
 	right_wall.z_index = 4
 	add_child(right_wall)
 
@@ -172,7 +192,7 @@ func _build_rock_layers() -> void:
 	mid_pts.append(Vector2(cave_terrain_points[0].x, vp_size.y + 20))
 	var mid_poly := Polygon2D.new()
 	mid_poly.polygon = mid_pts
-	mid_poly.color = Color(0.26, 0.18, 0.10)
+	mid_poly.color = rock_mid_color
 	mid_poly.z_index = 0
 	add_child(mid_poly)
 
@@ -184,7 +204,7 @@ func _build_rock_layers() -> void:
 	sub_pts.append(Vector2(cave_terrain_points[0].x, vp_size.y + 20))
 	var sub_poly := Polygon2D.new()
 	sub_poly.polygon = sub_pts
-	sub_poly.color = Color(0.20, 0.14, 0.08)
+	sub_poly.color = rock_sub_color
 	sub_poly.z_index = -1
 	add_child(sub_poly)
 
@@ -197,7 +217,8 @@ func _build_rock_layers() -> void:
 		var patch := ColorRect.new()
 		patch.size = Vector2(randf_range(8, 16), randf_range(2, 3))
 		patch.position = Vector2(px - patch.size.x * 0.5, py + randf_range(2, 8))
-		patch.color = Color(0.35, 0.28, 0.18, 0.5)
+		patch.color = ground_color.lightened(0.15)
+		patch.color.a = 0.5
 		patch.z_index = 0
 		add_child(patch)
 
@@ -209,7 +230,7 @@ func _build_rock_layers() -> void:
 	ceil_inner_pts.append(Vector2(cave_ceiling_points[cave_ceiling_points.size() - 1].x, -50))
 	var ceil_inner := Polygon2D.new()
 	ceil_inner.polygon = ceil_inner_pts
-	ceil_inner.color = Color(0.24, 0.18, 0.12)
+	ceil_inner.color = rock_inner_ceil_color
 	ceil_inner.z_index = 4
 	add_child(ceil_inner)
 
@@ -221,9 +242,9 @@ func _build_rock_layers() -> void:
 		speck.size = Vector2(randf_range(1, 2), randf_range(1, 2))
 		speck.position = Vector2(sx, sy)
 		speck.color = Color(
-			randf_range(0.22, 0.35),
-			randf_range(0.16, 0.25),
-			randf_range(0.10, 0.16),
+			randf_range(ground_color.r - 0.05, ground_color.r + 0.08),
+			randf_range(ground_color.g - 0.04, ground_color.g + 0.06),
+			randf_range(ground_color.b - 0.02, ground_color.b + 0.04),
 			randf_range(0.3, 0.6)
 		)
 		speck.z_index = 1
@@ -244,11 +265,7 @@ func _build_stalactites() -> void:
 				Vector2(randf_range(-1, 1), h),
 			])
 			tri.position = pt
-			tri.color = Color(
-				randf_range(0.25, 0.35),
-				randf_range(0.18, 0.25),
-				randf_range(0.12, 0.18)
-			)
+			tri.color = ceiling_color.lightened(randf_range(0.05, 0.15))
 			tri.z_index = 4
 			add_child(tri)
 
@@ -268,11 +285,7 @@ func _build_stalagmites() -> void:
 			Vector2(randf_range(-1, 1), -h),
 		])
 		tri.position = Vector2(sx, sy)
-		tri.color = Color(
-			randf_range(0.28, 0.38),
-			randf_range(0.20, 0.28),
-			randf_range(0.14, 0.20)
-		)
+		tri.color = ground_color.lightened(randf_range(0.02, 0.12))
 		tri.z_index = 2
 		add_child(tri)
 
@@ -384,8 +397,132 @@ func _build_moss_lichen() -> void:
 			tendril.z_index = 5
 			add_child(tendril)
 
-# --- Cave Floor Pools ---
-func _build_cave_floor_pools() -> void:
+# --- Cave Pools (barrier pools that block progression) ---
+func _build_cave_pools() -> void:
+	if cave_pool_defs.size() == 0:
+		# No pool defs — build decorative puddles like before
+		_build_decorative_puddles()
+		return
+
+	for pd in cave_pool_defs:
+		var pool_index: int = pd["pool_index"]
+		var x_start: float = pd["x_range"][0]
+		var x_end: float = pd["x_range"][1]
+
+		# Find the valley geometry in x_range
+		var valley_min_y: float = -INF
+		var valley_min_x: float = (x_start + x_end) * 0.5
+		# Find the overflow_y: highest terrain at edges of x_range
+		var left_edge_y: float = _get_cave_terrain_y_at(x_start)
+		var right_edge_y: float = _get_cave_terrain_y_at(x_end)
+		var overflow_y: float = minf(left_edge_y, right_edge_y)
+
+		# Find valley floor (deepest point in range)
+		for pt in cave_terrain_points:
+			if pt.x >= x_start and pt.x <= x_end:
+				if pt.y > valley_min_y:
+					valley_min_y = pt.y
+					valley_min_x = pt.x
+
+		# Water surface Y = lerp between overflow_y (full) and valley_min_y (empty)
+		var fill: float = GameManager.get_cave_pool_fill_fraction(cave_id, pool_index)
+		var completed: bool = GameManager.is_cave_pool_completed(cave_id, pool_index)
+		var water_y: float = lerpf(valley_min_y, overflow_y, fill) if not completed else valley_min_y
+
+		# Build water polygon: terrain contour below water_y
+		var water_poly := Polygon2D.new()
+		water_poly.z_index = 2
+		_update_water_poly_shape(water_poly, x_start, x_end, water_y)
+		water_poly.color = Color(0.15, 0.30, 0.50, 0.65)
+		water_poly.visible = not completed
+		add_child(water_poly)
+
+		# Water highlight line on surface
+		var water_hl := ColorRect.new()
+		water_hl.size = Vector2(x_end - x_start - 4, 1)
+		water_hl.position = Vector2(x_start + 2, water_y)
+		water_hl.color = Color(0.3, 0.5, 0.7, 0.35)
+		water_hl.z_index = 2
+		water_hl.visible = not completed
+		add_child(water_hl)
+
+		# Wall body (blocks player at left water edge)
+		var wall_body := StaticBody2D.new()
+		wall_body.collision_layer = 1
+		wall_body.collision_mask = 0
+		var wall_x: float = _find_left_water_edge_x(x_start, x_end, water_y) if not completed else x_start
+		var wall_h: float = overflow_y - _get_cave_ceiling_y_at(wall_x) + 20
+		var wall_coll := CollisionShape2D.new()
+		var wall_shape := RectangleShape2D.new()
+		wall_shape.size = Vector2(8, wall_h)
+		wall_coll.shape = wall_shape
+		wall_coll.position = Vector2(wall_x, overflow_y - wall_h * 0.5)
+		wall_body.add_child(wall_coll)
+		wall_body.set_meta("disabled", completed)
+		if completed:
+			wall_coll.set_deferred("disabled", true)
+		add_child(wall_body)
+
+		# Glow light under water
+		var glow_light := PointLight2D.new()
+		glow_light.position = Vector2(valley_min_x, valley_min_y - 5)
+		glow_light.color = crystal_color
+		glow_light.blend_mode = PointLight2D.BLEND_MODE_ADD
+		glow_light.energy = 0.8 * fill
+		glow_light.shadow_enabled = false
+		var glow_grad_tex := GradientTexture2D.new()
+		glow_grad_tex.width = 128
+		glow_grad_tex.height = 128
+		glow_grad_tex.fill = GradientTexture2D.FILL_RADIAL
+		glow_grad_tex.fill_from = Vector2(0.5, 0.5)
+		glow_grad_tex.fill_to = Vector2(0.5, 0.0)
+		var glow_grad := Gradient.new()
+		glow_grad.set_offset(0, 0.0)
+		glow_grad.set_color(0, Color(1, 1, 1, 1))
+		glow_grad.set_offset(1, 1.0)
+		glow_grad.set_color(1, Color(0, 0, 0, 0))
+		glow_grad_tex.gradient = glow_grad
+		glow_light.texture = glow_grad_tex
+		glow_light.texture_scale = 0.4
+		glow_light.visible = not completed
+		add_child(glow_light)
+
+		# Hidden loot node at valley floor — visible when pool completes
+		var loot_ref: Node = null
+		if pd.has("loot_data") and pd["loot_data"].size() > 0:
+			var ld: Dictionary = pd["loot_data"]
+			var loot_node = preload("res://scripts/caves/loot_node.gd").new()
+			loot_node.loot_id = ld.get("loot_id", "pool_loot_%d" % pool_index)
+			loot_node.cave_id = cave_id
+			loot_node.reward_money = ld.get("reward_money", 0.0)
+			if ld.has("reward_stat_levels"):
+				loot_node.reward_stat_levels = ld["reward_stat_levels"]
+			if ld.has("reward_upgrades"):
+				loot_node.reward_upgrades = ld["reward_upgrades"]
+			if ld.has("reward_tool_unlock"):
+				loot_node.reward_tool_unlock = ld["reward_tool_unlock"]
+			loot_node.reward_text = ld.get("reward_text", "Found hidden treasure!")
+			loot_node.position = Vector2(valley_min_x, valley_min_y)
+			loot_node.visible = completed
+			add_child(loot_node)
+			loot_ref = loot_node
+
+		cave_pool_refs.append({
+			"water_poly": water_poly,
+			"water_hl": water_hl,
+			"wall_body": wall_body,
+			"wall_coll": wall_coll,
+			"wall_shape": wall_shape,
+			"glow_light": glow_light,
+			"loot_ref": loot_ref,
+			"x_start": x_start,
+			"x_end": x_end,
+			"overflow_y": overflow_y,
+			"valley_min_y": valley_min_y,
+			"valley_min_x": valley_min_x,
+		})
+
+func _build_decorative_puddles() -> void:
 	var left_x: float = cave_terrain_points[0].x
 	var right_x: float = cave_terrain_points[cave_terrain_points.size() - 1].x
 	for i in range(randi_range(2, 4)):
@@ -399,13 +536,118 @@ func _build_cave_floor_pools() -> void:
 		pool.color = Color(0.15, 0.25, 0.35, 0.5)
 		pool.z_index = 1
 		add_child(pool)
-		# Highlight line on top
 		var hl := ColorRect.new()
 		hl.size = Vector2(pw - 2, 1)
 		hl.position = Vector2(px - pw * 0.5 + 1, py - ph)
 		hl.color = Color(0.3, 0.45, 0.55, 0.3)
 		hl.z_index = 1
 		add_child(hl)
+
+func _update_water_poly_shape(poly: Polygon2D, x_start: float, x_end: float, water_y: float) -> void:
+	# Build water polygon: top is water_y line, bottom traces terrain contour
+	var pts: PackedVector2Array = PackedVector2Array()
+	# Top-left
+	pts.append(Vector2(x_start, water_y))
+	# Bottom: trace terrain from left to right
+	for pt in cave_terrain_points:
+		if pt.x >= x_start and pt.x <= x_end:
+			if pt.y > water_y:
+				pts.append(Vector2(pt.x, pt.y))
+			else:
+				pts.append(Vector2(pt.x, water_y))
+	# Top-right
+	pts.append(Vector2(x_end, water_y))
+	if pts.size() >= 3:
+		poly.polygon = pts
+	else:
+		# Fallback: simple rectangle
+		poly.polygon = PackedVector2Array([
+			Vector2(x_start, water_y),
+			Vector2(x_start, water_y + 10),
+			Vector2(x_end, water_y + 10),
+			Vector2(x_end, water_y),
+		])
+
+func _find_left_water_edge_x(x_start: float, x_end: float, water_y: float) -> float:
+	# Find leftmost x where terrain dips below water_y (left shore of pool)
+	for i in range(cave_terrain_points.size() - 1):
+		var pt_a: Vector2 = cave_terrain_points[i]
+		var pt_b: Vector2 = cave_terrain_points[i + 1]
+		if pt_b.x < x_start:
+			continue
+		if pt_a.x > x_end:
+			break
+		# Terrain goes from above water to below water → left shore
+		if pt_a.y <= water_y and pt_b.y >= water_y:
+			var t: float = (water_y - pt_a.y) / (pt_b.y - pt_a.y + 0.001)
+			return lerpf(pt_a.x, pt_b.x, t)
+		# Already below water at this point
+		if pt_a.y >= water_y and pt_a.x >= x_start:
+			return pt_a.x
+	return x_start
+
+func _update_cave_pool_visual(pool_index: int) -> void:
+	if pool_index < 0 or pool_index >= cave_pool_refs.size():
+		return
+	var refs: Dictionary = cave_pool_refs[pool_index]
+	var fill: float = GameManager.get_cave_pool_fill_fraction(cave_id, pool_index)
+	var completed: bool = GameManager.is_cave_pool_completed(cave_id, pool_index)
+
+	if completed:
+		# Hide water, disable wall, reveal loot
+		if is_instance_valid(refs["water_poly"]):
+			refs["water_poly"].visible = false
+		if is_instance_valid(refs["water_hl"]):
+			refs["water_hl"].visible = false
+		if is_instance_valid(refs["wall_coll"]):
+			refs["wall_coll"].set_deferred("disabled", true)
+		if is_instance_valid(refs["glow_light"]):
+			refs["glow_light"].visible = false
+		if refs["loot_ref"] != null and is_instance_valid(refs["loot_ref"]):
+			refs["loot_ref"].visible = true
+		# Sparkle effect
+		_spawn_pool_sparkle(refs["valley_min_x"], refs["valley_min_y"])
+	else:
+		# Update water level
+		var water_y: float = lerpf(refs["valley_min_y"], refs["overflow_y"], fill)
+		if is_instance_valid(refs["water_poly"]):
+			_update_water_poly_shape(refs["water_poly"], refs["x_start"], refs["x_end"], water_y)
+			refs["water_poly"].visible = true
+		if is_instance_valid(refs["water_hl"]):
+			refs["water_hl"].position.y = water_y
+			refs["water_hl"].visible = true
+		if is_instance_valid(refs["glow_light"]):
+			refs["glow_light"].energy = 0.8 * fill
+			refs["glow_light"].visible = true
+		# Move wall to track left water edge
+		if is_instance_valid(refs["wall_coll"]):
+			var new_wall_x: float = _find_left_water_edge_x(refs["x_start"], refs["x_end"], water_y)
+			var wall_h: float = refs["overflow_y"] - _get_cave_ceiling_y_at(new_wall_x) + 20
+			refs["wall_coll"].position = Vector2(new_wall_x, refs["overflow_y"] - wall_h * 0.5)
+			refs["wall_shape"].size = Vector2(8, wall_h)
+
+func _spawn_pool_sparkle(sx: float, sy: float) -> void:
+	for i in range(8):
+		var spark := ColorRect.new()
+		spark.size = Vector2(2, 2)
+		spark.color = crystal_color.lightened(0.3)
+		spark.position = Vector2(sx + randf_range(-20, 20), sy + randf_range(-10, 5))
+		spark.z_index = 8
+		add_child(spark)
+		var tw := create_tween()
+		tw.tween_property(spark, "position:y", spark.position.y - randf_range(15, 30), 0.6)
+		tw.parallel().tween_property(spark, "modulate:a", 0.0, 0.6)
+		tw.tween_callback(spark.queue_free)
+
+func _on_cave_pool_level_changed(changed_cave_id: String, pool_index: int, _fill_fraction: float) -> void:
+	if changed_cave_id != cave_id:
+		return
+	_update_cave_pool_visual(pool_index)
+
+func _on_cave_pool_completed(completed_cave_id: String, pool_index: int) -> void:
+	if completed_cave_id != cave_id:
+		return
+	_update_cave_pool_visual(pool_index)
 
 # --- Cracks & Fissures ---
 func _build_cracks() -> void:
@@ -511,6 +753,103 @@ func _build_dust_motes() -> void:
 			"top_y": top_y + 10,
 			"bottom_y": bottom_y - 10,
 		})
+
+# --- Moisture Gleam (Phase 9B) ---
+func _build_moisture_gleams() -> void:
+	# Shiny pixel flickers on wet cave walls near pools
+	if cave_pool_defs.size() == 0:
+		return
+	for pool_def in cave_pool_defs:
+		var px_start: float = pool_def["x_range"][0]
+		var px_end: float = pool_def["x_range"][1]
+		# Place gleam pixels on walls near each pool
+		for _g in range(randi_range(4, 8)):
+			var gx: float = randf_range(px_start - 20, px_end + 20)
+			# Place on wall (near floor or ceiling)
+			var gy: float
+			if randf() > 0.5:
+				gy = _get_cave_terrain_y_at(gx) - randf_range(2, 15)  # Above floor
+			else:
+				gy = _get_cave_ceiling_y_at(gx) + randf_range(2, 15)  # Below ceiling
+			var gleam := ColorRect.new()
+			gleam.size = Vector2(1, 1)
+			gleam.color = Color(1.0, 1.0, 1.0, 0.0)
+			gleam.position = Vector2(gx, gy)
+			gleam.z_index = 8
+			add_child(gleam)
+			moisture_gleams.append({
+				"node": gleam,
+				"phase": randf() * TAU,
+				"flash_timer": randf_range(2.0, 8.0),
+				"flash_interval": randf_range(3.0, 10.0),
+			})
+
+# --- Light Shafts from ceiling ---
+func _build_light_shafts() -> void:
+	var left_x: float = cave_terrain_points[0].x
+	var right_x: float = cave_terrain_points[cave_terrain_points.size() - 1].x
+	# Fewer shafts in later/deeper caves (by cave order)
+	var cave_order: int = GameManager.CAVE_DEFINITIONS.get(cave_id, {}).get("order", 0)
+	var num_shafts: int = clampi(3 - cave_order / 3, 1, 3)
+	for i in range(num_shafts):
+		var sx: float = randf_range(left_x + 80, right_x - 80)
+		var ceil_y: float = _get_cave_ceiling_y_at(sx)
+		var floor_y: float = _get_cave_terrain_y_at(sx)
+		var beam_len: float = (floor_y - ceil_y) * randf_range(0.5, 0.8)
+		# Light beam Line2D
+		var beam := Line2D.new()
+		beam.width = randf_range(4, 8)
+		beam.default_color = Color(0.9, 0.85, 0.7, randf_range(0.03, 0.06))
+		beam.add_point(Vector2(sx, ceil_y))
+		beam.add_point(Vector2(sx + randf_range(-3, 3), ceil_y + beam_len))
+		beam.z_index = 6
+		add_child(beam)
+		# Light source at crack
+		var shaft_light := PointLight2D.new()
+		shaft_light.position = Vector2(sx, ceil_y + 5)
+		shaft_light.color = Color(0.9, 0.85, 0.7)
+		shaft_light.blend_mode = PointLight2D.BLEND_MODE_ADD
+		shaft_light.energy = randf_range(0.3, 0.6)
+		shaft_light.shadow_enabled = false
+		var sl_tex := GradientTexture2D.new()
+		sl_tex.width = 128
+		sl_tex.height = 128
+		sl_tex.fill = GradientTexture2D.FILL_RADIAL
+		sl_tex.fill_from = Vector2(0.5, 0.5)
+		sl_tex.fill_to = Vector2(0.5, 0.0)
+		var sl_grad := Gradient.new()
+		sl_grad.set_offset(0, 0.0)
+		sl_grad.set_color(0, Color(1, 1, 1, 1))
+		sl_grad.set_offset(1, 1.0)
+		sl_grad.set_color(1, Color(0, 0, 0, 0))
+		sl_tex.gradient = sl_grad
+		shaft_light.texture = sl_tex
+		shaft_light.texture_scale = 0.3
+		add_child(shaft_light)
+
+# --- Parallax background (distant rock silhouettes) ---
+func _build_parallax_bg() -> void:
+	var left_x: float = cave_terrain_points[0].x
+	var right_x: float = cave_terrain_points[cave_terrain_points.size() - 1].x
+	var mid_y: float = (cave_ceiling_points[0].y + cave_terrain_points[0].y) * 0.5
+	var bg_color: Color = ground_color.darkened(0.4)
+	bg_color.a = 0.3
+	# 3-4 distant rock silhouette shapes
+	for i in range(randi_range(3, 5)):
+		var bx: float = randf_range(left_x, right_x)
+		var by: float = mid_y + randf_range(-20, 20)
+		var bw: float = randf_range(30, 80)
+		var bh: float = randf_range(20, 50)
+		var bg_rock := Polygon2D.new()
+		bg_rock.polygon = PackedVector2Array([
+			Vector2(bx, by),
+			Vector2(bx + bw * 0.3, by - bh),
+			Vector2(bx + bw * 0.6, by - bh * 0.7),
+			Vector2(bx + bw, by),
+		])
+		bg_rock.color = bg_color
+		bg_rock.z_index = -5
+		add_child(bg_rock)
 
 # --- Exit Zone ---
 func _build_exit_zone() -> void:
@@ -651,6 +990,47 @@ func _process(delta: float) -> void:
 			new_x += range_x
 		var new_y: float = dm["base_y"] + sin(wave_time * 0.8 + dm["phase"]) * 4.0
 		n.position = Vector2(new_x, new_y)
+
+	# Phase 9B: Moisture gleam flickers
+	for mg in moisture_gleams:
+		if not is_instance_valid(mg["node"]):
+			continue
+		mg["flash_timer"] += delta
+		if mg["flash_timer"] >= mg["flash_interval"]:
+			mg["flash_timer"] = 0.0
+			mg["flash_interval"] = randf_range(3.0, 10.0)
+			# Brief white flash
+			var gleam_node: ColorRect = mg["node"]
+			gleam_node.color.a = 0.8
+			var tw := create_tween()
+			tw.tween_property(gleam_node, "color:a", 0.0, randf_range(0.2, 0.5))
+
+	# Pulse cave pool glow lights
+	for i in range(cave_pool_refs.size()):
+		if i < cave_pool_refs.size():
+			var refs: Dictionary = cave_pool_refs[i]
+			if is_instance_valid(refs["glow_light"]) and refs["glow_light"].visible:
+				var fill: float = GameManager.get_cave_pool_fill_fraction(cave_id, i)
+				refs["glow_light"].energy = 0.8 * fill * (0.9 + sin(wave_time * 1.2 + float(i)) * 0.1)
+
+	# Proximity-based cave pool detection (more reliable than Area2D)
+	if player_ref and is_instance_valid(player_ref) and player_ref.has_method("set_near_cave_pool"):
+		var px: float = player_ref.position.x
+		var found_pool: int = -1
+		for i in range(cave_pool_refs.size()):
+			var refs: Dictionary = cave_pool_refs[i]
+			if GameManager.is_cave_pool_completed(cave_id, i):
+				continue
+			# Player is near pool if within 50px left of pool start or inside pool range
+			if px >= refs["x_start"] - 50.0 and px <= refs["x_end"] + 20.0:
+				found_pool = i
+				break
+		if found_pool >= 0:
+			if not player_ref.near_cave_pool or player_ref.cave_pool_index != found_pool:
+				player_ref.set_near_cave_pool(true, cave_id, found_pool)
+		else:
+			if player_ref.near_cave_pool:
+				player_ref.set_near_cave_pool(false, cave_id, player_ref.cave_pool_index)
 
 func _spawn_drip() -> void:
 	if cave_ceiling_points.size() == 0:
