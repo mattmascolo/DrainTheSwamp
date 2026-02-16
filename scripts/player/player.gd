@@ -5,13 +5,11 @@ const GRAVITY: float = 800.0
 const SCOOP_COOLDOWN: float = 0.3
 const STAMINA_REGEN_DELAY_TIME: float = 0.0
 
-signal pump_requested()
 signal shop_requested()
 signal cave_entrance_requested(cave_id: String)
 
 var near_water: bool = false
 var near_swamp_index: int = -1
-var near_pump: bool = false
 var near_shop: bool = false
 var near_cave_entrance: bool = false
 var near_cave_id: String = ""
@@ -278,10 +276,6 @@ func _handle_scoop() -> void:
 		return
 	if near_shop:
 		shop_requested.emit()
-		scoop_cooldown_timer = SCOOP_COOLDOWN
-		return
-	if near_pump:
-		pump_requested.emit()
 		scoop_cooldown_timer = SCOOP_COOLDOWN
 		return
 	if GameManager.current_tool_id == "hose":
@@ -622,9 +616,6 @@ func _spawn_floating_text(text: String, color: Color = Color(0.3, 1.0, 0.4)) -> 
 	tween.tween_property(label, "position:y", label.position.y - 32, 0.8)
 	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.8)
 	tween.tween_callback(label.queue_free)
-
-func set_near_pump(value: bool) -> void:
-	near_pump = value
 
 func set_near_shop(value: bool) -> void:
 	near_shop = value

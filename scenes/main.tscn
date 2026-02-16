@@ -1,12 +1,10 @@
-[gd_scene load_steps=8 format=3 uid="uid://bmainscene01"]
+[gd_scene load_steps=6 format=3 uid="uid://bmainscene01"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_script"]
 [ext_resource type="PackedScene" uid="uid://bgameworld01" path="res://scenes/game_world.tscn" id="2_gameworld"]
 [ext_resource type="PackedScene" uid="uid://bhud00000001" path="res://scenes/ui/hud.tscn" id="3_hud"]
 [ext_resource type="PackedScene" uid="uid://bshoppanel01" path="res://scenes/ui/shop_panel.tscn" id="4_shop"]
-[ext_resource type="PackedScene" uid="uid://bstatpanel01" path="res://scenes/ui/stat_panel.tscn" id="5_stats"]
-[ext_resource type="PackedScene" uid="uid://bpumppanel01" path="res://scenes/ui/pump_panel.tscn" id="6_pump"]
-[ext_resource type="PackedScene" uid="uid://bmenupanel01" path="res://scenes/ui/menu_panel.tscn" id="7_menu"]
+[ext_resource type="PackedScene" uid="uid://bmenupanel01" path="res://scenes/ui/menu_panel.tscn" id="5_menu"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_script")
@@ -20,8 +18,4 @@ layer = 20
 
 [node name="ShopPanel" parent="UILayer" instance=ExtResource("4_shop")]
 
-[node name="StatPanel" parent="UILayer" instance=ExtResource("5_stats")]
-
-[node name="PumpPanel" parent="UILayer" instance=ExtResource("6_pump")]
-
-[node name="MenuPanel" parent="UILayer" instance=ExtResource("7_menu")]
+[node name="MenuPanel" parent="UILayer" instance=ExtResource("5_menu")]

@@ -329,5 +329,5 @@ shape = SubResource("RectangleShape2D_body")
 offset = Vector2(0, -20)
 limit_left = -60
 limit_top = -60
-limit_right = 1940
+limit_right = 5600
 limit_bottom = 440

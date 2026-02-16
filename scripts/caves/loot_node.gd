@@ -7,7 +7,6 @@ extends Node2D
 @export var reward_upgrades: Dictionary = {}  # {upgrade_id: levels_to_add}
 @export var reward_tool_unlock: String = ""  # tool_id to grant ownership for free
 @export var reward_stat_levels: Dictionary = {}  # {stat_id: levels_to_add}
-@export var reward_pump_levels: int = 0  # pump upgrade levels to grant
 @export var reward_text: String = ""
 
 var player_in_range: bool = false
@@ -134,12 +133,6 @@ func _collect() -> void:
 		if GameManager.stat_levels.has(stat_id):
 			GameManager.stat_levels[stat_id] += levels
 			GameManager.stat_upgraded.emit(stat_id, GameManager.stat_levels[stat_id])
-	# Grant pump levels
-	if reward_pump_levels > 0:
-		if not GameManager.pump_owned:
-			GameManager.pump_owned = true
-		GameManager.pump_level += reward_pump_levels
-		GameManager.pump_changed.emit()
 
 	# Mark collected in GameManager
 	GameManager.collect_loot(cave_id, loot_id, reward_text)

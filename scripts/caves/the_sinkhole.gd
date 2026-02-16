@@ -45,12 +45,12 @@ func _setup_loot_and_lore() -> void:
 	loot1.position = Vector2(400, _get_cave_terrain_y_at(400))
 	add_child(loot1)
 
-	# Broken pump parts at x=900
+	# Sunken strongbox at x=900
 	var loot2 = preload("res://scripts/caves/loot_node.gd").new()
-	loot2.loot_id = "pump_parts"
+	loot2.loot_id = "sunken_strongbox"
 	loot2.cave_id = cave_id
-	loot2.reward_pump_levels = 5
-	loot2.reward_text = "Found broken pump parts! Pump upgraded +5 levels!"
+	loot2.reward_money = 15000.0
+	loot2.reward_text = "Pried open a sunken strongbox! +$15,000"
 	loot2.position = Vector2(900, _get_cave_terrain_y_at(900))
 	add_child(loot2)
 

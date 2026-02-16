@@ -11,7 +11,7 @@ var cycle_time: float = 0.0
 var terrain_points: Array[Vector2] = [
 	# Left shore (shop area) — indices 0-1
 	Vector2(-40, 136), Vector2(80, 136),
-	# Puddle (~7 pts) — indices 2-8: gentle, worn, slight asymmetry
+	# Puddle (7 pts) — indices 2-8: shallow worn dip, left-leaning
 	Vector2(108, 160),   # entry top
 	Vector2(130, 168),   # entry mid-shelf
 	Vector2(142, 163),   # small notch up
@@ -21,7 +21,7 @@ var terrain_points: Array[Vector2] = [
 	Vector2(200, 148),   # exit top (gradual climb)
 	# Ridge 1 — smooth hump — indices 9-10
 	Vector2(230, 142), Vector2(270, 155),
-	# Pond (~9 pts) — indices 11-19: stepped, layered
+	# Pond (9 pts) — indices 11-19: off-center V, one steep wall
 	Vector2(310, 195),   # entry top
 	Vector2(330, 204),   # entry shelf
 	Vector2(348, 200),   # step back up
@@ -33,61 +33,208 @@ var terrain_points: Array[Vector2] = [
 	Vector2(480, 186),   # exit top
 	# Ridge 2 — plateau — indices 20-22
 	Vector2(520, 178), Vector2(555, 180), Vector2(595, 192),
-	# Marsh (~11 pts) — indices 23-33: uneven, organic
+	# Marsh (13 pts) — indices 23-35: wide, lumpy, organic
 	Vector2(650, 240),   # entry top
 	Vector2(670, 248),   # entry slope
-	Vector2(688, 244),   # bump
+	Vector2(688, 244),   # bump up
 	Vector2(705, 252),   # dip
-	Vector2(725, 256),   # basin
-	Vector2(748, 258),   # deepest
-	Vector2(770, 254),   # rise
-	Vector2(790, 256),   # second dip
-	Vector2(808, 250),   # rise
-	Vector2(822, 248),   # exit slope
-	Vector2(845, 232),   # exit top
-	# Ridge 3 — jagged peak — indices 34-36
-	Vector2(880, 224), Vector2(910, 218), Vector2(945, 238),
-	# Bog (~11 pts) — indices 37-47: steep, cracked, stair-step
-	Vector2(1010, 296),  # entry top
-	Vector2(1028, 306),  # steep entry
-	Vector2(1045, 302),  # crack ledge
-	Vector2(1060, 312),  # deeper
-	Vector2(1085, 316),  # basin
-	Vector2(1115, 318),  # deepest
-	Vector2(1145, 314),  # rise
-	Vector2(1168, 316),  # second crack
-	Vector2(1188, 310),  # stair step up
-	Vector2(1205, 306),  # exit ledge
-	Vector2(1230, 284),  # exit top
-	# Ridge 4 — cracked flat — indices 48-51
-	Vector2(1270, 276), Vector2(1300, 280), Vector2(1330, 278), Vector2(1360, 294),
-	# Deep Swamp (~13 pts) — indices 52-64: jagged, raw, multiple ledges
-	Vector2(1430, 348),  # entry top
-	Vector2(1448, 356),  # entry ledge
-	Vector2(1465, 352),  # notch up
-	Vector2(1485, 362),  # deeper
-	Vector2(1510, 368),  # basin shelf
-	Vector2(1540, 372),  # deep basin
-	Vector2(1570, 374),  # deepest
-	Vector2(1598, 370),  # rise
-	Vector2(1620, 372),  # second dip
-	Vector2(1645, 366),  # ledge
-	Vector2(1665, 368),  # notch
-	Vector2(1682, 362),  # exit slope
-	Vector2(1710, 344),  # exit top
-	# Right shore — indices 65-66
-	Vector2(1775, 340), Vector2(1920, 358),
+	Vector2(720, 250),   # rise
+	Vector2(738, 256),   # deeper
+	Vector2(758, 258),   # deepest
+	Vector2(775, 254),   # rise
+	Vector2(795, 257),   # second dip
+	Vector2(812, 252),   # bump
+	Vector2(828, 250),   # rise
+	Vector2(842, 248),   # exit slope
+	Vector2(862, 232),   # exit top
+	# Ridge 3 — jagged peak — indices 36-38
+	Vector2(895, 224), Vector2(925, 218), Vector2(960, 238),
+	# Bog (15 pts) — indices 39-53: steep jagged entry, stair-steps
+	Vector2(1020, 296),  # entry top
+	Vector2(1036, 310),  # steep entry
+	Vector2(1048, 304),  # crack ledge
+	Vector2(1062, 316),  # deeper ledge
+	Vector2(1080, 320),  # stair
+	Vector2(1098, 318),  # step back
+	Vector2(1118, 324),  # basin
+	Vector2(1140, 326),  # deepest
+	Vector2(1162, 322),  # rise
+	Vector2(1180, 324),  # second crack
+	Vector2(1198, 318),  # stair step up
+	Vector2(1215, 314),  # ledge
+	Vector2(1230, 310),  # exit ledge
+	Vector2(1244, 306),  # exit slope
+	Vector2(1262, 284),  # exit top
+	# Ridge 4 — cracked flat — indices 54-57
+	Vector2(1300, 276), Vector2(1330, 280), Vector2(1360, 278), Vector2(1395, 294),
+	# Swamp (17 pts) — indices 58-74: lopsided canyon, left cliff, gradual right slope
+	Vector2(1450, 340),  # entry top (steep left cliff)
+	Vector2(1462, 360),  # steep drop
+	Vector2(1472, 354),  # notch
+	Vector2(1486, 370),  # deeper
+	Vector2(1505, 376),  # ledge
+	Vector2(1528, 382),  # basin left
+	Vector2(1555, 386),  # deep basin
+	Vector2(1582, 390),  # deepest (far off-center right)
+	Vector2(1608, 388),  # slight rise
+	Vector2(1632, 384),  # gradual slope
+	Vector2(1658, 380),  # continuing slope
+	Vector2(1680, 374),  # slope
+	Vector2(1700, 368),  # slope
+	Vector2(1720, 362),  # slope
+	Vector2(1740, 356),  # slope
+	Vector2(1758, 350),  # exit slope
+	Vector2(1780, 334),  # exit top
+	# Ridge 5 — narrow spike — indices 75-77
+	Vector2(1820, 326), Vector2(1850, 318), Vector2(1885, 332),
+	# Lake (19 pts) — indices 78-96: wide open, underwater ridges
+	Vector2(1940, 380),  # entry top
+	Vector2(1960, 396),  # entry slope
+	Vector2(1985, 404),  # shelf
+	Vector2(2010, 398),  # ridge up
+	Vector2(2035, 410),  # trench
+	Vector2(2065, 416),  # deep
+	Vector2(2100, 420),  # deeper
+	Vector2(2138, 424),  # approaching deepest
+	Vector2(2175, 426),  # deepest
+	Vector2(2210, 422),  # rise
+	Vector2(2245, 418),  # underwater ridge
+	Vector2(2275, 412),  # ridge peak
+	Vector2(2305, 418),  # back down
+	Vector2(2335, 414),  # rise
+	Vector2(2365, 408),  # exit slope
+	Vector2(2390, 402),  # exit slope
+	Vector2(2410, 396),  # exit slope
+	Vector2(2430, 390),  # exit slope
+	Vector2(2455, 372),  # exit top
+	# Ridge 6 — stepped — indices 97-99
+	Vector2(2495, 364), Vector2(2525, 358), Vector2(2560, 370),
+	# Reservoir (21 pts) — indices 100-120: angular, dam-like, near-vertical walls
+	Vector2(2610, 412),  # entry top
+	Vector2(2622, 440),  # near-vertical drop
+	Vector2(2636, 436),  # angular ledge
+	Vector2(2650, 450),  # deeper
+	Vector2(2668, 454),  # step
+	Vector2(2690, 460),  # deep
+	Vector2(2715, 464),  # deeper
+	Vector2(2740, 466),  # basin
+	Vector2(2770, 468),  # deepest
+	Vector2(2800, 466),  # rise
+	Vector2(2830, 464),  # ledge
+	Vector2(2858, 460),  # step up
+	Vector2(2885, 456),  # angular
+	Vector2(2910, 452),  # rise
+	Vector2(2935, 448),  # step
+	Vector2(2958, 444),  # angular
+	Vector2(2978, 440),  # exit slope
+	Vector2(2996, 434),  # exit slope
+	Vector2(3012, 428),  # exit
+	Vector2(3028, 420),  # exit slope
+	Vector2(3048, 404),  # exit top
+	# Ridge 7 — jagged — indices 121-123
+	Vector2(3088, 396), Vector2(3115, 388), Vector2(3148, 400),
+	# Lagoon (23 pts) — indices 124-146: winding irregular, sub-basins
+	Vector2(3200, 440),  # entry top
+	Vector2(3218, 458),  # drop
+	Vector2(3240, 462),  # shelf
+	Vector2(3265, 468),  # sub-basin 1
+	Vector2(3288, 472),  # deep
+	Vector2(3310, 468),  # pinch point rise
+	Vector2(3332, 464),  # narrow
+	Vector2(3358, 470),  # sub-basin 2
+	Vector2(3385, 478),  # deeper
+	Vector2(3412, 482),  # deepest
+	Vector2(3440, 478),  # rise
+	Vector2(3465, 474),  # ridge
+	Vector2(3488, 470),  # pinch
+	Vector2(3510, 476),  # sub-basin 3
+	Vector2(3535, 480),  # deep
+	Vector2(3558, 476),  # rise
+	Vector2(3580, 472),  # slope
+	Vector2(3600, 466),  # exit slope
+	Vector2(3618, 460),  # exit
+	Vector2(3636, 454),  # exit
+	Vector2(3652, 448),  # exit
+	Vector2(3668, 442),  # exit slope
+	Vector2(3688, 430),  # exit top
+	# Ridge 8 — broken — indices 147-150
+	Vector2(3725, 422), Vector2(3755, 414), Vector2(3780, 420), Vector2(3810, 432),
+	# Bayou (25 pts) — indices 151-175: collapsed, twisted, chaotic
+	Vector2(3865, 468),  # entry top
+	Vector2(3878, 486),  # steep collapse
+	Vector2(3895, 480),  # root protrusion up
+	Vector2(3912, 492),  # deeper
+	Vector2(3932, 498),  # collapsed section
+	Vector2(3955, 494),  # bump
+	Vector2(3978, 502),  # deeper
+	Vector2(4002, 508),  # basin
+	Vector2(4028, 512),  # deep
+	Vector2(4055, 516),  # deeper
+	Vector2(4082, 520),  # approaching deepest
+	Vector2(4108, 522),  # deepest
+	Vector2(4135, 518),  # rise
+	Vector2(4158, 522),  # second dip
+	Vector2(4180, 516),  # rise
+	Vector2(4200, 510),  # slope
+	Vector2(4220, 506),  # root bump
+	Vector2(4238, 500),  # slope
+	Vector2(4258, 494),  # slope
+	Vector2(4276, 488),  # slope
+	Vector2(4295, 482),  # slope
+	Vector2(4312, 478),  # exit
+	Vector2(4328, 474),  # exit
+	Vector2(4345, 470),  # exit slope
+	Vector2(4365, 456),  # exit top
+	# Ridge 9 — ancient stone — indices 176-179
+	Vector2(4400, 448), Vector2(4430, 440), Vector2(4458, 436), Vector2(4490, 450),
+	# The Atlantic (29 pts) — indices 180-208: continental shelf, trench, underwater mountain
+	Vector2(4550, 484),  # entry top (continental shelf)
+	Vector2(4575, 496),  # shelf slope
+	Vector2(4600, 504),  # shelf
+	Vector2(4630, 508),  # shelf edge
+	Vector2(4660, 520),  # steep drop begins
+	Vector2(4688, 540),  # cliff
+	Vector2(4710, 558),  # deep drop
+	Vector2(4735, 572),  # trench approach
+	Vector2(4762, 582),  # trench
+	Vector2(4790, 590),  # deep trench
+	Vector2(4820, 596),  # deeper
+	Vector2(4852, 600),  # trench floor
+	Vector2(4885, 604),  # deepest
+	Vector2(4918, 600),  # rise
+	Vector2(4950, 594),  # underwater mountain base
+	Vector2(4978, 582),  # mountain slope
+	Vector2(5005, 570),  # mountain peak
+	Vector2(5030, 578),  # back down
+	Vector2(5058, 588),  # second basin
+	Vector2(5088, 594),  # deep
+	Vector2(5120, 590),  # rise
+	Vector2(5148, 584),  # slope
+	Vector2(5178, 576),  # slope
+	Vector2(5208, 566),  # slope
+	Vector2(5238, 556),  # exit slope
+	Vector2(5268, 544),  # exit
+	Vector2(5298, 530),  # exit
+	Vector2(5328, 516),  # exit slope
+	Vector2(5360, 498),  # exit top
+	# Right shore — indices 209-210
+	Vector2(5420, 490), Vector2(5500, 498),
 ]
 
 # Swamp geometry: [entry_top_index, exit_top_index] into terrain_points
 const SWAMP_RANGES: Array = [
-	[2, 8],    # Puddle
-	[11, 19],  # Pond
-	[23, 33],  # Marsh
-	[37, 47],  # Bog
-	[52, 64],  # Deep Swamp
+	[2, 8],      # Puddle
+	[11, 19],    # Pond
+	[23, 35],    # Marsh
+	[39, 53],    # Bog
+	[58, 74],    # Swamp
+	[78, 96],    # Lake
+	[100, 120],  # Reservoir
+	[124, 146],  # Lagoon
+	[151, 175],  # Bayou
+	[180, 208],  # The Atlantic
 ]
-const SWAMP_COUNT: int = 5
+const SWAMP_COUNT: int = 10
 const WATER_SHADER = preload("res://shaders/water.gdshader")
 const POST_PROCESS_SHADER = preload("res://shaders/post_process.gdshader")
 
@@ -110,8 +257,6 @@ var lily_pads: Array[Dictionary] = []
 var depth_polygons: Array[Polygon2D] = []
 var shimmer_lines: Array[Line2D] = []
 var mud_patches: Array[Dictionary] = []
-var player_in_pump_area: bool = false
-var pump_player_ref: Node2D = null
 var player_in_shop_area: bool = false
 var shop_player_ref: Node2D = null
 var camels: Array[Dictionary] = []
@@ -129,7 +274,6 @@ var birds: Array[Dictionary] = []
 var bird_timer: float = 0.0
 var fog_patches: Array[Dictionary] = []
 var dragonflies: Array[Dictionary] = []
-var pump_light_ref: ColorRect = null
 var water_highlights: Array[Dictionary] = []
 var sun_node: Node2D = null
 var fish: Array[Dictionary] = []
@@ -179,7 +323,6 @@ var grown_plants: Array[Dictionary] = []
 var last_drain_thresholds: Array[float] = []
 
 # Atmosphere effects (Phase 17)
-var pump_steam_particles: Array[Dictionary] = []
 var morning_mist_rects: Array[ColorRect] = []
 var aurora_lines: Array[Dictionary] = []
 var aurora_active: bool = false
@@ -190,13 +333,10 @@ var owl_blink_timer: float = 4.0
 
 # Cave entrances
 var cave_entrances: Array[Dictionary] = []
-const CAVE_IDS: Array = ["muddy_hollow", "gator_den", "the_sinkhole", "collapsed_mine", "the_abyss"]
+const CAVE_IDS: Array = ["muddy_hollow", "gator_den", "the_sinkhole", "collapsed_mine", "the_mire", "sunken_grotto", "the_cistern", "coral_cavern", "the_underdark", "mariana_trench"]
 
 # Dynamic shadows (Phase 13c)
 var player_shadow: ColorRect = null
-
-# Pump station glow (Phase 11b)
-var pump_glow_rect: ColorRect = null
 
 # Colors
 const SKY_COLOR_TOP := Color(0.22, 0.38, 0.72)
@@ -215,21 +355,36 @@ const SWAMP_WATER_COLORS: Array[Color] = [
 	Color(0.18, 0.42, 0.22, 0.88),  # Pond: classic pastoral green
 	Color(0.30, 0.28, 0.15, 0.92),  # Marsh: murky brown-olive
 	Color(0.12, 0.10, 0.08, 0.95),  # Bog: dark peaty brown-black
-	Color(0.08, 0.12, 0.20, 0.97),  # Deep Swamp: inky dark blue
+	Color(0.10, 0.18, 0.12, 0.94),  # Swamp: dark murky green
+	Color(0.15, 0.30, 0.50, 0.88),  # Lake: clear deep blue
+	Color(0.12, 0.20, 0.35, 0.92),  # Reservoir: slate blue-gray
+	Color(0.10, 0.35, 0.40, 0.90),  # Lagoon: tropical teal
+	Color(0.06, 0.08, 0.14, 0.96),  # Bayou: near-black murk
+	Color(0.04, 0.08, 0.22, 0.98),  # The Atlantic: abyssal deep blue
 ]
 const SWAMP_WATER_EMPTY_COLORS: Array[Color] = [
 	Color(0.45, 0.65, 0.68, 0.45),  # Puddle: pale aqua
 	Color(0.30, 0.52, 0.32, 0.55),  # Pond: faded green
 	Color(0.40, 0.38, 0.25, 0.60),  # Marsh: dried mud
 	Color(0.22, 0.18, 0.14, 0.65),  # Bog: dark peat residue
-	Color(0.15, 0.18, 0.28, 0.68),  # Deep Swamp: dark slate
+	Color(0.20, 0.28, 0.22, 0.62),  # Swamp: dried green-brown
+	Color(0.25, 0.40, 0.55, 0.55),  # Lake: pale blue
+	Color(0.22, 0.30, 0.42, 0.60),  # Reservoir: faded gray-blue
+	Color(0.20, 0.42, 0.45, 0.58),  # Lagoon: faded teal
+	Color(0.14, 0.16, 0.22, 0.68),  # Bayou: dark residue
+	Color(0.10, 0.14, 0.28, 0.72),  # The Atlantic: dark slate
 ]
 const SWAMP_DEPTH_COLORS: Array[Color] = [
 	Color(0.15, 0.35, 0.38, 0.40),  # Puddle: light teal depth
 	Color(0.06, 0.22, 0.08, 0.55),  # Pond: forest green depth
 	Color(0.18, 0.14, 0.06, 0.65),  # Marsh: mud brown depth
 	Color(0.05, 0.04, 0.03, 0.75),  # Bog: near-black depth
-	Color(0.03, 0.05, 0.12, 0.80),  # Deep Swamp: dark navy depth
+	Color(0.04, 0.10, 0.06, 0.72),  # Swamp: dark green depth
+	Color(0.06, 0.15, 0.30, 0.70),  # Lake: deep blue depth
+	Color(0.05, 0.10, 0.22, 0.75),  # Reservoir: dark steel depth
+	Color(0.04, 0.18, 0.22, 0.72),  # Lagoon: teal depth
+	Color(0.02, 0.03, 0.08, 0.82),  # Bayou: pitch dark depth
+	Color(0.01, 0.03, 0.12, 0.88),  # The Atlantic: abyssal depth
 ]
 # Per-pool shader parameters: [wave_strength, specular, choppiness, turbidity, foam_density]
 const POOL_SHADER_PARAMS: Array[Array] = [
@@ -237,7 +392,12 @@ const POOL_SHADER_PARAMS: Array[Array] = [
 	[1.2, 0.3, 0.3, 0.15, 0.8],    # Pond: gentle waves, some sheen
 	[1.5, 0.15, 0.8, 0.5, 1.2],    # Marsh: choppy, murky
 	[1.8, 0.1, 1.2, 0.7, 1.5],     # Bog: rough, opaque
-	[2.5, 0.08, 2.0, 0.85, 2.0],   # Deep Swamp: wild, very murky
+	[2.2, 0.08, 1.8, 0.8, 1.8],    # Swamp: rough, murky
+	[1.8, 0.25, 1.0, 0.3, 1.0],    # Lake: moderate, clearer
+	[1.5, 0.12, 0.8, 0.5, 1.4],    # Reservoir: contained, steady
+	[2.0, 0.20, 1.4, 0.4, 1.6],    # Lagoon: tropical waves
+	[2.8, 0.06, 2.2, 0.9, 2.2],    # Bayou: wild, opaque
+	[3.5, 0.05, 2.5, 0.95, 2.5],   # The Atlantic: massive, deep
 ]
 # Per-pool foam colors
 const POOL_FOAM_COLORS: Array[Color] = [
@@ -245,7 +405,12 @@ const POOL_FOAM_COLORS: Array[Color] = [
 	Color(0.85, 0.92, 0.85, 0.30),  # Pond: green-white
 	Color(0.65, 0.58, 0.42, 0.28),  # Marsh: brownish foam
 	Color(0.45, 0.38, 0.28, 0.25),  # Bog: dark brown foam
-	Color(0.30, 0.35, 0.48, 0.22),  # Deep Swamp: dark bluish foam
+	Color(0.35, 0.40, 0.30, 0.24),  # Swamp: dark green foam
+	Color(0.70, 0.80, 0.92, 0.28),  # Lake: blue-white foam
+	Color(0.50, 0.55, 0.65, 0.25),  # Reservoir: gray foam
+	Color(0.60, 0.75, 0.78, 0.26),  # Lagoon: teal foam
+	Color(0.25, 0.28, 0.35, 0.20),  # Bayou: near-black foam
+	Color(0.40, 0.50, 0.70, 0.22),  # The Atlantic: deep blue foam
 ]
 # Per-pool wave params: [amplitude, frequency]
 const POOL_WAVE_PARAMS: Array[Array] = [
@@ -253,7 +418,12 @@ const POOL_WAVE_PARAMS: Array[Array] = [
 	[1.0, 2.2],   # Pond: moderate
 	[1.6, 1.5],   # Marsh: medium/slower
 	[2.2, 1.1],   # Bog: large/slow
-	[3.0, 0.8],   # Deep Swamp: large/very slow
+	[2.6, 0.9],   # Swamp: large/slow
+	[2.0, 1.2],   # Lake: moderate/wide
+	[1.8, 1.0],   # Reservoir: steady
+	[2.4, 0.9],   # Lagoon: tropical swell
+	[3.0, 0.7],   # Bayou: heavy/slow
+	[4.0, 0.5],   # The Atlantic: massive/very slow
 ]
 # Per-pool bowl depth for rounded basin shape
 const GRASS_COLOR := Color(0.25, 0.48, 0.15)
@@ -275,7 +445,6 @@ func _ready() -> void:
 	_build_terrain_details()
 	_build_terrain_zones()
 	_build_shop()
-	_build_pump_station()
 	_build_water()
 	_build_water_walls()
 	_build_water_detect_areas()
@@ -337,24 +506,25 @@ func _build_parallax() -> void:
 
 # --- Sky & Atmosphere ---
 func _build_sky() -> void:
+	var world_w: float = terrain_points[terrain_points.size() - 1].x + 200.0
 	# Three-band sky gradient
 	var sky_top := ColorRect.new()
 	sky_top.position = Vector2(-100, -80)
-	sky_top.size = Vector2(2120, 100)
+	sky_top.size = Vector2(world_w + 200, 100)
 	sky_top.color = SKY_COLOR_TOP
 	sky_top.z_index = -12
 	sky_layer.add_child(sky_top)
 
 	var sky_mid := ColorRect.new()
 	sky_mid.position = Vector2(-100, 20)
-	sky_mid.size = Vector2(2120, 80)
+	sky_mid.size = Vector2(world_w + 200, 80)
 	sky_mid.color = SKY_COLOR_MID
 	sky_mid.z_index = -12
 	sky_layer.add_child(sky_mid)
 
 	var sky_bot := ColorRect.new()
 	sky_bot.position = Vector2(-100, 96)
-	sky_bot.size = Vector2(2120, 100)
+	sky_bot.size = Vector2(world_w + 200, 100)
 	sky_bot.color = SKY_COLOR_BOTTOM
 	sky_bot.z_index = -12
 	sky_layer.add_child(sky_bot)
@@ -440,41 +610,49 @@ func _build_clouds() -> void:
 		clouds.append(cloud_group)
 
 func _build_distant_hills() -> void:
-	# Far hills silhouette
+	var world_w: float = terrain_points[terrain_points.size() - 1].x + 100.0
+	# Far hills silhouette — procedural across world width
+	var far_pts := PackedVector2Array()
+	var fx: float = -100.0
+	while fx < world_w:
+		far_pts.append(Vector2(fx, randf_range(84, 124)))
+		fx += randf_range(180, 300)
+	far_pts.append(Vector2(world_w, 116))
+	far_pts.append(Vector2(world_w, 150))
+	far_pts.append(Vector2(-100, 150))
 	var hills := Polygon2D.new()
-	hills.polygon = PackedVector2Array([
-		Vector2(-100, 124), Vector2(120, 100), Vector2(300, 110),
-		Vector2(500, 90), Vector2(760, 104), Vector2(1000, 96),
-		Vector2(1240, 110), Vector2(1500, 84), Vector2(1760, 100),
-		Vector2(1920, 116), Vector2(1920, 150), Vector2(-100, 150)
-	])
+	hills.polygon = far_pts
 	hills.color = Color(0.12, 0.28, 0.12, 0.6)
 	hills.z_index = -7
 	far_hills_layer.add_child(hills)
 
 	# Mid hills
+	var mid_pts := PackedVector2Array()
+	var mx: float = -100.0
+	while mx < world_w:
+		mid_pts.append(Vector2(mx, randf_range(104, 130)))
+		mx += randf_range(160, 280)
+	mid_pts.append(Vector2(world_w, 124))
+	mid_pts.append(Vector2(world_w, 156))
+	mid_pts.append(Vector2(-100, 156))
 	var hills2 := Polygon2D.new()
-	hills2.polygon = PackedVector2Array([
-		Vector2(-100, 130), Vector2(200, 110), Vector2(400, 120),
-		Vector2(640, 104), Vector2(900, 116), Vector2(1160, 106),
-		Vector2(1400, 120), Vector2(1660, 108), Vector2(1920, 124),
-		Vector2(1920, 156), Vector2(-100, 156)
-	])
+	hills2.polygon = mid_pts
 	hills2.color = Color(0.08, 0.22, 0.08, 0.7)
 	hills2.z_index = -6
 	near_hills_layer.add_child(hills2)
 
 func _build_treeline() -> void:
+	var world_w: float = terrain_points[terrain_points.size() - 1].x + 100.0
 	# Dense treeline - jagged top edge for tree canopy look
 	var tree_points := PackedVector2Array()
 	var x: float = -100.0
-	while x < 2020.0:
+	while x < world_w:
 		var tree_h: float = randf_range(12, 28)
 		tree_points.append(Vector2(x, 136 - tree_h))
 		tree_points.append(Vector2(x + randf_range(6, 16), 136 - tree_h + randf_range(4, 10)))
 		x += randf_range(10, 24)
-	tree_points.append(Vector2(2020, 136))
-	tree_points.append(Vector2(2020, 164))
+	tree_points.append(Vector2(world_w, 136))
+	tree_points.append(Vector2(world_w, 164))
 	tree_points.append(Vector2(-100, 164))
 
 	var treeline := Polygon2D.new()
@@ -486,13 +664,13 @@ func _build_treeline() -> void:
 	# Lighter highlight trees in front
 	var tree_points2 := PackedVector2Array()
 	x = -100.0
-	while x < 2020.0:
+	while x < world_w:
 		var tree_h: float = randf_range(8, 20)
 		tree_points2.append(Vector2(x, 140 - tree_h))
 		tree_points2.append(Vector2(x + randf_range(6, 12), 140 - tree_h + randf_range(4, 8)))
 		x += randf_range(12, 28)
-	tree_points2.append(Vector2(2020, 140))
-	tree_points2.append(Vector2(2020, 164))
+	tree_points2.append(Vector2(world_w, 140))
+	tree_points2.append(Vector2(world_w, 164))
 	tree_points2.append(Vector2(-100, 164))
 
 	var treeline2 := Polygon2D.new()
@@ -603,16 +781,22 @@ func _build_terrain_details() -> void:
 		Vector2(30, 134), Vector2(64, 134),
 		Vector2(220, 138), Vector2(245, 148),
 		Vector2(545, 162), Vector2(580, 170),
-		Vector2(912, 190), Vector2(948, 206),
-		Vector2(1316, 224), Vector2(1348, 242),
-		Vector2(1790, 274), Vector2(1880, 288),
+		Vector2(925, 190), Vector2(960, 206),
+		Vector2(1330, 224), Vector2(1365, 242),
+		Vector2(1820, 290), Vector2(1855, 300),
+		Vector2(2495, 340), Vector2(2530, 346),
+		Vector2(3090, 368), Vector2(3120, 374),
+		Vector2(3730, 396), Vector2(3760, 404),
+		Vector2(4405, 420), Vector2(4440, 430),
+		Vector2(5380, 480), Vector2(5440, 486),
 	]
 	for rp in rock_positions:
 		_place_rock(rp, randf_range(4, 10), randf_range(4, 8))
 
 	# Dirt specks on terrain surface (zone-tinted)
-	for i in range(60):
-		var rx: float = randf_range(0, 1920)
+	var world_right: float = terrain_points[terrain_points.size() - 1].x
+	for i in range(150):
+		var rx: float = randf_range(0, world_right)
 		var ry: float = _get_terrain_y_at(rx)
 		if ry > 0:
 			var speck := ColorRect.new()
@@ -626,8 +810,8 @@ func _build_terrain_details() -> void:
 			add_child(speck)
 
 	# Soil strata lines - horizontal bands of slightly different color
-	for i in range(25):
-		var rx: float = randf_range(0, 1800)
+	for i in range(60):
+		var rx: float = randf_range(0, world_right)
 		var ry: float = _get_terrain_y_at(rx)
 		if ry > 0:
 			var stratum := ColorRect.new()
@@ -640,8 +824,8 @@ func _build_terrain_details() -> void:
 			add_child(stratum)
 
 	# Small pebbles embedded in dirt
-	for i in range(35):
-		var rx: float = randf_range(0, 1920)
+	for i in range(80):
+		var rx: float = randf_range(0, world_right)
 		var ry: float = _get_terrain_y_at(rx)
 		if ry > 0:
 			var pebble := ColorRect.new()
@@ -654,8 +838,8 @@ func _build_terrain_details() -> void:
 			add_child(pebble)
 
 	# Root-like dark lines near surface
-	for i in range(18):
-		var rx: float = randf_range(0, 1900)
+	for i in range(45):
+		var rx: float = randf_range(0, world_right)
 		var ry: float = _get_terrain_y_at(rx)
 		if ry > 0:
 			var root := Line2D.new()
@@ -672,8 +856,8 @@ func _build_terrain_details() -> void:
 			add_child(root)
 
 	# Dark dirt patches (clay/humus areas)
-	for i in range(12):
-		var rx: float = randf_range(0, 1900)
+	for i in range(30):
+		var rx: float = randf_range(0, world_right)
 		var ry: float = _get_terrain_y_at(rx)
 		if ry > 0:
 			var patch := ColorRect.new()
@@ -684,8 +868,8 @@ func _build_terrain_details() -> void:
 			add_child(patch)
 
 	# Sandy/lighter patches on ridges
-	for i in range(10):
-		var rx: float = randf_range(0, 1900)
+	for i in range(25):
+		var rx: float = randf_range(0, world_right)
 		var ry: float = _get_terrain_y_at(rx)
 		if ry > 0:
 			var sandy := ColorRect.new()
@@ -696,8 +880,8 @@ func _build_terrain_details() -> void:
 			add_child(sandy)
 
 	# Small worm holes / burrows
-	for i in range(8):
-		var rx: float = randf_range(50, 1880)
+	for i in range(20):
+		var rx: float = randf_range(50, world_right - 20)
 		var ry: float = _get_terrain_y_at(rx)
 		if ry > 0:
 			var hole := ColorRect.new()
@@ -735,32 +919,35 @@ const ZONE_TINT_COLORS: Array[Color] = [
 	Color(0.50, 0.38, 0.22, 0.20),  # Zone 1 (Pond): earthy medium brown
 	Color(0.38, 0.28, 0.14, 0.22),  # Zone 2 (Marsh): dark muddy brown
 	Color(0.25, 0.18, 0.10, 0.25),  # Zone 3 (Bog): very dark peaty brown
-	Color(0.12, 0.10, 0.08, 0.28),  # Zone 4 (Deep Swamp): nearly black
+	Color(0.15, 0.14, 0.08, 0.26),  # Zone 4 (Swamp): dark murky
+	Color(0.20, 0.30, 0.42, 0.22),  # Zone 5 (Lake): blue-gray
+	Color(0.32, 0.32, 0.30, 0.24),  # Zone 6 (Reservoir): concrete gray
+	Color(0.25, 0.40, 0.38, 0.22),  # Zone 7 (Lagoon): tropical teal
+	Color(0.10, 0.08, 0.06, 0.28),  # Zone 8 (Bayou): near-black
+	Color(0.08, 0.12, 0.22, 0.30),  # Zone 9 (Atlantic): deep ocean dark
 ]
 
 func _get_zone_index(x: float) -> int:
-	# Zone boundaries at midpoints between pools
-	# Pool centers: ~143(Puddle), ~400(Pond), ~755(Marsh), ~1131(Bog), ~1576(Deep Swamp)
-	var zone_boundaries: Array[float] = [270.0, 570.0, 940.0, 1360.0]
+	var zone_boundaries: Array[float] = [270.0, 570.0, 960.0, 1380.0, 1860.0, 2530.0, 3170.0, 3810.0, 4480.0]
 	for i in range(zone_boundaries.size()):
 		if x < zone_boundaries[i]:
 			return i
-	return 4
+	return 9
 
 func _build_terrain_zones() -> void:
 	# Zone tinting via small patches buried well below terrain surface
 	# to avoid peeking above slopes into the sky
-	var zone_centers: Array[float] = [135.0, 400.0, 755.0, 1130.0, 1575.0]
-	var zone_radii: Array[float] = [180.0, 200.0, 220.0, 250.0, 280.0]
+	var zone_centers: Array[float] = [135.0, 400.0, 755.0, 1140.0, 1615.0, 2200.0, 2830.0, 3445.0, 4115.0, 4950.0]
+	var zone_radii: Array[float] = [180.0, 200.0, 220.0, 250.0, 280.0, 300.0, 280.0, 300.0, 320.0, 400.0]
 
-	for zi in range(5):
+	for zi in range(SWAMP_COUNT):
 		var center_x: float = zone_centers[zi]
 		var radius: float = zone_radii[zi]
 		var col: Color = ZONE_TINT_COLORS[zi]
 		# Scatter small tinted patches well below terrain surface
 		for _j in range(25):
 			var px: float = center_x + randf_range(-radius, radius)
-			px = clampf(px, 0.0, 1920.0)
+			px = clampf(px, 0.0, terrain_points[terrain_points.size() - 1].x)
 			var py: float = _get_terrain_y_at(px)
 			if py < 0:
 				continue
@@ -912,8 +1099,8 @@ func _build_vegetation() -> void:
 		Color(0.9, 0.3, 0.3), Color(0.9, 0.85, 0.2),
 		Color(0.8, 0.4, 0.7), Color(0.95, 0.95, 0.9)
 	]
-	for i in range(12):
-		var fx: float = randf_range(10, 1900)
+	for i in range(30):
+		var fx: float = randf_range(10, terrain_points[terrain_points.size() - 1].x - 20)
 		var fy: float = _get_terrain_y_at(fx)
 		if fy > 0:
 			var stem_h: float = randf_range(4, 7)
@@ -991,7 +1178,7 @@ func _build_stars() -> void:
 		var star := ColorRect.new()
 		var sz: float = randf_range(1, 3)
 		star.size = Vector2(sz, sz)
-		star.position = Vector2(randf_range(-100, 2020), randf_range(-80, 100))
+		star.position = Vector2(randf_range(-100, terrain_points[terrain_points.size() - 1].x + 100), randf_range(-80, 100))
 		# Warm-to-cool whites
 		var warmth: float = randf()
 		star.color = Color(1.0, lerp(0.9, 1.0, warmth), lerp(0.75, 1.0, warmth), 0.0)
@@ -1006,7 +1193,7 @@ func _build_fireflies() -> void:
 		fly.size = Vector2(2, 2)
 		fly.color = Color(0.8, 1.0, 0.3, 0.0)
 		fly.z_index = 6
-		var base_x: float = randf_range(50, 1870)
+		var base_x: float = randf_range(50, terrain_points[terrain_points.size() - 1].x - 30)
 		var base_y: float = minf(randf_range(60, 130), _get_terrain_y_at(base_x) - 15.0)
 		fly.position = Vector2(base_x, base_y)
 		add_child(fly)
@@ -1038,7 +1225,7 @@ func _build_fireflies() -> void:
 func _build_tree_trunks() -> void:
 	for i in range(50):
 		var trunk := Line2D.new()
-		var tx: float = randf_range(-80, 2000)
+		var tx: float = randf_range(-80, terrain_points[terrain_points.size() - 1].x + 100)
 		var tw: float = randf_range(2, 4)
 		trunk.width = tw
 		trunk.default_color = Color(0.15, 0.1, 0.05, randf_range(0.3, 0.6))
@@ -1202,8 +1389,8 @@ func _build_mushrooms() -> void:
 		if randf() < 0.7:
 			_place_mushroom(Vector2(exit_top.x + randf_range(-4, 12), exit_top.y), cap_colors)
 	# A few extra scattered ones
-	for i in range(3):
-		var mx: float = randf_range(20, 1900)
+	for i in range(8):
+		var mx: float = randf_range(20, terrain_points[terrain_points.size() - 1].x - 20)
 		var my: float = _get_terrain_y_at(mx)
 		if my > 0:
 			_place_mushroom(Vector2(mx, my), cap_colors)
@@ -1426,7 +1613,7 @@ func _build_dragonflies() -> void:
 		wing_r.position = Vector2(0, -2)
 		wing_r.color = Color(0.8, 0.9, 1.0, 0.4)
 		df.add_child(wing_r)
-		var base_x: float = randf_range(80, 1840)
+		var base_x: float = randf_range(80, terrain_points[terrain_points.size() - 1].x - 60)
 		var base_y: float = minf(randf_range(60, 130), _get_terrain_y_at(base_x) - 20.0)
 		df.position = Vector2(base_x, base_y)
 		dragonflies.append({
@@ -1530,7 +1717,7 @@ func _spawn_pollen() -> void:
 	mote.size = Vector2(1, 1)
 	mote.color = Color(1.0, 0.95, 0.7, 0.0)
 	mote.z_index = 5
-	var px: float = randf_range(-50, 1970)
+	var px: float = randf_range(-50, terrain_points[terrain_points.size() - 1].x + 50)
 	var py: float = randf_range(60, 240)
 	mote.position = Vector2(px, py)
 	add_child(mote)
@@ -2017,7 +2204,12 @@ func _build_pool_features() -> void:
 			1: _build_pond_features(bl, br, et, xt, bw, basin_y)
 			2: _build_marsh_features(bl, br, et, xt, bw, basin_y)
 			3: _build_bog_features(bl, br, et, xt, bw, basin_y)
-			4: _build_deep_swamp_features(bl, br, et, xt, bw, basin_y)
+			4: _build_swamp_features(bl, br, et, xt, bw, basin_y)
+			5: _build_lake_features(bl, br, et, xt, bw, basin_y)
+			6: _build_reservoir_features(bl, br, et, xt, bw, basin_y)
+			7: _build_lagoon_features(bl, br, et, xt, bw, basin_y)
+			8: _build_bayou_features(bl, br, et, xt, bw, basin_y)
+			9: _build_atlantic_features(bl, br, et, xt, bw, basin_y)
 
 # Puddle: pebbles and sandy patch
 func _build_puddle_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, bw: float, basin_y: float) -> void:
@@ -2176,20 +2368,15 @@ func _build_bog_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, b
 		])
 		add_child(peat)
 
-# Deep Swamp: dead trees, hanging moss, extra glow
-func _build_deep_swamp_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, bw: float, basin_y: float) -> void:
+# Swamp: tangled vines, hanging moss, glowing fungi
+func _build_swamp_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, bw: float, basin_y: float) -> void:
 	# Dead trees on terrain edges near pool
-	for j in range(2):
-		var tx: float
-		if j == 0:
-			tx = bl.x - randf_range(8, 25)
-		else:
-			tx = br.x + randf_range(8, 25)
+	for j in range(3):
+		var tx: float = bl.x + bw * (0.1 + j * 0.35) + randf_range(-15, 15)
 		var base_y: float = _get_terrain_y_at(tx)
 		if base_y < 0:
 			base_y = basin_y
 		var tree_h: float = randf_range(25, 45)
-		# Trunk
 		var trunk := Line2D.new()
 		trunk.width = 4.0
 		trunk.default_color = Color(0.22, 0.15, 0.08, 0.85)
@@ -2197,38 +2384,33 @@ func _build_deep_swamp_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vec
 		trunk.add_point(Vector2(tx, base_y))
 		trunk.add_point(Vector2(tx + randf_range(-3, 3), base_y - tree_h))
 		add_child(trunk)
-		var top_x: float = tx + randf_range(-3, 3)
-		var top_y: float = base_y - tree_h
-		# Bare branches
 		for k in range(randi_range(3, 5)):
 			var br_line := Line2D.new()
 			br_line.width = 2.0
 			br_line.default_color = Color(0.25, 0.18, 0.10, 0.75)
 			br_line.z_index = 4
-			var branch_y: float = top_y + randf_range(5, tree_h * 0.4)
+			var branch_y: float = base_y - tree_h + randf_range(5, tree_h * 0.4)
 			var branch_dir: float = 1.0 if randf() > 0.5 else -1.0
 			var branch_len: float = randf_range(12, 28)
 			br_line.add_point(Vector2(tx, branch_y))
 			br_line.add_point(Vector2(tx + branch_dir * branch_len, branch_y - randf_range(4, 12)))
 			add_child(br_line)
-			# Hanging moss strands from branches
 			if randf() > 0.4:
 				var moss_line := Line2D.new()
 				moss_line.width = 1.0
 				moss_line.default_color = Color(0.28, 0.42, 0.22, 0.5)
 				moss_line.z_index = 4
 				var moss_x: float = tx + branch_dir * branch_len * randf_range(0.3, 0.8)
-				var moss_top_y: float = branch_y - randf_range(2, 8)
-				moss_line.add_point(Vector2(moss_x, moss_top_y))
-				moss_line.add_point(Vector2(moss_x + randf_range(-2, 2), moss_top_y + randf_range(8, 18)))
+				moss_line.add_point(Vector2(moss_x, branch_y - randf_range(2, 8)))
+				moss_line.add_point(Vector2(moss_x + randf_range(-2, 2), branch_y + randf_range(8, 18)))
 				add_child(moss_line)
-	# Extra glow spots in deep water
-	for j in range(randi_range(3, 5)):
+	# Glowing fungi on basin walls
+	for j in range(randi_range(4, 6)):
 		var glow_node := Node2D.new()
 		glow_node.z_index = 2
 		glow_node.position = Vector2(bl.x + randf_range(10, bw - 10), basin_y - randf_range(4, 20))
 		add_child(glow_node)
-		var glow_color := Color(0.3, 0.6, 0.5)
+		var glow_color := Color(0.3, 0.6, 0.2)
 		var bulb := ColorRect.new()
 		bulb.size = Vector2(3, 3)
 		bulb.position = Vector2(-1.5, -1.5)
@@ -2239,14 +2421,214 @@ func _build_deep_swamp_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vec
 		aura.position = Vector2(-3.5, -3.5)
 		aura.color = Color(glow_color.r, glow_color.g, glow_color.b, 0.15)
 		glow_node.add_child(aura)
-		glow_plants.append({
-			"node": glow_node,
-			"bulb": bulb,
-			"aura": aura,
-			"glow_color": glow_color,
-			"phase": randf() * TAU,
-			"pulse_speed": randf_range(1.2, 2.5),
-		})
+		glow_plants.append({"node": glow_node, "bulb": bulb, "aura": aura, "glow_color": glow_color, "phase": randf() * TAU, "pulse_speed": randf_range(1.2, 2.5)})
+
+# Lake: rocky outcrops, deep water plants
+func _build_lake_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, bw: float, basin_y: float) -> void:
+	# Rocky outcrops along edges
+	for j in range(randi_range(4, 6)):
+		var rx: float = bl.x + randf_range(10, bw - 10)
+		var ry: float = basin_y - randf_range(2, 8)
+		var rock := Polygon2D.new()
+		rock.color = Color(0.38, 0.36, 0.34, 0.75)
+		rock.z_index = 1
+		var rw: float = randf_range(8, 16)
+		var rh: float = randf_range(6, 12)
+		rock.polygon = PackedVector2Array([
+			Vector2(rx - rw * 0.5, ry),
+			Vector2(rx - rw * 0.3, ry - rh),
+			Vector2(rx + rw * 0.2, ry - rh * 0.8),
+			Vector2(rx + rw * 0.5, ry),
+		])
+		add_child(rock)
+	# Tall water plants
+	for j in range(randi_range(5, 8)):
+		var wx: float = bl.x + randf_range(15, bw - 15)
+		var weed := Line2D.new()
+		weed.width = 1.5
+		weed.default_color = Color(0.15, 0.35, 0.20, 0.6)
+		weed.z_index = 2
+		var wh: float = randf_range(10, 22)
+		weed.add_point(Vector2(wx, basin_y - 2))
+		weed.add_point(Vector2(wx + randf_range(-4, 4), basin_y - wh))
+		add_child(weed)
+
+# Reservoir: concrete walls, old pipes
+func _build_reservoir_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, bw: float, basin_y: float) -> void:
+	# Concrete wall segments
+	for j in range(randi_range(3, 5)):
+		var wx: float = bl.x + randf_range(8, bw - 8)
+		var wall := ColorRect.new()
+		wall.size = Vector2(randf_range(4, 8), randf_range(12, 22))
+		wall.position = Vector2(wx, basin_y - wall.size.y)
+		wall.color = Color(0.45, 0.44, 0.42, 0.7)
+		wall.z_index = 1
+		add_child(wall)
+	# Rusty pipes
+	for j in range(randi_range(2, 3)):
+		var pipe := Line2D.new()
+		pipe.width = 3.0
+		pipe.default_color = Color(0.50, 0.32, 0.18, 0.7)
+		pipe.z_index = 2
+		var px: float = bl.x + randf_range(20, bw - 20)
+		pipe.add_point(Vector2(px, basin_y - randf_range(4, 10)))
+		pipe.add_point(Vector2(px + randf_range(15, 35), basin_y - randf_range(8, 18)))
+		add_child(pipe)
+	# Drain grates
+	for j in range(2):
+		var gx: float = bl.x + bw * (0.3 + j * 0.4)
+		var grate := ColorRect.new()
+		grate.size = Vector2(10, 6)
+		grate.position = Vector2(gx - 5, basin_y - 5)
+		grate.color = Color(0.30, 0.28, 0.26, 0.8)
+		grate.z_index = 1
+		add_child(grate)
+
+# Lagoon: coral formations, bioluminescent specks
+func _build_lagoon_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, bw: float, basin_y: float) -> void:
+	# Coral formations
+	for j in range(randi_range(5, 8)):
+		var cx: float = bl.x + randf_range(15, bw - 15)
+		var coral := Polygon2D.new()
+		var ch: float = randf_range(8, 18)
+		var cw: float = randf_range(6, 14)
+		coral.polygon = PackedVector2Array([
+			Vector2(cx - cw * 0.5, basin_y),
+			Vector2(cx - cw * 0.3, basin_y - ch * 0.7),
+			Vector2(cx, basin_y - ch),
+			Vector2(cx + cw * 0.3, basin_y - ch * 0.6),
+			Vector2(cx + cw * 0.5, basin_y),
+		])
+		var hue: float = randf_range(0.0, 0.12)  # coral orange-pink range
+		coral.color = Color.from_hsv(hue, 0.5, 0.7, 0.6)
+		coral.z_index = 1
+		add_child(coral)
+	# Bioluminescent specks
+	for j in range(randi_range(6, 10)):
+		var glow_node := Node2D.new()
+		glow_node.z_index = 2
+		glow_node.position = Vector2(bl.x + randf_range(10, bw - 10), basin_y - randf_range(4, 20))
+		add_child(glow_node)
+		var glow_color := Color(0.2, 0.8, 0.7)
+		var bulb := ColorRect.new()
+		bulb.size = Vector2(2, 2)
+		bulb.position = Vector2(-1, -1)
+		bulb.color = Color(glow_color.r, glow_color.g, glow_color.b, 0.5)
+		glow_node.add_child(bulb)
+		var aura := ColorRect.new()
+		aura.size = Vector2(5, 5)
+		aura.position = Vector2(-2.5, -2.5)
+		aura.color = Color(glow_color.r, glow_color.g, glow_color.b, 0.12)
+		glow_node.add_child(aura)
+		glow_plants.append({"node": glow_node, "bulb": bulb, "aura": aura, "glow_color": glow_color, "phase": randf() * TAU, "pulse_speed": randf_range(1.5, 3.0)})
+
+# Bayou: cypress roots, spanish moss, ancient stone
+func _build_bayou_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, bw: float, basin_y: float) -> void:
+	# Massive cypress roots
+	for j in range(randi_range(4, 6)):
+		var root := Line2D.new()
+		root.width = randf_range(3, 5)
+		root.default_color = Color(0.28, 0.18, 0.10, 0.8)
+		root.z_index = 1
+		var rx: float = bl.x + randf_range(10, bw - 10)
+		var ry: float = basin_y
+		root.add_point(Vector2(rx, ry))
+		root.add_point(Vector2(rx + randf_range(-15, 15), ry - randf_range(8, 20)))
+		root.add_point(Vector2(rx + randf_range(-25, 25), ry - randf_range(15, 30)))
+		add_child(root)
+	# Spanish moss draping
+	for j in range(randi_range(6, 10)):
+		var moss := Line2D.new()
+		moss.width = 1.0
+		moss.default_color = Color(0.35, 0.42, 0.30, 0.45)
+		moss.z_index = 4
+		var mx: float = bl.x + randf_range(0, bw)
+		var terrain_y: float = _get_terrain_y_at(mx)
+		if terrain_y < 0:
+			terrain_y = basin_y - 30
+		moss.add_point(Vector2(mx, terrain_y - randf_range(10, 25)))
+		moss.add_point(Vector2(mx + randf_range(-3, 3), terrain_y - randf_range(0, 8)))
+		add_child(moss)
+	# Ancient crumbled stone blocks
+	for j in range(randi_range(2, 4)):
+		var stone := ColorRect.new()
+		var sw: float = randf_range(10, 18)
+		var sh: float = randf_range(8, 14)
+		stone.size = Vector2(sw, sh)
+		stone.position = Vector2(bl.x + randf_range(15, bw - 15), basin_y - sh)
+		stone.color = Color(0.35, 0.33, 0.30, 0.65)
+		stone.z_index = 1
+		add_child(stone)
+
+# The Atlantic: kelp forests, whale bones, sunken ship debris
+func _build_atlantic_features(bl: Vector2, br: Vector2, _et: Vector2, _xt: Vector2, bw: float, basin_y: float) -> void:
+	# Kelp forests — tall swaying plants
+	for j in range(randi_range(8, 12)):
+		var kx: float = bl.x + randf_range(20, bw - 20)
+		var kelp := Line2D.new()
+		kelp.width = 2.0
+		kelp.default_color = Color(0.12, 0.35, 0.18, 0.65)
+		kelp.z_index = 2
+		var kh: float = randf_range(20, 45)
+		var segments: int = randi_range(4, 7)
+		for k in range(segments):
+			var t: float = float(k) / float(segments - 1)
+			kelp.add_point(Vector2(kx + sin(t * 3.0) * 6.0, basin_y - kh * t))
+		add_child(kelp)
+	# Whale bone ribs
+	for j in range(randi_range(2, 3)):
+		var bx: float = bl.x + randf_range(bw * 0.2, bw * 0.8)
+		var bone_base_y: float = basin_y - randf_range(2, 6)
+		for k in range(randi_range(4, 6)):
+			var rib := Line2D.new()
+			rib.width = 2.0
+			rib.default_color = Color(0.75, 0.72, 0.65, 0.5)
+			rib.z_index = 1
+			var rib_x: float = bx + k * randf_range(4, 8)
+			rib.add_point(Vector2(rib_x, bone_base_y))
+			rib.add_point(Vector2(rib_x + randf_range(-3, 3), bone_base_y - randf_range(8, 16)))
+			add_child(rib)
+	# Sunken ship debris
+	var ship_x: float = bl.x + bw * randf_range(0.55, 0.75)
+	var ship_y: float = basin_y - 4
+	# Hull fragment
+	var hull := Polygon2D.new()
+	hull.color = Color(0.30, 0.22, 0.15, 0.7)
+	hull.z_index = 1
+	hull.polygon = PackedVector2Array([
+		Vector2(ship_x, ship_y),
+		Vector2(ship_x + 5, ship_y - 18),
+		Vector2(ship_x + 30, ship_y - 22),
+		Vector2(ship_x + 45, ship_y - 14),
+		Vector2(ship_x + 50, ship_y),
+	])
+	add_child(hull)
+	# Mast
+	var mast := Line2D.new()
+	mast.width = 2.0
+	mast.default_color = Color(0.35, 0.25, 0.15, 0.65)
+	mast.z_index = 2
+	mast.add_point(Vector2(ship_x + 20, ship_y - 20))
+	mast.add_point(Vector2(ship_x + 18, ship_y - 50))
+	add_child(mast)
+	# Abyssal glow spots
+	for j in range(randi_range(8, 12)):
+		var glow_node := Node2D.new()
+		glow_node.z_index = 2
+		glow_node.position = Vector2(bl.x + randf_range(10, bw - 10), basin_y - randf_range(4, 30))
+		add_child(glow_node)
+		var glow_color := Color(0.2, 0.4, 0.9)
+		var bulb := ColorRect.new()
+		bulb.size = Vector2(3, 3)
+		bulb.position = Vector2(-1.5, -1.5)
+		bulb.color = Color(glow_color.r, glow_color.g, glow_color.b, 0.5)
+		glow_node.add_child(bulb)
+		var aura := ColorRect.new()
+		aura.size = Vector2(8, 8)
+		aura.position = Vector2(-4, -4)
+		aura.color = Color(glow_color.r, glow_color.g, glow_color.b, 0.12)
+		glow_node.add_child(aura)
+		glow_plants.append({"node": glow_node, "bulb": bulb, "aura": aura, "glow_color": glow_color, "phase": randf() * TAU, "pulse_speed": randf_range(0.8, 2.0)})
 
 # --- Swamp Geometry ---
 func _get_swamp_geometry(swamp_index: int) -> Dictionary:
@@ -2743,13 +3125,13 @@ func _update_camels(delta: float) -> void:
 				elif cs["state_timer"] >= 0.5:
 					if GameManager.water_carried > 0.0001:
 						GameManager.camel_take_water(i)
-						cs["state"] = "to_pump"
+						cs["state"] = "to_shop"
 						cs["state_timer"] = 0.0
 					else:
 						# No water, retry
 						cs["state_timer"] = 0.0
 
-			"to_pump":
+			"to_shop":
 				# Walk left to shop to sell (x≈6)
 				var pump_x: float = 6.0
 				var dx2: float = pump_x - cs["x"]
@@ -2785,7 +3167,7 @@ func _update_camels(delta: float) -> void:
 		node.scale.x = 1.0 if cd["facing_right"] else -1.0
 
 		# Camel dust trail when walking
-		var is_walking: bool = (cs["state"] == "to_player" or cs["state"] == "to_pump")
+		var is_walking: bool = (cs["state"] == "to_player" or cs["state"] == "to_shop")
 		if is_walking:
 			cd["dust_timer"] = cd.get("dust_timer", 0.0) + delta
 			if cd["dust_timer"] >= 0.3:
@@ -3076,139 +3458,6 @@ func _on_shop_body_exited(body: Node2D) -> void:
 		player_in_shop_area = false
 		shop_player_ref = null
 
-func _build_pump_station() -> void:
-	# Pump station on Ridge 1 at x≈230
-	var pump_base_x: float = 216.0
-	var pump_y: float = 136.0  # Ridge 1 height
-
-	# Platform/base
-	var platform := ColorRect.new()
-	platform.position = Vector2(pump_base_x, pump_y - 6)
-	platform.size = Vector2(44, 6)
-	platform.color = Color(0.4, 0.38, 0.36)
-	platform.z_index = 2
-	add_child(platform)
-
-	# Pump body - main housing
-	var pump_body := ColorRect.new()
-	pump_body.position = Vector2(pump_base_x + 6, pump_y - 36)
-	pump_body.size = Vector2(28, 30)
-	pump_body.color = Color(0.5, 0.5, 0.55)
-	pump_body.z_index = 3
-	add_child(pump_body)
-
-	# Pump body highlight
-	var pump_hl := ColorRect.new()
-	pump_hl.position = Vector2(pump_base_x + 8, pump_y - 34)
-	pump_hl.size = Vector2(8, 26)
-	pump_hl.color = Color(0.58, 0.58, 0.62)
-	pump_hl.z_index = 3
-	add_child(pump_hl)
-
-	# Pump top cap
-	var pump_cap := ColorRect.new()
-	pump_cap.position = Vector2(pump_base_x + 4, pump_y - 40)
-	pump_cap.size = Vector2(32, 6)
-	pump_cap.color = Color(0.42, 0.42, 0.46)
-	pump_cap.z_index = 3
-	add_child(pump_cap)
-
-	# Pipe extending right (toward Pond)
-	var pump_pipe := ColorRect.new()
-	pump_pipe.position = Vector2(pump_base_x + 34, pump_y - 24)
-	pump_pipe.size = Vector2(20, 6)
-	pump_pipe.color = Color(0.4, 0.4, 0.45)
-	pump_pipe.z_index = 3
-	add_child(pump_pipe)
-
-	# Pipe joint
-	var pipe_joint := ColorRect.new()
-	pipe_joint.position = Vector2(pump_base_x + 32, pump_y - 26)
-	pipe_joint.size = Vector2(6, 10)
-	pipe_joint.color = Color(0.45, 0.45, 0.5)
-	pipe_joint.z_index = 3
-	add_child(pipe_joint)
-
-	# Indicator light
-	var pump_light := ColorRect.new()
-	pump_light.position = Vector2(pump_base_x + 14, pump_y - 32)
-	pump_light.size = Vector2(6, 6)
-	pump_light.color = Color(0.2, 0.85, 0.3)
-	pump_light.z_index = 4
-	add_child(pump_light)
-	pump_light_ref = pump_light
-
-	# Vines growing on pump housing
-	for vi in range(3):
-		var vine := Line2D.new()
-		vine.width = 1.5
-		vine.default_color = Color(0.2, 0.4, 0.15, 0.7)
-		var vx: float = pump_base_x + 6.0 + vi * 8.0
-		vine.add_point(Vector2(vx, pump_y - 6))
-		vine.add_point(Vector2(vx + randf_range(-3, 3), pump_y - 18))
-		vine.add_point(Vector2(vx + randf_range(-4, 4), pump_y - 30))
-		vine.z_index = 4
-		add_child(vine)
-		var vine_leaf := ColorRect.new()
-		vine_leaf.size = Vector2(3, 2)
-		vine_leaf.position = Vector2(vx + randf_range(-3, 2), randf_range(pump_y - 26, pump_y - 14))
-		vine_leaf.color = Color(0.25, 0.5, 0.18, 0.8)
-		vine_leaf.z_index = 4
-		add_child(vine_leaf)
-
-	# Gauge
-	var gauge := ColorRect.new()
-	gauge.position = Vector2(pump_base_x + 22, pump_y - 26)
-	gauge.size = Vector2(8, 8)
-	gauge.color = Color(0.15, 0.15, 0.2)
-	gauge.z_index = 4
-	add_child(gauge)
-	var gauge_needle := ColorRect.new()
-	gauge_needle.position = Vector2(pump_base_x + 24, pump_y - 25)
-	gauge_needle.size = Vector2(4, 2)
-	gauge_needle.color = Color(0.9, 0.3, 0.2)
-	gauge_needle.z_index = 4
-	add_child(gauge_needle)
-
-	# Label
-	var pump_lbl := Label.new()
-	pump_lbl.text = "PUMP"
-	pump_lbl.add_theme_font_size_override("font_size", 10)
-	pump_lbl.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95, 0.8))
-	pump_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-	pump_lbl.add_theme_constant_override("shadow_offset_x", 1)
-	pump_lbl.add_theme_constant_override("shadow_offset_y", 1)
-	pump_lbl.position = Vector2(pump_base_x + 4, pump_y - 56)
-	pump_lbl.z_index = 5
-	add_child(pump_lbl)
-
-	# Detection area for player interaction (pump only, no sell)
-	var pump_area := Area2D.new()
-	pump_area.collision_layer = 0
-	pump_area.collision_mask = 1
-	var shape := CollisionShape2D.new()
-	var rect := RectangleShape2D.new()
-	rect.size = Vector2(60, 52)
-	shape.shape = rect
-	shape.position = Vector2(pump_base_x + 24, pump_y - 18)
-	pump_area.add_child(shape)
-	add_child(pump_area)
-
-	pump_area.body_entered.connect(_on_pump_body_entered)
-	pump_area.body_exited.connect(_on_pump_body_exited)
-
-func _on_pump_body_entered(body: Node2D) -> void:
-	if body is CharacterBody2D and body.has_method("set_near_pump"):
-		body.set_near_pump(true)
-		player_in_pump_area = true
-		pump_player_ref = body
-
-func _on_pump_body_exited(body: Node2D) -> void:
-	if body is CharacterBody2D and body.has_method("set_near_pump"):
-		body.set_near_pump(false)
-		player_in_pump_area = false
-		pump_player_ref = null
-
 # --- Weather System ---
 func _build_weather() -> void:
 	rain_layer = CanvasLayer.new()
@@ -3340,27 +3589,6 @@ func _spawn_coin_fly(from_pos: Vector2) -> void:
 		tw.parallel().tween_property(coin, "modulate:a", 0.0, 0.6)
 		tw.tween_callback(coin.queue_free)
 
-# --- Pump Steam (Phase 17a) ---
-func _spawn_pump_steam() -> void:
-	if not pump_light_ref or not is_instance_valid(pump_light_ref):
-		return
-	var px: float = pump_light_ref.global_position.x + randf_range(-6, 6)
-	var py: float = pump_light_ref.global_position.y - 8
-	var steam := ColorRect.new()
-	steam.size = Vector2(randf_range(3, 6), randf_range(2, 4))
-	steam.position = Vector2(px, py)
-	steam.color = Color(0.9, 0.9, 0.95, 0.3)
-	steam.z_index = 8
-	add_child(steam)
-	var tw := create_tween()
-	tw.set_parallel(true)
-	tw.tween_property(steam, "position:y", py - randf_range(12, 20), 0.8)
-	tw.tween_property(steam, "position:x", px + randf_range(-6, 6), 0.8)
-	tw.tween_property(steam, "size", steam.size + Vector2(3, 2), 0.8)
-	tw.tween_property(steam, "modulate:a", 0.0, 0.8)
-	tw.set_parallel(false)
-	tw.tween_callback(steam.queue_free)
-
 # --- Screen Effects (Phase 7) ---
 func _screen_shake(amount: float, duration: float) -> void:
 	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
@@ -3406,7 +3634,7 @@ func _build_atmosphere() -> void:
 	for i in range(6):
 		var mist := ColorRect.new()
 		mist.size = Vector2(randf_range(40, 80), randf_range(6, 12))
-		mist.position = Vector2(randf_range(0, 1800), randf_range(100, 140))
+		mist.position = Vector2(randf_range(0, terrain_points[terrain_points.size() - 1].x), randf_range(100, 140))
 		mist.color = Color(0.9, 0.85, 0.7, 0.0)
 		mist.z_index = 4
 		add_child(mist)
@@ -3434,7 +3662,7 @@ func _build_atmosphere() -> void:
 	# Owl (perched in treeline at night)
 	owl_node = Node2D.new()
 	owl_node.z_index = 5
-	owl_node.position = Vector2(randf_range(400, 1600), 65)
+	owl_node.position = Vector2(randf_range(400, terrain_points[terrain_points.size() - 1].x - 200), 65)
 	owl_node.visible = false
 	add_child(owl_node)
 	# Body
@@ -3471,18 +3699,6 @@ func _build_atmosphere() -> void:
 	owl_ear_r.position = Vector2(2, -13)
 	owl_ear_r.color = Color(0.35, 0.3, 0.22)
 	owl_node.add_child(owl_ear_r)
-
-	# Pump station glow
-	if pump_light_ref and is_instance_valid(pump_light_ref):
-		pump_glow_rect = ColorRect.new()
-		pump_glow_rect.size = Vector2(20, 14)
-		pump_glow_rect.position = Vector2(pump_light_ref.global_position.x - 10, pump_light_ref.global_position.y - 7)
-		pump_glow_rect.color = Color(0.2, 0.8, 0.3, 0.0)
-		pump_glow_rect.z_index = 0
-		var glow_mat := CanvasItemMaterial.new()
-		glow_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-		pump_glow_rect.material = glow_mat
-		add_child(pump_glow_rect)
 
 # --- Player Shadow (Phase 13c) ---
 func _build_player_shadow() -> void:
@@ -3753,14 +3969,6 @@ func _process(delta: float) -> void:
 						if is_instance_valid(e): e.color.a = orig_a
 					)
 
-	# Pump station glow (Phase 11b)
-	if pump_glow_rect:
-		var pg_pulse: float = (sin(wave_time * 2.0) + 1.0) * 0.5
-		if GameManager.pump_owned:
-			pump_glow_rect.color.a = lerpf(0.05, 0.15, pg_pulse)
-		else:
-			pump_glow_rect.color.a = 0.0
-
 	# Player shadow (Phase 13c)
 	if player_shadow:
 		var player_node: Node2D = get_tree().get_first_node_in_group("player") as Node2D
@@ -3923,14 +4131,6 @@ func _process(delta: float) -> void:
 		for child in moon.get_children():
 			if child is ColorRect:
 				child.color.a = 0.0
-
-	# Pump indicator light pulse
-	if pump_light_ref and is_instance_valid(pump_light_ref):
-		var pulse: float = (sin(wave_time * 3.0) + 1.0) * 0.5
-		if GameManager.pump_owned:
-			pump_light_ref.color = Color(0.2, lerpf(0.5, 1.0, pulse), 0.3)
-		else:
-			pump_light_ref.color = Color(lerpf(0.3, 0.6, pulse), 0.15, 0.1)
 
 	# Swamp gas bubbles
 	bubble_timer += delta
