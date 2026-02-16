@@ -99,8 +99,8 @@ var tool_definitions: Dictionary = {
 	},
 	"hose": {
 		"name": "Garden Hose",
-		"base_output": 0.5,
-		"cost": 8000.0,
+		"base_output": 2.0,
+		"cost": 5000.0,
 		"type": "semi_auto",
 		"order": 8
 	}
@@ -115,7 +115,7 @@ var stat_definitions: Dictionary = {
 		"growth_rate": 1.18,
 		"scale": "exponential",
 		"base_cost": 10.0,
-		"cost_exponent": 1.20,
+		"cost_exponent": 1.16,
 		"format": "gal"
 	},
 	"movement_speed": {
@@ -124,7 +124,7 @@ var stat_definitions: Dictionary = {
 		"growth_rate": 1.12,
 		"scale": "exponential",
 		"base_cost": 12.0,
-		"cost_exponent": 1.14,
+		"cost_exponent": 1.12,
 		"format": "multiplier"
 	},
 	"stamina": {
@@ -133,7 +133,7 @@ var stat_definitions: Dictionary = {
 		"growth_rate": 1.15,
 		"scale": "exponential",
 		"base_cost": 10.0,
-		"cost_exponent": 1.18,
+		"cost_exponent": 1.14,
 		"format": "value"
 	},
 	"stamina_regen": {
@@ -142,7 +142,7 @@ var stat_definitions: Dictionary = {
 		"growth_rate": 1.15,
 		"scale": "exponential",
 		"base_cost": 12.0,
-		"cost_exponent": 1.18,
+		"cost_exponent": 1.14,
 		"format": "per_sec"
 	},
 	# --- Global Power Stats (slightly pricier, scales faster) ---
@@ -152,7 +152,7 @@ var stat_definitions: Dictionary = {
 		"growth_rate": 1.30,
 		"scale": "exponential",
 		"base_cost": 50.0,
-		"cost_exponent": 1.30,
+		"cost_exponent": 1.22,
 		"format": "multiplier"
 	},
 	"scoop_power": {
@@ -161,7 +161,7 @@ var stat_definitions: Dictionary = {
 		"growth_rate": 1.28,
 		"scale": "exponential",
 		"base_cost": 35.0,
-		"cost_exponent": 1.28,
+		"cost_exponent": 1.20,
 		"format": "multiplier"
 	},
 	"drain_mastery": {
@@ -170,7 +170,7 @@ var stat_definitions: Dictionary = {
 		"growth_rate": 1.30,
 		"scale": "exponential",
 		"base_cost": 50.0,
-		"cost_exponent": 1.30,
+		"cost_exponent": 1.22,
 		"format": "multiplier"
 	}
 }
@@ -215,7 +215,7 @@ const HOSE_DURATION: float = 20.0
 
 # Camel constants
 const CAMEL_BASE_COST: float = 500.0
-const CAMEL_COST_EXPONENT: float = 1.8
+const CAMEL_COST_EXPONENT: float = 1.5
 const CAMEL_CAPACITY_UPGRADE_BASE: float = 50.0
 const CAMEL_SPEED_UPGRADE_BASE: float = 75.0
 const CAMEL_UPGRADE_EXPONENT: float = 1.25
@@ -228,9 +228,9 @@ var camel_states: Array = []  # [{state, x, water_carried, source_swamp, state_t
 
 # Elephant constants
 const ELEPHANT_BASE_COST: float = 75000.0
-const ELEPHANT_TRUNK_CAP_BASE: float = 100000.0
-const ELEPHANT_TROT_SPEED_BASE: float = 100000.0
-const ELEPHANT_TRUNK_STR_BASE: float = 150000.0
+const ELEPHANT_TRUNK_CAP_BASE: float = 50000.0
+const ELEPHANT_TROT_SPEED_BASE: float = 50000.0
+const ELEPHANT_TRUNK_STR_BASE: float = 75000.0
 const ELEPHANT_CAP_EXPONENT: float = 1.30
 const ELEPHANT_SPEED_EXPONENT: float = 1.30
 const ELEPHANT_STR_EXPONENT: float = 1.35
@@ -293,7 +293,7 @@ var upgrade_definitions: Dictionary = {
 		"name": "Lantern",
 		"description": "Light in the dark",
 		"cost": 50.0,
-		"cost_exponent": 1.40,
+		"cost_exponent": 1.30,
 		"max_level": -1,
 		"order": 5
 	}
@@ -432,7 +432,7 @@ func get_total_water_percent() -> float:
 func get_tool_output(tool_id: String) -> float:
 	var base: float = tool_definitions[tool_id]["base_output"]
 	var level: int = tools_owned[tool_id]["level"]
-	var raw: float = base * pow(1.30, level)
+	var raw: float = base * pow(1.15, level)
 	# Apply scoop power multiplier for manual tools
 	if tool_definitions[tool_id]["type"] == "manual":
 		raw *= get_stat_value("scoop_power")
@@ -682,33 +682,39 @@ func get_rain_collector_rate() -> float:
 	var level: int = upgrades_owned["rain_collector"]
 	if level <= 0:
 		return 0.0
-	return 0.50 * pow(1.30, level - 1)
+	if level <= 5:
+		return 0.50 * pow(1.30, level - 1)
+	# After L5: sqrt scaling (diminishing returns)
+	var l5_value: float = 0.50 * pow(1.30, 4)  # L5 rate
+	return l5_value * sqrt(float(level - 4))
 
 func get_splash_guard_multiplier() -> float:
 	var level: int = upgrades_owned["splash_guard"]
 	if level <= 0:
 		return 1.0
-	return pow(0.82, level)
+	# Asymptotic curve: caps at 75% reduction (floor of 0.25)
+	return 1.0 - 0.75 * (1.0 - exp(-0.25 * level))
 
 func get_lucky_charm_chance() -> float:
 	var level: int = upgrades_owned["lucky_charm"]
 	if level <= 0:
 		return 0.0
-	return minf(0.05 * pow(1.35, level - 1), 0.80)
+	return minf(0.05 * pow(1.20, level - 1), 0.60)
 
 func has_auto_seller() -> bool:
 	return upgrades_owned["auto_seller"] > 0
 
 func get_auto_scoop_interval() -> float:
 	var level: int = upgrades_owned["auto_scooper"]
-	# Always active: base 2.5s, each upgrade level reduces by ~12%, min 0.1s
-	return maxf(2.5 * pow(0.88, level), 0.1)
+	# Always active: base 2.5s, each upgrade level reduces by ~8%, min 0.5s
+	return maxf(2.5 * pow(0.92, level), 0.5)
 
 func get_lantern_radius() -> float:
 	var level: int = upgrades_owned["lantern"]
 	if level <= 0:
 		return 0.0
-	return 48.0 * pow(1.40, level - 1)
+	# Asymptotic cap at 400px
+	return 400.0 * (1.0 - exp(-0.15 * level))
 
 func get_lantern_energy() -> float:
 	var level: int = upgrades_owned["lantern"]
