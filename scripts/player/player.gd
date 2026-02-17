@@ -3,7 +3,6 @@ extends CharacterBody2D
 const BASE_SPEED: float = 120.0
 const GRAVITY: float = 800.0
 const SCOOP_COOLDOWN: float = 0.3
-const STAMINA_REGEN_DELAY_TIME: float = 0.0
 
 signal shop_requested()
 signal cave_entrance_requested(cave_id: String)
@@ -18,7 +17,6 @@ var cave_pool_cave_id: String = ""
 var cave_pool_index: int = -1
 var ui_panel_open: bool = false
 var scoop_cooldown_timer: float = 0.0
-var stamina_idle_timer: float = 0.0
 var facing_right: bool = true
 var flash_tween: Tween = null
 var tool_tween: Tween = null
@@ -27,15 +25,15 @@ var is_walking: bool = false
 var prev_walk_sin: float = 0.0
 var auto_scoop_timer: float = 0.0
 
-# Phase 12: Player immersion
 var idle_timer: float = 0.0
 var idle_state: int = 0
 var drip_timer: float = 0.0
 
-# Phase 16: Speed lines
 var speed_line_timer: float = 0.0
 
 # Dev fly mode
+var fly_mode: bool = false
+const FLY_SPEED: float = 400.0
 
 # Lantern system
 var lantern_light: PointLight2D = null
@@ -69,7 +67,32 @@ func _ready() -> void:
 	_update_tool_visual()
 	_setup_lantern()
 
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_F4:
+				GameManager.money += 100000.0
+				GameManager.money_changed.emit(GameManager.money)
+				_spawn_floating_text("+$100,000", Color(1.0, 0.85, 0.2))
+			KEY_F5:
+				fly_mode = not fly_mode
+				if fly_mode:
+					_spawn_floating_text("FLY MODE ON", Color(0.4, 1.0, 0.4))
+				else:
+					_spawn_floating_text("FLY MODE OFF", Color(1.0, 0.4, 0.4))
+
 func _physics_process(delta: float) -> void:
+	# Fly mode: free movement, no gravity, no collision
+	if fly_mode:
+		var dir_x: float = Input.get_axis("move_left", "move_right")
+		var dir_y: float = Input.get_axis("move_up", "move_down")
+		var fly_speed: float = FLY_SPEED
+		if Input.is_key_pressed(KEY_SHIFT):
+			fly_speed *= 3.0
+		position += Vector2(dir_x, dir_y) * fly_speed * delta
+		velocity = Vector2.ZERO
+		is_walking = false
+		return
 
 	# Gravity
 	if not is_on_floor():
@@ -227,9 +250,7 @@ func _physics_process(delta: float) -> void:
 		scoop_cooldown_timer -= delta
 
 	# Stamina regen
-	stamina_idle_timer += delta
-	if stamina_idle_timer >= STAMINA_REGEN_DELAY_TIME:
-		GameManager.regen_stamina(delta)
+	GameManager.regen_stamina(delta)
 
 	# Manual scoop: single press (skip if UI panel is open)
 	if Input.is_action_just_pressed("scoop") and scoop_cooldown_timer <= 0.0 and not ui_panel_open:
@@ -253,7 +274,6 @@ func _auto_scoop_water() -> void:
 	if near_cave_pool and cave_pool_index >= 0:
 		if GameManager.try_scoop_cave_pool(cave_pool_cave_id, cave_pool_index):
 			scoop_cooldown_timer = SCOOP_COOLDOWN
-			stamina_idle_timer = 0.0
 			_scoop_feedback()
 		return
 	# Overworld water
@@ -264,7 +284,6 @@ func _auto_scoop_water() -> void:
 		return
 	if GameManager.try_scoop(near_swamp_index):
 		scoop_cooldown_timer = SCOOP_COOLDOWN
-		stamina_idle_timer = 0.0
 		_scoop_feedback()
 
 func _handle_scoop() -> void:
@@ -275,7 +294,6 @@ func _handle_scoop() -> void:
 	if near_cave_pool and cave_pool_index >= 0:
 		if GameManager.try_scoop_cave_pool(cave_pool_cave_id, cave_pool_index):
 			scoop_cooldown_timer = SCOOP_COOLDOWN
-			stamina_idle_timer = 0.0
 			_scoop_feedback()
 		elif GameManager.is_inventory_full():
 			_spawn_floating_text("FULL!", Color(1.0, 0.4, 0.3))
@@ -297,7 +315,6 @@ func _handle_scoop() -> void:
 		return
 	if GameManager.try_scoop(near_swamp_index):
 		scoop_cooldown_timer = SCOOP_COOLDOWN
-		stamina_idle_timer = 0.0
 		_scoop_feedback()
 	elif GameManager.is_inventory_full():
 		_spawn_floating_text("FULL!", Color(1.0, 0.4, 0.3))
@@ -460,18 +477,11 @@ func _update_tool_visual() -> void:
 	tool_visuals.clear()
 
 	# Animate tool sprite: shrink then grow
-	if had_tool:
-		tool_sprite.scale = Vector2(0.0, 0.0)
-		var equip_tw := create_tween()
-		equip_tw.set_ease(Tween.EASE_OUT)
-		equip_tw.set_trans(Tween.TRANS_BACK)
-		equip_tw.tween_property(tool_sprite, "scale", Vector2(1.0, 1.0), 0.15)
-	else:
-		tool_sprite.scale = Vector2(0.0, 0.0)
-		var equip_tw := create_tween()
-		equip_tw.set_ease(Tween.EASE_OUT)
-		equip_tw.set_trans(Tween.TRANS_BACK)
-		equip_tw.tween_property(tool_sprite, "scale", Vector2(1.0, 1.0), 0.2)
+	tool_sprite.scale = Vector2(0.0, 0.0)
+	var equip_tw := create_tween()
+	equip_tw.set_ease(Tween.EASE_OUT)
+	equip_tw.set_trans(Tween.TRANS_BACK)
+	equip_tw.tween_property(tool_sprite, "scale", Vector2(1.0, 1.0), 0.15 if had_tool else 0.2)
 
 	var tool_id: String = GameManager.current_tool_id
 	match tool_id:

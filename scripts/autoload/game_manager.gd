@@ -213,6 +213,7 @@ const CAMEL_UPGRADE_EXPONENT: float = 1.35
 const CAMEL_SPEED_MAX_LEVEL: int = 8
 
 # Camel state
+var camel_unlocked: bool = false  # Unlocked by completing the Marsh (pool 3)
 var camel_count: int = 0
 var camel_capacity_level: int = 0
 var camel_speed_level: int = 0
@@ -449,6 +450,10 @@ func _drain_swamp(swamp_index: int, gallons: float) -> float:
 			money += reward
 			money_changed.emit(money)
 		swamp_completed.emit(swamp_index, reward)
+		# Unlock camel when Marsh (pool index 2) is completed
+		if swamp_index == 2 and not camel_unlocked:
+			camel_unlocked = true
+			camel_changed.emit()
 
 	return actual
 
@@ -658,7 +663,7 @@ func buy_upgrade(upgrade_id: String) -> bool:
 
 # --- Camel actions ---
 func buy_camel() -> bool:
-	if camel_count >= 1:
+	if not camel_unlocked or camel_count >= 1:
 		return false
 	var cost: float = get_camel_cost()
 	if money < cost:
@@ -881,6 +886,7 @@ func reset_game() -> void:
 	hose_active = false
 	hose_timer = 0.0
 	hose_swamp_index = -1
+	camel_unlocked = false
 	camel_count = 0
 	camel_capacity_level = 0
 	camel_speed_level = 0
@@ -972,7 +978,7 @@ func get_save_data() -> Dictionary:
 		cave_pool_save[cave_id] = pools
 
 	return {
-		"version": 16,
+		"version": 17,
 		"money": money,
 		"current_tool_id": current_tool_id,
 		"tools_owned": tools_owned.duplicate(true),
@@ -982,6 +988,7 @@ func get_save_data() -> Dictionary:
 		"last_scoop_swamp": last_scoop_swamp,
 		"swamp_states": swamp_save,
 		"current_day": current_day,
+		"camel_unlocked": camel_unlocked,
 		"camel_count": camel_count,
 		"camel_capacity_level": camel_capacity_level,
 		"camel_speed_level": camel_speed_level,
@@ -993,7 +1000,7 @@ func get_save_data() -> Dictionary:
 
 func load_save_data(data: Dictionary) -> void:
 	money = data.get("money", 0.0)
-	current_tool_id = data.get("current_tool_id", "spoon")
+	current_tool_id = data.get("current_tool_id", "hands")
 	if data.has("tools_owned"):
 		for key in data["tools_owned"]:
 			var k: String = key
@@ -1024,9 +1031,13 @@ func load_save_data(data: Dictionary) -> void:
 			swamp_states[0]["completed"] = true
 
 	# Camels
+	camel_unlocked = data.get("camel_unlocked", false)
 	camel_count = int(data.get("camel_count", 0))
 	camel_capacity_level = int(data.get("camel_capacity_level", 0))
 	camel_speed_level = int(data.get("camel_speed_level", 0))
+	# Migration: old saves without camel_unlocked — unlock if they own a camel or Marsh is done
+	if not camel_unlocked and (camel_count > 0 or is_swamp_completed(2)):
+		camel_unlocked = true
 	_init_camel_states()
 
 	# Upgrades

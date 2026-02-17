@@ -9,7 +9,10 @@ var cycle_time: float = 0.0
 # Terrain: array of Vector2 points defining the ground surface
 # Each pool has a unique contour; ridges between them vary in shape
 var terrain_points: Array[Vector2] = [
-	# Left shore (shop area) — indices 0-1
+	# Left forest edge — indices 0-5
+	Vector2(-240, 118), Vector2(-220, 122), Vector2(-195, 128),
+	Vector2(-160, 132), Vector2(-110, 134), Vector2(-60, 136),
+	# Left shore (shop area) — indices 6-7
 	Vector2(-40, 136), Vector2(80, 136),
 	# Puddle (7 pts) — indices 2-8: shallow worn dip, left-leaning
 	Vector2(108, 160),   # entry top
@@ -217,22 +220,25 @@ var terrain_points: Array[Vector2] = [
 	Vector2(5298, 530),  # exit
 	Vector2(5328, 516),  # exit slope
 	Vector2(5360, 498),  # exit top
-	# Right shore — indices 209-210
+	# Right shore — indices 215-216
 	Vector2(5420, 490), Vector2(5500, 498),
+	# Island — indices 217-222
+	Vector2(5560, 510), Vector2(5600, 490), Vector2(5640, 484),
+	Vector2(5680, 484), Vector2(5720, 490), Vector2(5760, 510),
 ]
 
 # Swamp geometry: [entry_top_index, exit_top_index] into terrain_points
 const SWAMP_RANGES: Array = [
-	[2, 8],      # Puddle
-	[11, 19],    # Pond
-	[23, 35],    # Marsh
-	[39, 53],    # Bog
-	[58, 74],    # Swamp
-	[78, 96],    # Lake
-	[100, 120],  # Reservoir
-	[124, 146],  # Lagoon
-	[151, 175],  # Bayou
-	[180, 208],  # The Atlantic
+	[8, 14],     # Puddle
+	[17, 25],    # Pond
+	[29, 41],    # Marsh
+	[45, 59],    # Bog
+	[64, 80],    # Swamp
+	[84, 102],   # Lake
+	[106, 126],  # Reservoir
+	[130, 152],  # Lagoon
+	[157, 181],  # Bayou
+	[186, 214],  # The Atlantic
 ]
 const SWAMP_COUNT: int = 10
 const WATER_SHADER = preload("res://shaders/water.gdshader")
@@ -499,7 +505,9 @@ func _ready() -> void:
 	_build_pool_features()
 	_build_pool_glow_lights()
 	_build_left_boundary()
+	_build_left_trees()
 	_build_right_boundary()
+	_build_island_house()
 	_build_post_processing()
 	_build_distance_fog()
 	_build_weather()
@@ -3219,6 +3227,146 @@ func _build_right_boundary() -> void:
 	col.shape = rect
 	wall_body.add_child(col)
 	add_child(wall_body)
+
+# --- Dense trees/brush at left boundary ---
+func _build_left_trees() -> void:
+	var tree_x_start: float = terrain_points[0].x  # -240
+	var tree_x_end: float = terrain_points[0].x + 60.0  # -180
+	var ground_y: float = terrain_points[0].y  # ~118
+
+	# Dense canopy — overlapping dark-green ovals
+	var canopy_colors: Array[Color] = [
+		Color(0.06, 0.18, 0.04), Color(0.08, 0.22, 0.06),
+		Color(0.05, 0.15, 0.03), Color(0.07, 0.20, 0.05),
+	]
+	for i in range(12):
+		var cx: float = randf_range(tree_x_start - 20, tree_x_end + 10)
+		var cy: float = ground_y - randf_range(20, 70)
+		var rw: float = randf_range(16, 32)
+		var rh: float = randf_range(14, 26)
+		var canopy := Polygon2D.new()
+		var pts := PackedVector2Array()
+		for a in range(8):
+			var angle: float = TAU * float(a) / 8.0
+			pts.append(Vector2(
+				cx + cos(angle) * rw * randf_range(0.8, 1.0),
+				cy + sin(angle) * rh * randf_range(0.8, 1.0)
+			))
+		canopy.polygon = pts
+		canopy.color = canopy_colors[i % canopy_colors.size()]
+		canopy.z_index = 5
+		add_child(canopy)
+
+	# Trunks
+	for i in range(5):
+		var tx: float = randf_range(tree_x_start, tree_x_end)
+		var trunk := ColorRect.new()
+		trunk.position = Vector2(tx, ground_y - randf_range(30, 55))
+		trunk.size = Vector2(randf_range(3, 6), randf_range(30, 55))
+		trunk.color = Color(0.12, 0.08, 0.04, 0.8)
+		trunk.z_index = 4
+		add_child(trunk)
+
+	# Undergrowth / brush — low wide shapes filling the base
+	for i in range(8):
+		var bx: float = randf_range(tree_x_start - 10, tree_x_end + 20)
+		var by: float = ground_y - randf_range(2, 14)
+		var brush := ColorRect.new()
+		brush.position = Vector2(bx, by)
+		brush.size = Vector2(randf_range(12, 24), randf_range(6, 12))
+		brush.color = Color(0.05, 0.14, 0.03, randf_range(0.7, 0.9))
+		brush.z_index = 5
+		add_child(brush)
+
+# --- Island with house at the right end ---
+func _build_island_house() -> void:
+	# Island terrain is already in terrain_points (indices 217-222)
+	# Find the island center — midpoint of the flat top
+	var island_cx: float = 5660.0
+	var island_y: float = 484.0  # Ground level on the flat top
+
+	# --- House ---
+	# Foundation
+	var foundation := ColorRect.new()
+	foundation.position = Vector2(island_cx - 18, island_y - 4)
+	foundation.size = Vector2(36, 6)
+	foundation.color = Color(0.4, 0.38, 0.32)
+	foundation.z_index = 2
+	add_child(foundation)
+
+	# Walls
+	var wall := ColorRect.new()
+	wall.position = Vector2(island_cx - 14, island_y - 30)
+	wall.size = Vector2(28, 26)
+	wall.color = Color(0.52, 0.38, 0.22)
+	wall.z_index = 3
+	add_child(wall)
+
+	# Plank lines
+	for i in range(4):
+		var plank := ColorRect.new()
+		plank.position = Vector2(island_cx - 14, island_y - 30 + i * 6 + 3)
+		plank.size = Vector2(28, 1)
+		plank.color = Color(0.42, 0.30, 0.16, 0.35)
+		plank.z_index = 3
+		add_child(plank)
+
+	# Door
+	var door := ColorRect.new()
+	door.position = Vector2(island_cx - 4, island_y - 16)
+	door.size = Vector2(8, 12)
+	door.color = Color(0.28, 0.18, 0.10)
+	door.z_index = 4
+	add_child(door)
+
+	# Window
+	var window := ColorRect.new()
+	window.position = Vector2(island_cx + 6, island_y - 24)
+	window.size = Vector2(5, 5)
+	window.color = Color(0.6, 0.75, 0.85, 0.8)
+	window.z_index = 4
+	add_child(window)
+
+	# Roof (triangle as Polygon2D)
+	var roof := Polygon2D.new()
+	roof.polygon = PackedVector2Array([
+		Vector2(island_cx - 18, island_y - 30),
+		Vector2(island_cx, island_y - 48),
+		Vector2(island_cx + 18, island_y - 30),
+	])
+	roof.color = Color(0.55, 0.22, 0.12)
+	roof.z_index = 5
+	add_child(roof)
+
+	# Chimney
+	var chimney := ColorRect.new()
+	chimney.position = Vector2(island_cx + 8, island_y - 48)
+	chimney.size = Vector2(5, 12)
+	chimney.color = Color(0.38, 0.32, 0.28)
+	chimney.z_index = 4
+	add_child(chimney)
+
+	# Small tree next to house
+	var tree_x: float = island_cx - 30
+	var tree_trunk := ColorRect.new()
+	tree_trunk.position = Vector2(tree_x, island_y - 28)
+	tree_trunk.size = Vector2(3, 28)
+	tree_trunk.color = Color(0.15, 0.10, 0.05)
+	tree_trunk.z_index = 2
+	add_child(tree_trunk)
+
+	var tree_canopy := Polygon2D.new()
+	var canopy_pts := PackedVector2Array()
+	for a in range(7):
+		var angle: float = TAU * float(a) / 7.0
+		canopy_pts.append(Vector2(
+			tree_x + 1.5 + cos(angle) * 12.0,
+			island_y - 36 + sin(angle) * 10.0
+		))
+	tree_canopy.polygon = canopy_pts
+	tree_canopy.color = Color(0.08, 0.22, 0.06)
+	tree_canopy.z_index = 3
+	add_child(tree_canopy)
 
 # --- Water Detection ---
 func _build_water_detect_areas() -> void:

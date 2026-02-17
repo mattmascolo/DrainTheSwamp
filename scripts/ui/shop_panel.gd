@@ -118,12 +118,12 @@ func _refresh() -> void:
 # TOOLS TAB
 # =============================================================================
 func _build_tools_tab() -> void:
-	# --- Camel Section (at top) ---
-	_build_camel_section()
-
-	var tool_sep := HSeparator.new()
-	tool_sep.add_theme_constant_override("separation", 8)
-	tool_list.add_child(tool_sep)
+	# --- Camel Section (at top, hidden until unlocked) ---
+	if GameManager.camel_unlocked:
+		_build_camel_section()
+		var tool_sep := HSeparator.new()
+		tool_sep.add_theme_constant_override("separation", 8)
+		tool_list.add_child(tool_sep)
 
 	var sorted_tools: Array = GameManager.tool_definitions.keys()
 	sorted_tools.sort_custom(func(a: Variant, b: Variant) -> bool: return GameManager.tool_definitions[a]["cost"] < GameManager.tool_definitions[b]["cost"])
@@ -652,7 +652,7 @@ func _build_camel_section() -> void:
 		upgrade_panel.add_child(up_row)
 		tool_list.add_child(upgrade_panel)
 
-func _style_button(btn: Button, bg_color: Color, affordable: bool = true) -> void:
+func _style_button(btn: Button, bg_color: Color) -> void:
 	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	var style := StyleBoxFlat.new()
 	style.bg_color = bg_color
@@ -660,12 +660,7 @@ func _style_button(btn: Button, bg_color: Color, affordable: bool = true) -> voi
 	style.border_width_top = 2
 	style.border_width_right = 2
 	style.border_width_bottom = 2
-	# Affordance: green-tinted border if player can afford, muted otherwise
-	if affordable:
-		style.border_color = bg_color.lightened(0.4).lerp(Color(0.3, 0.8, 0.4), 0.25)
-	else:
-		style.border_color = bg_color.lightened(0.2)
-		style.bg_color = bg_color.lerp(Color(0.1, 0.1, 0.12), 0.3)
+	style.border_color = bg_color.lightened(0.4).lerp(Color(0.3, 0.8, 0.4), 0.25)
 	style.corner_radius_top_left = 4
 	style.corner_radius_top_right = 4
 	style.corner_radius_bottom_left = 4

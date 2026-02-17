@@ -1,8 +1,5 @@
 class_name Economy
 
-static func upgrade_cost(base_cost: float, level: int) -> float:
-	return base_cost * pow(1.15, level)
-
 const MONEY_SUFFIXES: Array[Array] = [
 	[1e18, " Qi"],   # Quintillion
 	[1e15, " Qa"],   # Quadrillion

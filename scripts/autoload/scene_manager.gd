@@ -79,7 +79,7 @@ func _build_popup() -> void:
 
 	# Connect to GameManager signals
 	GameManager.loot_collected.connect(_on_loot_collected)
-	GameManager.lore_read.connect(_on_lore_read)
+	GameManager.swamp_completed.connect(_on_swamp_completed)
 
 func _process(delta: float) -> void:
 	if popup_auto_close > 0.0:
@@ -106,8 +106,9 @@ func _close_popup() -> void:
 func _on_loot_collected(_cave_id: String, _loot_id: String, reward_text: String) -> void:
 	show_popup(reward_text, 3.0)
 
-func _on_lore_read(_cave_id: String, _lore_id: String) -> void:
-	pass  # lore_wall calls show_popup directly with its text
+func _on_swamp_completed(swamp_index: int, _reward: float) -> void:
+	if swamp_index == 2:
+		show_popup("A stray camel wanders out of the drained marsh!\nCamel now available in the Shop.", 5.0)
 
 # --- Scene Transitions ---
 func transition_to_scene(scene_path: String, use_pixelate: bool = false) -> void:
