@@ -31,6 +31,14 @@ var moisture_gleams: Array[Dictionary] = []  # Phase 9B: shimmer pixels on wet w
 var cave_pool_refs: Array[Dictionary] = []  # [{water_poly, wall_body, glow_light, loot_ref, detect_area}]
 
 const PLAYER_SCENE = preload("res://scenes/player/player.tscn")
+const HUD_SCENE = preload("res://scenes/ui/hud.tscn")
+const SHOP_SCENE = preload("res://scenes/ui/shop_panel.tscn")
+const MENU_SCENE = preload("res://scenes/ui/menu_panel.tscn")
+
+# Cave UI refs
+var cave_hud = null
+var cave_shop_panel = null
+var cave_menu_panel = null
 
 func _ready() -> void:
 	_setup_cave()
@@ -61,6 +69,7 @@ func _setup_cave() -> void:
 	_spawn_player()
 	_setup_camera()
 	_setup_loot_and_lore()
+	_setup_cave_ui()
 
 	# Connect cave pool signals
 	GameManager.cave_pool_level_changed.connect(_on_cave_pool_level_changed)
@@ -951,6 +960,134 @@ func _setup_camera() -> void:
 # --- Virtual: override in subclass ---
 func _setup_loot_and_lore() -> void:
 	pass
+
+# --- Cave UI (HUD + Shop + Menu) ---
+func _setup_cave_ui() -> void:
+	# HUD (CanvasLayer at layer 10 — same as overworld)
+	cave_hud = HUD_SCENE.instantiate()
+	add_child(cave_hud)
+	cave_hud.menu_pressed.connect(_on_cave_menu_pressed)
+
+	# UILayer for panels (CanvasLayer at layer 20)
+	var ui_layer := CanvasLayer.new()
+	ui_layer.layer = 20
+	add_child(ui_layer)
+
+	cave_shop_panel = SHOP_SCENE.instantiate()
+	ui_layer.add_child(cave_shop_panel)
+
+	cave_menu_panel = MENU_SCENE.instantiate()
+	ui_layer.add_child(cave_menu_panel)
+	cave_menu_panel.reset_confirmed.connect(_on_cave_reset_confirmed)
+
+	# Close panels when visibility changes
+	cave_shop_panel.visibility_changed.connect(_on_cave_panel_visibility_changed)
+	cave_menu_panel.visibility_changed.connect(_on_cave_panel_visibility_changed)
+
+	# Let player open shop via scoop near any position in cave
+	if player_ref:
+		player_ref.shop_requested.connect(_on_cave_shop_pressed)
+
+	# Unstuck button (bottom-right area, above bottom bar)
+	var unstuck_layer := CanvasLayer.new()
+	unstuck_layer.layer = 15
+	add_child(unstuck_layer)
+	var unstuck_btn := Button.new()
+	unstuck_btn.text = "Unstuck"
+	unstuck_btn.add_theme_font_size_override("font_size", 10)
+	unstuck_btn.add_theme_color_override("font_color", Color(0.85, 0.75, 0.55))
+	var btn_style := StyleBoxFlat.new()
+	btn_style.bg_color = Color(0.15, 0.13, 0.1, 0.7)
+	btn_style.border_color = Color(0.4, 0.35, 0.25, 0.6)
+	btn_style.set_border_width_all(1)
+	btn_style.set_corner_radius_all(3)
+	btn_style.set_content_margin_all(4)
+	unstuck_btn.add_theme_stylebox_override("normal", btn_style)
+	var hover_style := btn_style.duplicate() as StyleBoxFlat
+	hover_style.bg_color = Color(0.22, 0.18, 0.12, 0.85)
+	unstuck_btn.add_theme_stylebox_override("hover", hover_style)
+	unstuck_btn.add_theme_stylebox_override("pressed", hover_style)
+	var vp_size: Vector2 = get_viewport_rect().size
+	unstuck_btn.position = Vector2(vp_size.x - 70, vp_size.y - 60)
+	unstuck_btn.pressed.connect(_on_unstuck_pressed)
+	unstuck_layer.add_child(unstuck_btn)
+
+func _on_cave_shop_pressed() -> void:
+	if cave_shop_panel.visible:
+		_close_cave_panels()
+		return
+	_close_cave_panels()
+	cave_shop_panel.open()
+	if player_ref:
+		player_ref.ui_panel_open = true
+
+func _on_cave_menu_pressed() -> void:
+	_close_cave_panels()
+	cave_menu_panel.open()
+	if player_ref:
+		player_ref.ui_panel_open = true
+
+func _on_cave_reset_confirmed() -> void:
+	_close_cave_panels()
+	GameManager.reset_game()
+	SaveManager.save_game()
+	SceneManager.transition_to_return()
+
+func _close_cave_panels() -> void:
+	if cave_shop_panel:
+		cave_shop_panel.visible = false
+	if player_ref:
+		player_ref.ui_panel_open = false
+
+func _on_cave_panel_visibility_changed() -> void:
+	if cave_shop_panel and cave_menu_panel:
+		if not cave_shop_panel.visible and not cave_menu_panel.visible:
+			if player_ref:
+				player_ref.ui_panel_open = false
+
+func _on_unstuck_pressed() -> void:
+	if not player_ref or not is_instance_valid(player_ref):
+		return
+	var px: float = player_ref.position.x
+	# Find closest pool to the player
+	var closest_idx: int = -1
+	var closest_dist: float = 999999.0
+	for i in range(cave_pool_refs.size()):
+		var refs: Dictionary = cave_pool_refs[i]
+		var pool_cx: float = (refs["x_start"] + refs["x_end"]) * 0.5
+		var dist: float = absf(px - pool_cx)
+		if dist < closest_dist:
+			closest_dist = dist
+			closest_idx = i
+	if closest_idx >= 0:
+		var refs: Dictionary = cave_pool_refs[closest_idx]
+		var safe_x: float = refs["x_start"] - 30.0
+		# Clamp to cave left boundary
+		var left_bound: float = cave_terrain_points[0].x + 30.0
+		safe_x = maxf(safe_x, left_bound)
+		var safe_y: float = _get_cave_terrain_y_at(safe_x) - 16.0
+		player_ref.position = Vector2(safe_x, safe_y)
+		player_ref.velocity = Vector2.ZERO
+	else:
+		# No pools — just move to cave entrance area
+		var left_x: float = cave_terrain_points[0].x + 30.0
+		var floor_y: float = cave_terrain_points[0].y - 16.0
+		player_ref.position = Vector2(left_x, floor_y)
+		player_ref.velocity = Vector2.ZERO
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		if cave_menu_panel and cave_menu_panel.visible:
+			cave_menu_panel._close()
+			if player_ref:
+				player_ref.ui_panel_open = false
+		elif cave_shop_panel and cave_shop_panel.visible:
+			_close_cave_panels()
+		else:
+			if cave_menu_panel:
+				cave_menu_panel.open()
+				if player_ref:
+					player_ref.ui_panel_open = true
 
 # --- Ceiling Y helper ---
 func _get_cave_ceiling_y_at(x: float) -> float:

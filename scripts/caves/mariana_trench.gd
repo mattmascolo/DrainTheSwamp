@@ -81,7 +81,7 @@ func _init() -> void:
 				"loot_id": "trench_pool_2",
 				"reward_stat_levels": {
 					"carrying_capacity": 10,
-					"move_speed": 10,
+					"movement_speed": 10,
 					"stamina": 10,
 					"stamina_regen": 10,
 					"water_value": 10,

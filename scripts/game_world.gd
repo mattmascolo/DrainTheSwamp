@@ -248,6 +248,7 @@ var water_detect_areas: Array[Area2D] = []
 var water_walls: Array = []
 var swamp_labels: Array[Label] = []
 var swamp_percent_labels: Array[Label] = []
+var swamp_gallon_labels: Array[Label] = []
 var clouds: Array[Node2D] = []
 var cattails: Array[Node2D] = []
 var stars: Array[ColorRect] = []
@@ -261,8 +262,6 @@ var mud_patches: Array[Dictionary] = []
 var player_in_shop_area: bool = false
 var shop_player_ref: Node2D = null
 var camels: Array[Dictionary] = []
-var elephant_data: Dictionary = {}
-
 # Second pass visuals
 var moon: Node2D = null
 var moon_glow: Polygon2D = null
@@ -460,7 +459,7 @@ const ROCK_DARK_COLOR := Color(0.32, 0.3, 0.28)
 var wave_time: float = 0.0
 
 func _ready() -> void:
-	cycle_time = CYCLE_DURATION * 0.2
+	cycle_time = CYCLE_DURATION * GameManager.cycle_progress
 	_build_parallax()
 	_build_sky()
 	_build_sun()
@@ -518,8 +517,6 @@ func _ready() -> void:
 	GameManager.scoop_performed.connect(_on_scoop_performed)
 	GameManager.camel_changed.connect(_on_camel_changed)
 	_build_camels()
-	GameManager.elephant_changed.connect(_on_elephant_changed)
-	_build_elephant()
 
 # --- Parallax ---
 func _build_parallax() -> void:
@@ -3258,9 +3255,22 @@ func _build_water_detect_areas() -> void:
 		area.body_exited.connect(func(body: Node2D) -> void: _on_swamp_body_exited(body, idx))
 
 # --- Swamp Labels ---
+func _format_gallons(gal: float) -> String:
+	if gal >= 1e9:
+		return "%.1fB" % (gal / 1e9)
+	elif gal >= 1e6:
+		return "%.1fM" % (gal / 1e6)
+	elif gal >= 1e3:
+		return "%.1fK" % (gal / 1e3)
+	elif gal >= 10.0:
+		return "%.0f" % gal
+	else:
+		return "%.1f" % gal
+
 func _build_swamp_labels() -> void:
 	swamp_labels.clear()
 	swamp_percent_labels.clear()
+	swamp_gallon_labels.clear()
 	for i in range(SWAMP_COUNT):
 		var geo: Dictionary = _get_swamp_geometry(i)
 		var basin_mid_x: float = (geo["basin_left"].x + geo["basin_right"].x) * 0.5
@@ -3300,6 +3310,29 @@ func _build_swamp_labels() -> void:
 		pct_label.z_index = 5
 		add_child(pct_label)
 		swamp_percent_labels.append(pct_label)
+
+		# Gallon counter label — below percentage
+		var gal_label := Label.new()
+		var total_gal: float = GameManager.swamp_definitions[i]["total_gallons"]
+		var drained: float = GameManager.swamp_states[i]["gallons_drained"]
+		var remaining: float = maxf(total_gal - drained, 0.0)
+		gal_label.text = "%s / %s gal" % [_format_gallons(remaining), _format_gallons(total_gal)]
+		gal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		gal_label.add_theme_font_size_override("font_size", 9)
+		gal_label.add_theme_color_override("font_color", Color(0.6, 0.75, 0.9, 0.8))
+		gal_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+		gal_label.add_theme_constant_override("shadow_offset_x", 1)
+		gal_label.add_theme_constant_override("shadow_offset_y", 1)
+		gal_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+		gal_label.add_theme_constant_override("outline_size", 2)
+		gal_label.custom_minimum_size = Vector2(100, 0)
+		gal_label.position = Vector2(basin_mid_x - 50, basin_y + 32)
+		gal_label.z_index = 5
+		add_child(gal_label)
+		swamp_gallon_labels.append(gal_label)
+		if GameManager.swamp_states[i]["completed"]:
+			gal_label.text = "DRAINED"
+			gal_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4, 0.8))
 
 # --- Signal Handlers ---
 func _on_swamp_body_entered(body: Node2D, swamp_index: int) -> void:
@@ -3619,352 +3652,6 @@ func _spawn_camel_sell_text(x: float, y: float, earned: float) -> void:
 	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.8)
 	tween.tween_callback(label.queue_free)
 
-# --- Elephant ---
-func _on_elephant_changed() -> void:
-	_build_elephant()
-
-func _build_elephant() -> void:
-	# Remove existing elephant node
-	if elephant_data.has("node") and is_instance_valid(elephant_data["node"]):
-		elephant_data["node"].queue_free()
-	elephant_data.clear()
-
-	if not GameManager.elephant_owned:
-		return
-
-	var el_node := Node2D.new()
-	el_node.z_index = 3
-
-	var start_x: float = GameManager.elephant_state["x"]
-	el_node.position = Vector2(start_x, _get_terrain_y_at(start_x))
-
-	# Body (chunky gray)
-	var body := ColorRect.new()
-	body.size = Vector2(12, 10)
-	body.position = Vector2(-6, -16)
-	body.color = Color(0.55, 0.55, 0.58)
-	el_node.add_child(body)
-
-	# Head (slightly lighter)
-	var head := ColorRect.new()
-	head.size = Vector2(6, 6)
-	head.position = Vector2(5, -20)
-	head.color = Color(0.6, 0.6, 0.63)
-	el_node.add_child(head)
-
-	# Left ear
-	var ear_l := ColorRect.new()
-	ear_l.size = Vector2(4, 5)
-	ear_l.position = Vector2(-2, -22)
-	ear_l.color = Color(0.48, 0.48, 0.52)
-	el_node.add_child(ear_l)
-
-	# Right ear
-	var ear_r := ColorRect.new()
-	ear_r.size = Vector2(4, 5)
-	ear_r.position = Vector2(9, -22)
-	ear_r.color = Color(0.48, 0.48, 0.52)
-	el_node.add_child(ear_r)
-
-	# Front legs
-	var leg_fl := ColorRect.new()
-	leg_fl.size = Vector2(2, 4)
-	leg_fl.position = Vector2(2, -6)
-	leg_fl.color = Color(0.5, 0.5, 0.53)
-	el_node.add_child(leg_fl)
-
-	var leg_fr := ColorRect.new()
-	leg_fr.size = Vector2(2, 4)
-	leg_fr.position = Vector2(5, -6)
-	leg_fr.color = Color(0.47, 0.47, 0.5)
-	el_node.add_child(leg_fr)
-
-	# Back legs
-	var leg_bl := ColorRect.new()
-	leg_bl.size = Vector2(2, 4)
-	leg_bl.position = Vector2(-5, -6)
-	leg_bl.color = Color(0.5, 0.5, 0.53)
-	el_node.add_child(leg_bl)
-
-	var leg_br := ColorRect.new()
-	leg_br.size = Vector2(2, 4)
-	leg_br.position = Vector2(-2, -6)
-	leg_br.color = Color(0.47, 0.47, 0.5)
-	el_node.add_child(leg_br)
-
-	# Trunk (Line2D, 2px wide, 3 points)
-	var trunk := Line2D.new()
-	trunk.width = 2.0
-	trunk.default_color = Color(0.58, 0.58, 0.61)
-	trunk.add_point(Vector2(8, -17))   # base at head
-	trunk.add_point(Vector2(10, -12))  # mid
-	trunk.add_point(Vector2(9, -7))    # tip hangs down
-	el_node.add_child(trunk)
-
-	# Tail
-	var tail := ColorRect.new()
-	tail.size = Vector2(1, 6)
-	tail.position = Vector2(-7, -14)
-	tail.color = Color(0.5, 0.5, 0.53)
-	el_node.add_child(tail)
-
-	# Eye
-	var eye := ColorRect.new()
-	eye.size = Vector2(1, 1)
-	eye.position = Vector2(9, -19)
-	eye.color = Color(0.12, 0.1, 0.08)
-	el_node.add_child(eye)
-
-	add_child(el_node)
-	elephant_data = {
-		"node": el_node,
-		"body": body,
-		"head": head,
-		"ear_l": ear_l,
-		"ear_r": ear_r,
-		"leg_fl": leg_fl,
-		"leg_fr": leg_fr,
-		"leg_bl": leg_bl,
-		"leg_br": leg_br,
-		"trunk": trunk,
-		"tail": tail,
-		"eye": eye,
-		"walk_time": 0.0,
-		"facing_right": true,
-		"dust_timer": 0.0,
-	}
-
-func _update_elephant(delta: float) -> void:
-	if elephant_data.is_empty():
-		return
-	var es: Dictionary = GameManager.elephant_state
-	var ed: Dictionary = elephant_data
-	var node: Node2D = ed["node"]
-	var trunk_cap: float = GameManager.get_elephant_trunk_capacity()
-	var trot_speed: float = GameManager.get_elephant_trot_speed()
-	var trunk_str: float = GameManager.get_elephant_trunk_strength()
-
-	match es["state"]:
-		"idle":
-			_animate_elephant_idle(ed)
-			# Find nearest undrained pool
-			var best_idx: int = -1
-			var best_dist: float = 999999.0
-			for i in range(SWAMP_COUNT):
-				if GameManager.is_swamp_completed(i):
-					continue
-				if GameManager.get_swamp_fill_fraction(i) <= 0.001:
-					continue
-				var geo: Dictionary = _get_swamp_geometry(i)
-				var pool_center_x: float = (geo["entry_top"].x + geo["exit_top"].x) * 0.5
-				var dist: float = absf(es["x"] - pool_center_x)
-				if dist < best_dist:
-					best_dist = dist
-					best_idx = i
-			if best_idx >= 0:
-				es["target_swamp"] = best_idx
-				es["state"] = "to_water"
-				es["state_timer"] = 0.0
-
-		"to_water":
-			var target_idx: int = es["target_swamp"]
-			if target_idx < 0 or target_idx >= SWAMP_COUNT or GameManager.is_swamp_completed(target_idx):
-				es["state"] = "idle"
-				es["state_timer"] = 0.0
-			else:
-				var geo: Dictionary = _get_swamp_geometry(target_idx)
-				# Walk to entry side of pool
-				var target_x: float = geo["entry_top"].x + 10.0
-				var dx: float = target_x - es["x"]
-				if absf(dx) > 8.0:
-					var dir: float = signf(dx)
-					es["x"] += dir * trot_speed * delta
-					ed["facing_right"] = dir > 0.0
-					ed["walk_time"] += delta * 6.0
-					_animate_elephant_walk(ed)
-				else:
-					es["state"] = "scooping"
-					es["source_swamp"] = target_idx
-					es["scoop_timer"] = 0.0
-					es["state_timer"] = 0.0
-
-		"scooping":
-			_animate_elephant_scoop(ed, es["scoop_timer"])
-			es["scoop_timer"] += delta
-			if es["scoop_timer"] >= GameManager.ELEPHANT_SCOOP_INTERVAL:
-				es["scoop_timer"] -= GameManager.ELEPHANT_SCOOP_INTERVAL
-				var remaining_space: float = trunk_cap - es["water_carried"]
-				if remaining_space <= 0.001:
-					# Trunk full -> go sell
-					es["state"] = "to_shop"
-					es["state_timer"] = 0.0
-				else:
-					var scoop_amount: float = minf(trunk_str, remaining_space)
-					var actual: float = GameManager.elephant_scoop_water(es["source_swamp"], scoop_amount)
-					if actual > 0.0:
-						es["water_carried"] += actual
-						_spawn_elephant_scoop_splash(es["x"] + 10, _get_terrain_y_at(es["x"] + 10))
-					else:
-						# Pool empty
-						if es["water_carried"] > 0.001:
-							es["state"] = "to_shop"
-							es["state_timer"] = 0.0
-						else:
-							es["state"] = "idle"
-							es["state_timer"] = 0.0
-
-		"to_shop":
-			var shop_x: float = 30.0
-			var dx2: float = shop_x - es["x"]
-			if absf(dx2) > 5.0:
-				var dir2: float = signf(dx2)
-				es["x"] += dir2 * trot_speed * delta
-				ed["facing_right"] = dir2 > 0.0
-				ed["walk_time"] += delta * 6.0
-				_animate_elephant_walk(ed)
-			else:
-				es["state"] = "selling"
-				es["state_timer"] = 0.0
-				_animate_elephant_idle(ed)
-
-		"selling":
-			_animate_elephant_idle(ed)
-			es["state_timer"] += delta
-			if es["state_timer"] >= 0.5:
-				var earned: float = GameManager.elephant_sell_water()
-				if earned > 0.01:
-					_spawn_elephant_sell_text(es["x"], _get_terrain_y_at(es["x"]) - 30, earned)
-				es["state"] = "idle"
-				es["state_timer"] = 0.0
-
-	# Update position on terrain
-	var terrain_y: float = _get_terrain_y_at(es["x"])
-	if terrain_y > 0:
-		node.position = Vector2(es["x"], terrain_y)
-	else:
-		node.position.x = es["x"]
-
-	# Flip direction
-	node.scale.x = 1.0 if ed["facing_right"] else -1.0
-
-	# Dust trail when walking
-	var is_walking: bool = (es["state"] == "to_water" or es["state"] == "to_shop")
-	if is_walking:
-		ed["dust_timer"] += delta
-		if ed["dust_timer"] >= 0.35:
-			ed["dust_timer"] = 0.0
-			_spawn_elephant_dust(es["x"], node.position.y)
-
-	# Trunk visual: curl up when carrying water
-	var trunk_line: Line2D = ed["trunk"]
-	var fill_frac: float = 0.0
-	if trunk_cap > 0.0:
-		fill_frac = clampf(es["water_carried"] / trunk_cap, 0.0, 1.0)
-	if fill_frac > 0.01:
-		# Trunk curls up when carrying
-		trunk_line.set_point_position(1, Vector2(10, -14 - fill_frac * 3))
-		trunk_line.set_point_position(2, Vector2(12, -16 - fill_frac * 4))
-		trunk_line.default_color = Color(0.58, 0.58, 0.61).lerp(Color(0.35, 0.55, 0.75), fill_frac * 0.5)
-	else:
-		# Trunk hangs down idle
-		trunk_line.set_point_position(1, Vector2(10, -12))
-		trunk_line.set_point_position(2, Vector2(9, -7))
-		trunk_line.default_color = Color(0.58, 0.58, 0.61)
-
-func _animate_elephant_walk(ed: Dictionary) -> void:
-	var wt: float = ed["walk_time"]
-	var leg_offset: float = sin(wt) * 2.0
-	ed["leg_fl"].position.y = -6.0 + leg_offset
-	ed["leg_fr"].position.y = -6.0 - leg_offset
-	ed["leg_bl"].position.y = -6.0 - leg_offset
-	ed["leg_br"].position.y = -6.0 + leg_offset
-	# Body bob
-	var bob: float = sin(wt * 2.0) * 0.8
-	ed["body"].position.y = -16.0 + bob
-	ed["head"].position.y = -20.0 + bob
-	ed["eye"].position.y = -19.0 + bob
-	# Ear flop
-	var ear_flop: float = sin(wt * 2.5) * 1.5
-	ed["ear_l"].position.y = -22.0 + ear_flop
-	ed["ear_r"].position.y = -22.0 - ear_flop
-	# Tail swing
-	var tail_swing: float = sin(wt * 1.5) * 1.5
-	ed["tail"].position.x = -7.0 + tail_swing
-
-func _animate_elephant_idle(ed: Dictionary) -> void:
-	var breath: float = sin(Time.get_ticks_msec() * 0.002) * 0.4
-	ed["body"].position.y = -16.0 + breath
-	ed["head"].position.y = -20.0 + breath * 0.5
-	ed["eye"].position.y = -19.0 + breath * 0.5
-	ed["ear_l"].position.y = -22.0 + breath * 0.3
-	ed["ear_r"].position.y = -22.0 + breath * 0.3
-	# Reset legs
-	ed["leg_fl"].position.y = -6.0
-	ed["leg_fr"].position.y = -6.0
-	ed["leg_bl"].position.y = -6.0
-	ed["leg_br"].position.y = -6.0
-	ed["tail"].position.x = -7.0
-
-func _animate_elephant_scoop(ed: Dictionary, timer: float) -> void:
-	# Trunk dips down during scoop cycle
-	var trunk_line: Line2D = ed["trunk"]
-	var progress: float = fmod(timer, GameManager.ELEPHANT_SCOOP_INTERVAL) / GameManager.ELEPHANT_SCOOP_INTERVAL
-	var dip: float = sin(progress * PI) * 5.0
-	trunk_line.set_point_position(1, Vector2(10, -12 + dip * 0.5))
-	trunk_line.set_point_position(2, Vector2(9, -7 + dip))
-	# Idle body
-	_animate_elephant_idle(ed)
-
-func _spawn_elephant_dust(x: float, y: float) -> void:
-	for i in range(2):
-		var dust := ColorRect.new()
-		dust.size = Vector2(2, 2)
-		dust.color = Color(0.5, 0.5, 0.55, 0.35)
-		dust.position = Vector2(x + randf_range(-3, 3), y + randf_range(-2, 0))
-		dust.z_index = -1
-		add_child(dust)
-		var tw := create_tween()
-		tw.set_parallel(true)
-		tw.tween_property(dust, "position", dust.position + Vector2(randf_range(-5, 5), randf_range(-5, -2)), 0.5)
-		tw.tween_property(dust, "modulate:a", 0.0, 0.5)
-		tw.set_parallel(false)
-		tw.tween_callback(dust.queue_free)
-
-func _spawn_elephant_scoop_splash(x: float, y: float) -> void:
-	for i in range(3):
-		var splash := ColorRect.new()
-		splash.size = Vector2(2, 2)
-		splash.color = Color(0.3, 0.6, 0.9, 0.6)
-		splash.position = Vector2(x + randf_range(-4, 4), y + randf_range(-3, 0))
-		splash.z_index = 4
-		add_child(splash)
-		var tw := create_tween()
-		tw.set_parallel(true)
-		tw.tween_property(splash, "position", splash.position + Vector2(randf_range(-8, 8), randf_range(-12, -4)), 0.4)
-		tw.tween_property(splash, "modulate:a", 0.0, 0.4)
-		tw.set_parallel(false)
-		tw.tween_callback(splash.queue_free)
-
-func _spawn_elephant_sell_text(x: float, y: float, earned: float) -> void:
-	var label := Label.new()
-	label.text = "+%s" % Economy.format_money(earned)
-	label.add_theme_font_size_override("font_size", 14)
-	label.add_theme_color_override("font_color", Color(0.4, 1.0, 0.5))
-	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.7))
-	label.add_theme_constant_override("shadow_offset_x", 1)
-	label.add_theme_constant_override("shadow_offset_y", 1)
-	label.position = Vector2(x - 20, y)
-	label.z_index = 10
-	label.pivot_offset = Vector2(20, 8)
-	label.scale = Vector2(0.5, 0.5)
-	add_child(label)
-	var tw := create_tween()
-	tw.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1).set_ease(Tween.EASE_OUT)
-	tw.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1).set_ease(Tween.EASE_IN_OUT)
-	tw.parallel().tween_property(label, "position:y", label.position.y - 28, 0.8)
-	tw.parallel().tween_property(label, "modulate:a", 0.0, 0.8)
-	tw.tween_callback(label.queue_free)
-
 func _on_water_level_changed(swamp_index: int, _percent: float) -> void:
 	if swamp_index >= 0 and swamp_index < SWAMP_COUNT:
 		_update_water_polygon(swamp_index)
@@ -3974,21 +3661,90 @@ func _on_water_level_changed(swamp_index: int, _percent: float) -> void:
 		if swamp_index < swamp_percent_labels.size():
 			var pct: float = GameManager.get_swamp_water_percent(swamp_index)
 			swamp_percent_labels[swamp_index].text = "%.1f%%" % pct
+		if swamp_index < swamp_gallon_labels.size():
+			var total_gal: float = GameManager.swamp_definitions[swamp_index]["total_gallons"]
+			var drained: float = GameManager.swamp_states[swamp_index]["gallons_drained"]
+			var remaining: float = maxf(total_gal - drained, 0.0)
+			swamp_gallon_labels[swamp_index].text = "%s / %s gal" % [_format_gallons(remaining), _format_gallons(total_gal)]
 		_check_cave_entrance_updates(swamp_index)
 		# Phase 8B: Pool drain milestones
 		_check_pool_milestones(swamp_index)
 
-func _on_swamp_completed(swamp_index: int, _reward: float) -> void:
+func _on_swamp_completed(swamp_index: int, reward: float) -> void:
 	if swamp_index >= 0 and swamp_index < swamp_labels.size():
 		swamp_labels[swamp_index].add_theme_color_override("font_color", Color(0.3, 1.0, 0.4, 0.9))
 		swamp_labels[swamp_index].text = GameManager.swamp_definitions[swamp_index]["name"] + " [DONE]"
 	if swamp_index >= 0 and swamp_index < swamp_percent_labels.size():
 		swamp_percent_labels[swamp_index].text = "0.0%"
 		swamp_percent_labels[swamp_index].add_theme_color_override("font_color", Color(0.3, 1.0, 0.4, 0.9))
+	if swamp_index >= 0 and swamp_index < swamp_gallon_labels.size():
+		swamp_gallon_labels[swamp_index].text = "DRAINED"
+		swamp_gallon_labels[swamp_index].add_theme_color_override("font_color", Color(0.3, 1.0, 0.4, 0.8))
 	# Phase 7a: Heavy screen shake on swamp drained
 	_screen_shake(5.0, 0.3)
 	# Phase 7c: Milestone flash — golden vignette pulse + brief scale bounce
 	_milestone_flash()
+	# Show reward text
+	if reward > 0.0:
+		var geo: Dictionary = _get_swamp_geometry(swamp_index)
+		var cx: float = (geo["entry_top"].x + geo["exit_top"].x) * 0.5
+		var cy: float = geo["entry_top"].y - 30
+		_spawn_completion_reward_text(cx, cy, reward, GameManager.swamp_definitions[swamp_index]["name"])
+
+func _spawn_completion_reward_text(x: float, y: float, reward: float, pool_name: String) -> void:
+	# Pool name "DRAINED!" label
+	var title := Label.new()
+	title.text = "%s DRAINED!" % pool_name
+	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
+	title.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.8))
+	title.add_theme_constant_override("shadow_offset_x", 2)
+	title.add_theme_constant_override("shadow_offset_y", 2)
+	title.position = Vector2(x - 50, y - 16)
+	title.z_index = 12
+	title.pivot_offset = Vector2(50, 8)
+	title.scale = Vector2(0.3, 0.3)
+	add_child(title)
+	var tw1 := create_tween()
+	tw1.tween_property(title, "scale", Vector2(1.3, 1.3), 0.15).set_ease(Tween.EASE_OUT)
+	tw1.tween_property(title, "scale", Vector2(1.0, 1.0), 0.1)
+	tw1.tween_interval(1.5)
+	tw1.tween_property(title, "modulate:a", 0.0, 0.5)
+	tw1.tween_callback(title.queue_free)
+	# Reward money label
+	var reward_label := Label.new()
+	reward_label.text = "+%s BONUS!" % Economy.format_money(reward)
+	reward_label.add_theme_font_size_override("font_size", 14)
+	reward_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	reward_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.8))
+	reward_label.add_theme_constant_override("shadow_offset_x", 1)
+	reward_label.add_theme_constant_override("shadow_offset_y", 1)
+	reward_label.position = Vector2(x - 40, y + 4)
+	reward_label.z_index = 12
+	reward_label.pivot_offset = Vector2(40, 8)
+	reward_label.scale = Vector2(0.5, 0.5)
+	add_child(reward_label)
+	var tw2 := create_tween()
+	tw2.tween_interval(0.2)
+	tw2.tween_property(reward_label, "scale", Vector2(1.2, 1.2), 0.12).set_ease(Tween.EASE_OUT)
+	tw2.tween_property(reward_label, "scale", Vector2(1.0, 1.0), 0.08)
+	tw2.tween_property(reward_label, "position:y", reward_label.position.y - 20, 1.5)
+	tw2.tween_property(reward_label, "modulate:a", 0.0, 0.5)
+	tw2.tween_callback(reward_label.queue_free)
+	# Celebration particles
+	for i in range(16):
+		var spark := ColorRect.new()
+		spark.size = Vector2(3, 3)
+		spark.color = [Color(1.0, 0.85, 0.2), Color(0.3, 1.0, 0.4), Color(0.4, 0.8, 1.0)][i % 3]
+		spark.position = Vector2(x + randf_range(-8, 8), y + randf_range(-8, 8))
+		spark.z_index = 11
+		add_child(spark)
+		var tw3 := create_tween()
+		tw3.set_parallel(true)
+		tw3.tween_property(spark, "position", spark.position + Vector2(randf_range(-40, 40), randf_range(-50, -20)), 0.8)
+		tw3.tween_property(spark, "modulate:a", 0.0, 0.8)
+		tw3.set_parallel(false)
+		tw3.tween_callback(spark.queue_free)
 
 # --- Pump Station ---
 func _build_shop() -> void:
@@ -4363,24 +4119,61 @@ func _check_pool_milestones(swamp_index: int) -> void:
 
 func _trigger_pool_milestone(swamp_index: int, threshold: float) -> void:
 	var pool_name: String = GameManager.swamp_definitions[swamp_index]["name"]
-	var pct_label: String = str(int(threshold * 100)) + "%"
+	var drained_pct: int = 100 - int(threshold * 100)
+	var geo: Dictionary = _get_swamp_geometry(swamp_index)
+	var cx: float = (geo["entry_top"].x + geo["exit_top"].x) * 0.5
+	var cy: float = geo["entry_top"].y - 20
 	match threshold:
 		0.75:
 			_screen_shake(1.5, 0.15)
-			SceneManager.show_popup(pool_name + " down to " + pct_label + "! Waves intensifying...", 2.5)
+			SceneManager.show_popup(pool_name + " — 25%% drained!", 2.5)
+			_spawn_milestone_particles(cx, cy, Color(0.4, 0.8, 1.0))
 		0.50:
 			_screen_shake(2.5, 0.2)
-			SceneManager.show_popup(pool_name + " half drained! Pool bed emerging...", 3.0)
+			SceneManager.show_popup(pool_name + " — 50%% drained! Pool bed emerging...", 3.0)
 			_spawn_pool_debris(swamp_index)
+			_spawn_milestone_particles(cx, cy, Color(0.3, 1.0, 0.5))
 		0.25:
 			_screen_shake(3.0, 0.25)
 			SceneManager.flash_white(0.2)
-			SceneManager.show_popup(pool_name + " nearly gone! Cracked earth showing...", 3.0)
+			SceneManager.show_popup(pool_name + " — 75%% drained! Almost there!", 3.0)
 			_spawn_pool_cracks(swamp_index)
+			_spawn_milestone_particles(cx, cy, Color(1.0, 0.85, 0.2))
 		0.10:
 			_screen_shake(4.0, 0.3)
 			SceneManager.flash_white(0.25)
-			SceneManager.show_popup(pool_name + " almost drained! Just a puddle left!", 3.0)
+			SceneManager.show_popup(pool_name + " — 90%% drained! Just a puddle left!", 3.0)
+			_spawn_milestone_particles(cx, cy, Color(1.0, 0.5, 0.2))
+	# Floating milestone text at pool
+	var ms_label := Label.new()
+	ms_label.text = "%s %d%%" % [pool_name, drained_pct]
+	ms_label.add_theme_font_size_override("font_size", 14)
+	ms_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
+	ms_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.8))
+	ms_label.add_theme_constant_override("shadow_offset_x", 1)
+	ms_label.add_theme_constant_override("shadow_offset_y", 1)
+	ms_label.position = Vector2(cx - 30, cy - 10)
+	ms_label.z_index = 12
+	add_child(ms_label)
+	var ms_tw := create_tween()
+	ms_tw.tween_property(ms_label, "position:y", ms_label.position.y - 30, 1.5)
+	ms_tw.parallel().tween_property(ms_label, "modulate:a", 0.0, 1.5)
+	ms_tw.tween_callback(ms_label.queue_free)
+
+func _spawn_milestone_particles(x: float, y: float, color: Color) -> void:
+	for i in range(12):
+		var spark := ColorRect.new()
+		spark.size = Vector2(3, 3)
+		spark.color = color
+		spark.position = Vector2(x + randf_range(-6, 6), y + randf_range(-6, 6))
+		spark.z_index = 11
+		add_child(spark)
+		var tw := create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(spark, "position", spark.position + Vector2(randf_range(-30, 30), randf_range(-40, -15)), 0.7)
+		tw.tween_property(spark, "modulate:a", 0.0, 0.7)
+		tw.set_parallel(false)
+		tw.tween_callback(spark.queue_free)
 
 func _spawn_pool_debris(swamp_index: int) -> void:
 	# Scatter small rocks/debris on exposed pool floor
@@ -4782,10 +4575,6 @@ func _process(delta: float) -> void:
 	# Update camels
 	if GameManager.camel_count > 0:
 		_update_camels(delta)
-
-	# Update elephant
-	if GameManager.elephant_owned:
-		_update_elephant(delta)
 
 	cycle_time += delta
 	if cycle_time >= CYCLE_DURATION:
@@ -5880,9 +5669,43 @@ func _check_cave_entrance_updates(swamp_index: int) -> void:
 			_animate_cave_crack_open(ce)
 
 func _on_cave_unlocked(cave_id: String) -> void:
+	var cave_name: String = GameManager.CAVE_DEFINITIONS[cave_id]["name"]
+	_spawn_cave_unlock_notification(cave_name)
 	for ce in cave_entrances:
 		if ce["cave_id"] == cave_id and not ce["open"]:
 			_animate_cave_crack_open(ce)
+
+func _spawn_cave_unlock_notification(cave_name: String) -> void:
+	var vp_size: Vector2 = get_viewport_rect().size
+	var cam: Camera2D = get_viewport().get_camera_2d()
+	var cam_pos: Vector2 = cam.global_position if cam else Vector2(vp_size.x * 0.5, vp_size.y * 0.5)
+	# World-space position near top of screen
+	var nx: float = cam_pos.x
+	var ny: float = cam_pos.y - vp_size.y * 0.35
+	var notif := Label.new()
+	notif.text = "Cave Discovered: %s!" % cave_name
+	notif.add_theme_font_size_override("font_size", 16)
+	notif.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4))
+	notif.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.9))
+	notif.add_theme_constant_override("shadow_offset_x", 2)
+	notif.add_theme_constant_override("shadow_offset_y", 2)
+	notif.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	notif.custom_minimum_size = Vector2(200, 0)
+	notif.position = Vector2(nx - 100, ny)
+	notif.z_index = 15
+	notif.pivot_offset = Vector2(100, 10)
+	notif.scale = Vector2(0.3, 0.3)
+	notif.modulate.a = 0.0
+	add_child(notif)
+	var tw := create_tween()
+	tw.tween_property(notif, "modulate:a", 1.0, 0.2)
+	tw.parallel().tween_property(notif, "scale", Vector2(1.2, 1.2), 0.2).set_ease(Tween.EASE_OUT)
+	tw.tween_property(notif, "scale", Vector2(1.0, 1.0), 0.1)
+	tw.tween_interval(2.0)
+	tw.tween_property(notif, "position:y", notif.position.y - 20, 0.5)
+	tw.parallel().tween_property(notif, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(notif.queue_free)
+	_screen_shake(2.0, 0.15)
 
 func _animate_cave_crack_open(entry: Dictionary) -> void:
 	if entry["open"]:

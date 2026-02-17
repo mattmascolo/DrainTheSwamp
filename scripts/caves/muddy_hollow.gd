@@ -52,7 +52,7 @@ func _init() -> void:
 			"loot_data": {
 				"loot_id": "muddy_pool_loot",
 				"reward_money": 200.0,
-				"reward_stat_levels": {"move_speed": 2},
+				"reward_stat_levels": {"movement_speed": 2},
 				"reward_text": "The pool reveals hidden treasures! +$200, Move Speed +2!",
 			},
 		},

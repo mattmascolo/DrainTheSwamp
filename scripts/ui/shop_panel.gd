@@ -17,7 +17,6 @@ func _ready() -> void:
 	GameManager.tool_upgraded.connect(func(_t: String, _l: int) -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	GameManager.tool_changed.connect(func(_d: Dictionary) -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	GameManager.camel_changed.connect(func() -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
-	GameManager.elephant_changed.connect(func() -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	GameManager.upgrade_changed.connect(func() -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	GameManager.stat_upgraded.connect(func(_s: String, _l: int) -> void: _dirty = true; _refresh_cooldown = REFRESH_INTERVAL)
 	visible = false
@@ -342,175 +341,32 @@ func _build_tools_tab() -> void:
 		_style_button(cap_btn, Color(0.1, 0.15, 0.2))
 		up_row.add_child(cap_btn)
 
-		var spd_btn := Button.new()
-		spd_btn.add_theme_font_size_override("font_size", 14)
-		var spd_cost: float = GameManager.get_camel_speed_upgrade_cost()
-		spd_btn.text = "Spd Lv%d %s" % [GameManager.camel_speed_level + 1, Economy.format_money(spd_cost)]
-		spd_btn.custom_minimum_size = Vector2(130, 0)
-		var cur_spd: float = GameManager.get_camel_speed()
-		var next_spd: float = 35.0 * pow(1.20, GameManager.camel_speed_level + 1)
-		spd_btn.tooltip_text = "Camel Speed Lv%d\nCurrent: %.0f px/s\nNext: %.0f px/s (+20%%)\nCost: %s" % [GameManager.camel_speed_level, cur_spd, next_spd, Economy.format_money(spd_cost)]
-		if GameManager.money < spd_cost:
-			spd_btn.disabled = true
+		if GameManager.camel_speed_level >= GameManager.CAMEL_SPEED_MAX_LEVEL:
+			var spd_max := Label.new()
+			spd_max.text = "Spd [MAX]"
+			spd_max.add_theme_font_size_override("font_size", 14)
+			spd_max.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
+			up_row.add_child(spd_max)
 		else:
-			spd_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
-			spd_btn.pressed.connect(func() -> void: GameManager.upgrade_camel_speed())
-		_style_button(spd_btn, Color(0.1, 0.15, 0.2))
-		up_row.add_child(spd_btn)
+			var spd_btn := Button.new()
+			spd_btn.add_theme_font_size_override("font_size", 14)
+			var spd_cost: float = GameManager.get_camel_speed_upgrade_cost()
+			spd_btn.text = "Spd Lv%d %s" % [GameManager.camel_speed_level + 1, Economy.format_money(spd_cost)]
+			spd_btn.custom_minimum_size = Vector2(130, 0)
+			var cur_spd: float = GameManager.get_camel_speed()
+			var next_spd: float = 35.0 * pow(1.20, GameManager.camel_speed_level + 1)
+			spd_btn.tooltip_text = "Camel Speed Lv%d\nCurrent: %.0f px/s\nNext: %.0f px/s (+20%%)\nCost: %s" % [GameManager.camel_speed_level, cur_spd, next_spd, Economy.format_money(spd_cost)]
+			if GameManager.money < spd_cost:
+				spd_btn.disabled = true
+			else:
+				spd_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
+				spd_btn.pressed.connect(func() -> void: GameManager.upgrade_camel_speed())
+			_style_button(spd_btn, Color(0.1, 0.15, 0.2))
+			up_row.add_child(spd_btn)
 
 		upgrade_panel.add_child(up_row)
 		tool_list.add_child(upgrade_panel)
 
-	# --- Elephant Section ---
-	var el_sep := HSeparator.new()
-	el_sep.add_theme_constant_override("separation", 8)
-	tool_list.add_child(el_sep)
-
-	var el_header := Label.new()
-	el_header.text = "-- Elephant Worker --"
-	el_header.add_theme_font_size_override("font_size", 14)
-	el_header.add_theme_color_override("font_color", Color(0.65, 0.65, 0.68))
-	el_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tool_list.add_child(el_header)
-
-	var el_buy_panel := PanelContainer.new()
-	var el_buy_style := StyleBoxFlat.new()
-	el_buy_style.bg_color = Color(0.1, 0.1, 0.14, 0.6)
-	el_buy_style.corner_radius_top_left = 4
-	el_buy_style.corner_radius_top_right = 4
-	el_buy_style.corner_radius_bottom_left = 4
-	el_buy_style.corner_radius_bottom_right = 4
-	el_buy_style.content_margin_left = 8
-	el_buy_style.content_margin_right = 8
-	el_buy_style.content_margin_top = 4
-	el_buy_style.content_margin_bottom = 4
-	el_buy_panel.add_theme_stylebox_override("panel", el_buy_style)
-
-	var el_buy_row := HBoxContainer.new()
-	el_buy_row.add_theme_constant_override("separation", 8)
-
-	var el_info := Label.new()
-	el_info.add_theme_font_size_override("font_size", 14)
-	el_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	el_info.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-	el_info.add_theme_constant_override("shadow_offset_x", 2)
-	el_info.add_theme_constant_override("shadow_offset_y", 2)
-	if GameManager.elephant_owned:
-		el_info.text = "Elephant (Cap: %.1fg, Spd: %.0f, Str: %.3f)" % [GameManager.get_elephant_trunk_capacity(), GameManager.get_elephant_trot_speed(), GameManager.get_elephant_trunk_strength()]
-		el_info.add_theme_color_override("font_color", Color(0.65, 0.65, 0.68))
-	else:
-		el_info.text = "Elephant (auto-scoop worker)"
-		el_info.add_theme_color_override("font_color", Color(0.5, 0.5, 0.55))
-	el_buy_row.add_child(el_info)
-
-	if GameManager.elephant_owned:
-		var el_owned_label := Label.new()
-		el_owned_label.text = "[OWNED]"
-		el_owned_label.add_theme_font_size_override("font_size", 14)
-		el_owned_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
-		el_buy_row.add_child(el_owned_label)
-	else:
-		var buy_el_btn := Button.new()
-		buy_el_btn.add_theme_font_size_override("font_size", 14)
-		var el_cost: float = GameManager.get_elephant_cost()
-		buy_el_btn.text = "Buy %s" % Economy.format_money(el_cost)
-		buy_el_btn.custom_minimum_size = Vector2(110, 0)
-		if GameManager.money < el_cost:
-			buy_el_btn.disabled = true
-		else:
-			buy_el_btn.add_theme_color_override("font_color", Color(0.65, 0.65, 0.7))
-			buy_el_btn.pressed.connect(func() -> void: GameManager.buy_elephant())
-		_style_button(buy_el_btn, Color(0.12, 0.12, 0.16))
-		el_buy_row.add_child(buy_el_btn)
-
-	var el_tip: String = "Elephant Worker - Auto-scoop\n"
-	if not GameManager.elephant_owned:
-		el_tip += "Walks to pools, scoops water,\ncarries it to shop and sells.\n"
-		el_tip += "Fully autonomous income!\n"
-		el_tip += "Cost: %s" % Economy.format_money(GameManager.get_elephant_cost())
-	else:
-		el_tip += "Capacity: %.1f gal | Speed: %.0f px/s\n" % [GameManager.get_elephant_trunk_capacity(), GameManager.get_elephant_trot_speed()]
-		el_tip += "Strength: %.3f gal/scoop" % GameManager.get_elephant_trunk_strength()
-	el_buy_panel.tooltip_text = el_tip
-	el_buy_panel.mouse_filter = Control.MOUSE_FILTER_PASS
-	el_buy_panel.add_child(el_buy_row)
-	tool_list.add_child(el_buy_panel)
-
-	# Elephant upgrades (only if owned)
-	if GameManager.elephant_owned:
-		var el_up_panel := PanelContainer.new()
-		var el_up_style := StyleBoxFlat.new()
-		el_up_style.bg_color = Color(0.1, 0.1, 0.13, 0.6)
-		el_up_style.corner_radius_top_left = 4
-		el_up_style.corner_radius_top_right = 4
-		el_up_style.corner_radius_bottom_left = 4
-		el_up_style.corner_radius_bottom_right = 4
-		el_up_style.content_margin_left = 8
-		el_up_style.content_margin_right = 8
-		el_up_style.content_margin_top = 4
-		el_up_style.content_margin_bottom = 4
-		el_up_panel.add_theme_stylebox_override("panel", el_up_style)
-
-		var el_up_row := HBoxContainer.new()
-		el_up_row.add_theme_constant_override("separation", 8)
-
-		var el_spacer := Control.new()
-		el_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		el_up_row.add_child(el_spacer)
-
-		# Trunk Capacity upgrade
-		var tcap_btn := Button.new()
-		tcap_btn.add_theme_font_size_override("font_size", 14)
-		var tcap_cost: float = GameManager.get_elephant_trunk_capacity_upgrade_cost()
-		tcap_btn.text = "Cap Lv%d %s" % [GameManager.elephant_trunk_capacity_level + 1, Economy.format_money(tcap_cost)]
-		tcap_btn.custom_minimum_size = Vector2(130, 0)
-		var cur_tcap: float = GameManager.get_elephant_trunk_capacity()
-		var next_tcap: float = 1.0 * pow(1.25, GameManager.elephant_trunk_capacity_level + 1)
-		tcap_btn.tooltip_text = "Trunk Capacity Lv%d\nCurrent: %.1f gal\nNext: %.1f gal (+25%%)\nCost: %s" % [GameManager.elephant_trunk_capacity_level, cur_tcap, next_tcap, Economy.format_money(tcap_cost)]
-		if GameManager.money < tcap_cost:
-			tcap_btn.disabled = true
-		else:
-			tcap_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
-			tcap_btn.pressed.connect(func() -> void: GameManager.upgrade_elephant_trunk_capacity())
-		_style_button(tcap_btn, Color(0.1, 0.12, 0.18))
-		el_up_row.add_child(tcap_btn)
-
-		# Trot Speed upgrade
-		var tspd_btn := Button.new()
-		tspd_btn.add_theme_font_size_override("font_size", 14)
-		var tspd_cost: float = GameManager.get_elephant_trot_speed_upgrade_cost()
-		tspd_btn.text = "Spd Lv%d %s" % [GameManager.elephant_trot_speed_level + 1, Economy.format_money(tspd_cost)]
-		tspd_btn.custom_minimum_size = Vector2(130, 0)
-		var cur_tspd: float = GameManager.get_elephant_trot_speed()
-		var next_tspd: float = 30.0 * pow(1.20, GameManager.elephant_trot_speed_level + 1)
-		tspd_btn.tooltip_text = "Trot Speed Lv%d\nCurrent: %.0f px/s\nNext: %.0f px/s (+20%%)\nCost: %s" % [GameManager.elephant_trot_speed_level, cur_tspd, next_tspd, Economy.format_money(tspd_cost)]
-		if GameManager.money < tspd_cost:
-			tspd_btn.disabled = true
-		else:
-			tspd_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
-			tspd_btn.pressed.connect(func() -> void: GameManager.upgrade_elephant_trot_speed())
-		_style_button(tspd_btn, Color(0.1, 0.12, 0.18))
-		el_up_row.add_child(tspd_btn)
-
-		# Trunk Strength upgrade
-		var tstr_btn := Button.new()
-		tstr_btn.add_theme_font_size_override("font_size", 14)
-		var tstr_cost: float = GameManager.get_elephant_trunk_strength_upgrade_cost()
-		tstr_btn.text = "Str Lv%d %s" % [GameManager.elephant_trunk_strength_level + 1, Economy.format_money(tstr_cost)]
-		tstr_btn.custom_minimum_size = Vector2(130, 0)
-		var cur_tstr: float = GameManager.get_elephant_trunk_strength()
-		var next_tstr: float = 0.02 * pow(1.30, GameManager.elephant_trunk_strength_level + 1)
-		tstr_btn.tooltip_text = "Trunk Strength Lv%d\nCurrent: %.3f gal/scoop\nNext: %.3f gal/scoop (+30%%)\nCost: %s" % [GameManager.elephant_trunk_strength_level, cur_tstr, next_tstr, Economy.format_money(tstr_cost)]
-		if GameManager.money < tstr_cost:
-			tstr_btn.disabled = true
-		else:
-			tstr_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
-			tstr_btn.pressed.connect(func() -> void: GameManager.upgrade_elephant_trunk_strength())
-		_style_button(tstr_btn, Color(0.1, 0.12, 0.18))
-		el_up_row.add_child(tstr_btn)
-
-		el_up_panel.add_child(el_up_row)
-		tool_list.add_child(el_up_panel)
 
 # =============================================================================
 # STATS TAB
@@ -583,19 +439,26 @@ func _build_stats_tab() -> void:
 		row.add_child(info_label)
 
 		# Upgrade button
-		var cost: float = GameManager.get_stat_upgrade_cost(stat_id)
-		var up_btn := Button.new()
-		up_btn.add_theme_font_size_override("font_size", 14)
-		up_btn.text = "Up %s" % Economy.format_money(cost)
-		up_btn.custom_minimum_size = Vector2(110, 0)
-		if GameManager.money < cost:
-			up_btn.disabled = true
+		if GameManager.is_stat_maxed(stat_id):
+			var max_label := Label.new()
+			max_label.text = "[MAX]"
+			max_label.add_theme_font_size_override("font_size", 14)
+			max_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
+			row.add_child(max_label)
 		else:
-			up_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
-			var sid: String = stat_id
-			up_btn.pressed.connect(func() -> void: GameManager.upgrade_stat(sid))
-		_style_button(up_btn, Color(0.1, 0.18, 0.3))
-		row.add_child(up_btn)
+			var cost: float = GameManager.get_stat_upgrade_cost(stat_id)
+			var up_btn := Button.new()
+			up_btn.add_theme_font_size_override("font_size", 14)
+			up_btn.text = "Up %s" % Economy.format_money(cost)
+			up_btn.custom_minimum_size = Vector2(110, 0)
+			if GameManager.money < cost:
+				up_btn.disabled = true
+			else:
+				up_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
+				var sid: String = stat_id
+				up_btn.pressed.connect(func() -> void: GameManager.upgrade_stat(sid))
+			_style_button(up_btn, Color(0.1, 0.18, 0.3))
+			row.add_child(up_btn)
 
 		# Tooltip
 		row_panel.tooltip_text = _get_stat_tooltip(stat_id, defn, level, value)
@@ -742,35 +605,25 @@ func _get_upgrade_tooltip(uid: String, defn: Dictionary, level: int) -> String:
 		"splash_guard":
 			if level > 0:
 				tip += "\nStamina cost: %.0f%%" % (GameManager.get_splash_guard_multiplier() * 100.0)
-				var next_mult: float = pow(0.82, level + 1)
-				tip += "\nNext: %.0f%% (-18%%)" % (next_mult * 100.0)
+				var next_mult: float = 1.0 - 0.75 * (1.0 - exp(-0.25 * (level + 1)))
+				tip += "\nNext: %.0f%%" % (next_mult * 100.0)
 			else:
-				tip += "\nBase: -18% stamina cost per level"
+				tip += "\nReduces stamina cost (cap 75%% reduction)"
 		"auto_seller":
 			if level > 0:
 				tip += "\nActive! Auto-sells when inventory full."
 			else:
 				tip += "\nAuto-sell water when inventory full\nNo walking needed!"
-		"lucky_charm":
-			if level > 0:
-				tip += "\n2x money chance: %.0f%%" % (GameManager.get_lucky_charm_chance() * 100.0)
-				var next_chance: float = minf(0.05 * pow(1.35, level), 0.80)
-				tip += "\nNext: %.0f%% (+35%%)" % (next_chance * 100.0)
-			else:
-				tip += "\nBase: 5% chance for 2x money, x1.35 per level"
 		"auto_scooper":
 			var cur_interval: float = GameManager.get_auto_scoop_interval()
 			tip += "\nScoop every %.2fs" % cur_interval
-			var next_interval: float = maxf(2.5 * pow(0.88, level + 1), 0.1)
-			tip += "\nNext: %.2fs (-12%%)" % next_interval
+			var next_interval: float = maxf(2.5 * pow(0.92, level + 1), 0.5)
+			tip += "\nNext: %.2fs (-8%%)" % next_interval
 		"lantern":
 			if level > 0:
-				tip += "\nRadius: %.0fpx, Brightness: %.2f" % [GameManager.get_lantern_radius(), GameManager.get_lantern_energy()]
-				var next_radius: float = 48.0 * pow(1.40, level)
-				var next_energy: float = minf(2.4 * pow(1.12, level), 8.0)
-				tip += "\nNext: %.0fpx radius, %.2f brightness" % [next_radius, next_energy]
+				tip += "\nRadius: %.0fpx, Brightness: %.1f" % [GameManager.get_lantern_radius(), GameManager.get_lantern_energy()]
 			else:
-				tip += "\nAutomatic light during night\nBase 48px radius"
+				tip += "\nAutomatic light during night\n200px radius"
 	if not GameManager.is_upgrade_maxed(uid):
 		tip += "\nCost: %s" % Economy.format_money(GameManager.get_upgrade_cost(uid))
 	return tip
@@ -790,7 +643,7 @@ func _get_tool_tooltip(tid: String, defn: Dictionary, owned_data: Dictionary) ->
 		else:
 			tip += "\nOutput: %.4f gal/scoop" % cur_output
 
-		var next_output: float = defn["base_output"] * pow(1.30, level + 1)
+		var next_output: float = defn["base_output"] * pow(1.15, level + 1)
 		if defn["type"] == "manual":
 			next_output *= GameManager.get_stat_value("scoop_power")
 		var gain_pct: float = (next_output / cur_output - 1.0) * 100.0

@@ -127,11 +127,15 @@ func _collect() -> void:
 		if GameManager.upgrades_owned.has(upgrade_id):
 			GameManager.upgrades_owned[upgrade_id] += levels
 			GameManager.upgrade_changed.emit()
-	# Grant stat levels
+	# Grant stat levels (clamped to max_level if set)
 	for stat_id: String in reward_stat_levels:
 		var levels: int = reward_stat_levels[stat_id]
 		if GameManager.stat_levels.has(stat_id):
 			GameManager.stat_levels[stat_id] += levels
+			var defn: Dictionary = GameManager.stat_definitions[stat_id]
+			var ml: int = defn.get("max_level", -1)
+			if ml >= 0 and GameManager.stat_levels[stat_id] > ml:
+				GameManager.stat_levels[stat_id] = ml
 			GameManager.stat_upgraded.emit(stat_id, GameManager.stat_levels[stat_id])
 
 	# Mark collected in GameManager
