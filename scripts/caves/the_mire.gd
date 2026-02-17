@@ -78,7 +78,7 @@ func _setup_loot_and_lore() -> void:
 	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
 	lore1.lore_id = "mire_depths"
 	lore1.cave_id = cave_id
-	lore1.lore_text = "Twisted roots claw through the walls. The mire has been swallowing things for centuries. The deeper you go, the older it gets..."
+	lore1.lore_text = "INTERNAL MEMO — LOBBYING FIRM \"SWAMP FRIENDS LLC\"\n\nClient List (DO NOT SHARE):\n- SwampCo Industries (Senator Swampsworth, chair)\n- Definitely-Not-A-Shell-Company LLC (Congresswoman Lobbyton)\n- The Consultant (services: \"consulting\")\n- 47 other politicians from both parties\n\nALL CLIENTS HAVE ASSETS STORED IN THE SWAMP. DO NOT LET IT DRAIN."
 	lore1.position = Vector2(1000, _get_cave_terrain_y_at(1000))
 	add_child(lore1)
 

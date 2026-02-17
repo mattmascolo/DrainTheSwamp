@@ -80,7 +80,7 @@ func _setup_loot_and_lore() -> void:
 	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
 	lore1.lore_id = "gator_warning"
 	lore1.cave_id = cave_id
-	lore1.lore_text = "Scratch marks cover the walls. Something large once called this place home. Bones are scattered everywhere..."
+	lore1.lore_text = "EXPENSE REPORT — SENATOR SWAMPSWORTH\n\nDonor Dinner at The Capital Grille ... $14,200\n\"Swamp Research\" Trip to Bahamas ... $48,000\nActual swamp-related expenses ... $0.00\n\nTOTAL: $62,200 (charged to Swamp Initiative fund)"
 	lore1.position = Vector2(450, _get_cave_terrain_y_at(450))
 	add_child(lore1)
 

@@ -79,7 +79,7 @@ func _setup_loot_and_lore() -> void:
 	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
 	lore1.lore_id = "grotto_secrets"
 	lore1.cave_id = cave_id
-	lore1.lore_text = "Water drips endlessly from every surface. This grotto was once part of an underground river. The water remembers its path..."
+	lore1.lore_text = "REDACTED GOVERNMENT FILE\n\nSubject: Operation Wet Blanket\nObjective: Slow down the drainer without attracting media attention\n\nProposed methods:\n- Release more water into swamp (REJECTED — too obvious)\n- Revoke his \"swamp access permit\" (NOTE: he doesn't have one)\n- Declare swamp a \"protected wetland\" (IN PROGRESS)\n- Bribe him (FAILED — \"he just bought another shovel with it\")"
 	lore1.position = Vector2(1100, _get_cave_terrain_y_at(1100))
 	add_child(lore1)
 

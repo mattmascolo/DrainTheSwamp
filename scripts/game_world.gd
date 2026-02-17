@@ -268,6 +268,11 @@ var mud_patches: Array[Dictionary] = []
 var player_in_shop_area: bool = false
 var shop_player_ref: Node2D = null
 var camels: Array[Dictionary] = []
+# Endgame
+var jeff_node: Node2D = null
+var jeff_area: Area2D = null
+var player_near_jeff: bool = false
+var endgame_triggered: bool = false
 # Second pass visuals
 var moon: Node2D = null
 var moon_glow: Polygon2D = null
@@ -508,6 +513,7 @@ func _ready() -> void:
 	_build_left_trees()
 	_build_right_boundary()
 	_build_island_house()
+	_build_jeff()
 	_build_post_processing()
 	_build_distance_fog()
 	_build_weather()
@@ -517,6 +523,7 @@ func _ready() -> void:
 	_build_atmosphere()
 	_build_player_shadow()
 	_build_cave_entrances()
+	_build_billboards()
 	_init_drain_thresholds()
 
 	GameManager.water_level_changed.connect(_on_water_level_changed)
@@ -3368,6 +3375,244 @@ func _build_island_house() -> void:
 	tree_canopy.z_index = 3
 	add_child(tree_canopy)
 
+func _build_jeff() -> void:
+	var jeff_x: float = 5670.0
+	var jeff_y: float = 484.0  # Ground level on island
+
+	jeff_node = Node2D.new()
+	jeff_node.position = Vector2(jeff_x, jeff_y)
+	jeff_node.z_index = 6
+	add_child(jeff_node)
+
+	# Body
+	var body := ColorRect.new()
+	body.position = Vector2(-3, -16)
+	body.size = Vector2(6, 12)
+	body.color = Color(0.15, 0.15, 0.35)  # Dark suit
+	jeff_node.add_child(body)
+
+	# Head
+	var head := Polygon2D.new()
+	var head_pts := PackedVector2Array()
+	for i in range(8):
+		var angle: float = TAU * float(i) / 8.0
+		head_pts.append(Vector2(cos(angle) * 3.5, -20 + sin(angle) * 3.5))
+	head.polygon = head_pts
+	head.color = Color(0.85, 0.70, 0.55)
+	jeff_node.add_child(head)
+
+	# Legs
+	var left_leg := ColorRect.new()
+	left_leg.position = Vector2(-3, -4)
+	left_leg.size = Vector2(2, 4)
+	left_leg.color = Color(0.12, 0.12, 0.30)
+	jeff_node.add_child(left_leg)
+
+	var right_leg := ColorRect.new()
+	right_leg.position = Vector2(1, -4)
+	right_leg.size = Vector2(2, 4)
+	right_leg.color = Color(0.12, 0.12, 0.30)
+	jeff_node.add_child(right_leg)
+
+	# Interaction Area2D
+	jeff_area = Area2D.new()
+	jeff_area.collision_layer = 0
+	jeff_area.collision_mask = 1
+	var col := CollisionShape2D.new()
+	var shape := RectangleShape2D.new()
+	shape.size = Vector2(40, 40)
+	col.shape = shape
+	col.position = Vector2(0, -10)
+	jeff_area.add_child(col)
+	jeff_node.add_child(jeff_area)
+	jeff_area.body_entered.connect(func(_body: Node2D) -> void: player_near_jeff = true)
+	jeff_area.body_exited.connect(func(_body: Node2D) -> void: player_near_jeff = false)
+
+func _trigger_endgame() -> void:
+	endgame_triggered = true
+
+	# BONK! screen shake + flash
+	_screen_shake(8.0, 0.5)
+	SceneManager.flash_white(0.3)
+
+	# BONK text
+	var bonk_label := Label.new()
+	bonk_label.text = "BONK!"
+	bonk_label.add_theme_font_size_override("font_size", 32)
+	bonk_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.1))
+	bonk_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.9))
+	bonk_label.add_theme_constant_override("shadow_offset_x", 3)
+	bonk_label.add_theme_constant_override("shadow_offset_y", 3)
+	bonk_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	bonk_label.position = Vector2(jeff_node.position.x - 40, jeff_node.position.y - 60)
+	bonk_label.size = Vector2(80, 40)
+	bonk_label.z_index = 10
+	add_child(bonk_label)
+
+	# Jeff falls over
+	var tw_jeff := create_tween()
+	tw_jeff.tween_property(jeff_node, "rotation", deg_to_rad(90), 0.3).set_ease(Tween.EASE_OUT)
+	tw_jeff.tween_property(jeff_node, "modulate:a", 0.3, 0.5)
+
+	# After a brief pause, show credits newspaper
+	var tw_credits := create_tween()
+	tw_credits.tween_interval(2.0)
+	tw_credits.tween_callback(func() -> void:
+		bonk_label.queue_free()
+		_show_credits_newspaper()
+	)
+
+func _show_credits_newspaper() -> void:
+	# Build a full-screen credits overlay — similar to milestone newspaper but special
+	var credits_layer := CanvasLayer.new()
+	credits_layer.layer = 95
+	add_child(credits_layer)
+
+	var vp_size: Vector2 = get_viewport_rect().size
+
+	var overlay := ColorRect.new()
+	overlay.size = vp_size
+	overlay.color = Color(0, 0, 0, 0.0)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	credits_layer.add_child(overlay)
+
+	var panel := PanelContainer.new()
+	var panel_w: float = 420.0
+	var panel_h: float = 300.0
+	panel.position = Vector2((vp_size.x - panel_w) * 0.5, (vp_size.y - panel_h) * 0.5)
+	panel.size = Vector2(panel_w, panel_h)
+	panel.modulate = Color(1, 1, 1, 0)
+
+	var paper_style := StyleBoxFlat.new()
+	paper_style.bg_color = Color(0.92, 0.88, 0.78)
+	paper_style.border_color = Color(0.3, 0.25, 0.2)
+	paper_style.border_width_top = 2
+	paper_style.border_width_bottom = 2
+	paper_style.border_width_left = 2
+	paper_style.border_width_right = 2
+	paper_style.corner_radius_top_left = 2
+	paper_style.corner_radius_top_right = 2
+	paper_style.corner_radius_bottom_left = 2
+	paper_style.corner_radius_bottom_right = 2
+	paper_style.content_margin_left = 16
+	paper_style.content_margin_right = 16
+	paper_style.content_margin_top = 12
+	paper_style.content_margin_bottom = 12
+	panel.add_theme_stylebox_override("panel", paper_style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	panel.add_child(vbox)
+
+	var masthead := Label.new()
+	masthead.text = "THE SWAMP GAZETTE"
+	masthead.add_theme_font_size_override("font_size", 16)
+	masthead.add_theme_color_override("font_color", Color(0.15, 0.12, 0.10))
+	masthead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(masthead)
+
+	var date_lbl := Label.new()
+	date_lbl.text = "SPECIAL EDITION"
+	date_lbl.add_theme_font_size_override("font_size", 8)
+	date_lbl.add_theme_color_override("font_color", Color(0.4, 0.38, 0.35))
+	date_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(date_lbl)
+
+	var sep1 := HSeparator.new()
+	var sep_style := StyleBoxFlat.new()
+	sep_style.bg_color = Color(0.3, 0.25, 0.2, 0.5)
+	sep_style.content_margin_top = 2
+	sep_style.content_margin_bottom = 2
+	sep1.add_theme_stylebox_override("separator", sep_style)
+	vbox.add_child(sep1)
+
+	var headline := Label.new()
+	headline.text = "LOCAL MAN FINISHES THE JOB"
+	headline.add_theme_font_size_override("font_size", 14)
+	headline.add_theme_color_override("font_color", Color(0.12, 0.10, 0.08))
+	headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	headline.autowrap_mode = TextServer.AUTOWRAP_WORD
+	vbox.add_child(headline)
+
+	var subhead := Label.new()
+	subhead.text = "Drains entire ocean, walks to island, delivers justice"
+	subhead.add_theme_font_size_override("font_size", 9)
+	subhead.add_theme_color_override("font_color", Color(0.35, 0.32, 0.28))
+	subhead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(subhead)
+
+	var sep2 := HSeparator.new()
+	var sep_style2 := StyleBoxFlat.new()
+	sep_style2.bg_color = Color(0.3, 0.25, 0.2, 0.5)
+	sep_style2.content_margin_top = 2
+	sep_style2.content_margin_bottom = 2
+	sep2.add_theme_stylebox_override("separator", sep_style2)
+	vbox.add_child(sep2)
+
+	var body := Label.new()
+	body.text = "In what experts are calling \"the most productive use of government funds in history,\" the lone employee of the Swamp Draining Initiative has completed his mission by draining the Atlantic Ocean, walking to a private island, and delivering a decisive bonk to its sole occupant.\n\nThe $500 field operations budget has now yielded results worth billions. All 47 implicated politicians remain at large. The Consultant has submitted a final invoice for $500,000.\n\nThe swamp drainer has declined all interviews, stating only: \"I'm going home.\""
+	body.add_theme_font_size_override("font_size", 8)
+	body.add_theme_color_override("font_color", Color(0.18, 0.15, 0.12))
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(body)
+
+	var credits := Label.new()
+	credits.text = "DRAIN THE SWAMP\nThanks for playing!"
+	credits.add_theme_font_size_override("font_size", 10)
+	credits.add_theme_color_override("font_color", Color(0.5, 0.45, 0.35))
+	credits.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(credits)
+
+	var prompt := Label.new()
+	prompt.text = "[Press any key to return to title]"
+	prompt.add_theme_font_size_override("font_size", 10)
+	prompt.add_theme_color_override("font_color", Color(0.9, 0.75, 0.4))
+	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(prompt)
+
+	overlay.add_child(panel)
+
+	# Fade in
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(overlay, "color:a", 0.85, 0.8)
+	tw.tween_property(panel, "modulate:a", 1.0, 0.8)
+	tw.set_parallel(false)
+	tw.tween_interval(0.5)
+	tw.tween_callback(func() -> void:
+		# Wait for any key, then return to title
+		_wait_for_credits_dismiss(overlay, panel, credits_layer, prompt)
+	)
+
+func _wait_for_credits_dismiss(overlay: ColorRect, panel: PanelContainer, layer: CanvasLayer, prompt: Label) -> void:
+	var elapsed_ref: Array[float] = [0.0]
+	var dismissed: Array[bool] = [false]
+	# Use a timer to poll for input and animate prompt
+	var check_fn: Callable
+	check_fn = func(delta_val: float) -> void:
+		if dismissed[0]:
+			return
+		elapsed_ref[0] += delta_val
+		prompt.modulate.a = 0.5 + 0.5 * sin(elapsed_ref[0] * 2.0)
+		if Input.is_action_just_pressed("scoop") or Input.is_action_just_pressed("ui_cancel") or Input.is_action_just_pressed("ui_accept"):
+			dismissed[0] = true
+			var tw_out := create_tween()
+			tw_out.set_parallel(true)
+			tw_out.tween_property(overlay, "color:a", 0.0, 0.5)
+			tw_out.tween_property(panel, "modulate:a", 0.0, 0.5)
+			tw_out.set_parallel(false)
+			tw_out.tween_interval(0.3)
+			tw_out.tween_callback(func() -> void:
+				layer.queue_free()
+				SceneManager.transition_to_scene("res://scenes/title_screen.tscn")
+			)
+	# Connect to tree process
+	get_tree().process_frame.connect(func() -> void:
+		if is_instance_valid(layer):
+			check_fn.call(get_process_delta_time())
+	)
+
 # --- Water Detection ---
 func _build_water_detect_areas() -> void:
 	water_detect_areas.clear()
@@ -4713,6 +4958,11 @@ func _build_distance_fog() -> void:
 
 # --- Day/Night Cycle & Animation ---
 func _process(delta: float) -> void:
+	# Endgame: check if player is near Jeff and presses scoop
+	if player_near_jeff and not endgame_triggered and Input.is_action_just_pressed("scoop"):
+		if GameManager.is_swamp_completed(9):
+			_trigger_endgame()
+
 	# Continuous sell while player stands in shop area
 	if player_in_shop_area and is_instance_valid(shop_player_ref):
 		var earned: float = GameManager.sell_water()
@@ -5683,6 +5933,82 @@ func _get_pool_deepest_point(swamp_index: int) -> Vector2:
 			deepest_y = terrain_points[idx].y
 			deepest_x = terrain_points[idx].x
 	return Vector2(deepest_x, deepest_y)
+
+func _build_billboards() -> void:
+	var billboard_texts: Array[String] = [
+		"VOTE SWAMPSWORTH\nHE'LL DRAIN THE SWAMP!\n(terms and conditions apply)",
+		"LOBBYTON 2024\nFIGHTING FOR YOU*\n(*'you' refers to donors)",
+		"GOVERNMENT PROPERTY\nNO UNAUTHORIZED\nDRAINING",
+		"DANGER:\nSWAMP CONTAINS\nCLASSIFIED MATERIALS",
+		"THE CONSULTANT\nRECOMMENDS:\nMORE RESEARCH NEEDED",
+		"THIS SWAMP PROTECTED\nBY BIPARTISAN\nAGREEMENT",
+		"WARNING:\nDRAINING MAY EXPOSE\nUNCOMFORTABLE TRUTHS",
+		"SWAMPSWORTH &\nLOBBYTON AGREE:\nSTOP HERE",
+		"POINT OF NO RETURN\nALL POLITICIANS HAVE\nFLED THE COUNTRY",
+	]
+
+	for ridge_i in range(SWAMP_COUNT - 1):
+		var ridge_start: int = SWAMP_RANGES[ridge_i][1]
+		var ridge_end: int = SWAMP_RANGES[ridge_i + 1][0]
+		if ridge_start >= terrain_points.size() or ridge_end >= terrain_points.size():
+			continue
+		var ridge_mid_x: float = (terrain_points[ridge_start].x + terrain_points[ridge_end].x) * 0.5
+		var ground_y: float = _get_terrain_y_at(ridge_mid_x)
+		if ground_y < 0:
+			continue
+
+		# Post (vertical line)
+		var post_h: float = 32.0
+		var post := Polygon2D.new()
+		post.polygon = PackedVector2Array([
+			Vector2(ridge_mid_x - 1, ground_y),
+			Vector2(ridge_mid_x + 1, ground_y),
+			Vector2(ridge_mid_x + 1, ground_y - post_h),
+			Vector2(ridge_mid_x - 1, ground_y - post_h),
+		])
+		post.color = Color(0.35, 0.25, 0.18)
+		post.z_index = 3
+		add_child(post)
+
+		# Sign panel
+		var sign_w: float = 50.0
+		var sign_h: float = 28.0
+		var sign_x: float = ridge_mid_x - sign_w * 0.5
+		var sign_y: float = ground_y - post_h - sign_h
+		var sign_bg := Polygon2D.new()
+		sign_bg.polygon = PackedVector2Array([
+			Vector2(sign_x, sign_y),
+			Vector2(sign_x + sign_w, sign_y),
+			Vector2(sign_x + sign_w, sign_y + sign_h),
+			Vector2(sign_x, sign_y + sign_h),
+		])
+		sign_bg.color = Color(0.85, 0.80, 0.65)
+		sign_bg.z_index = 3
+		add_child(sign_bg)
+
+		# Sign border
+		var border := Line2D.new()
+		border.width = 1.0
+		border.default_color = Color(0.3, 0.25, 0.18, 0.8)
+		border.z_index = 4
+		border.add_point(Vector2(sign_x, sign_y))
+		border.add_point(Vector2(sign_x + sign_w, sign_y))
+		border.add_point(Vector2(sign_x + sign_w, sign_y + sign_h))
+		border.add_point(Vector2(sign_x, sign_y + sign_h))
+		border.add_point(Vector2(sign_x, sign_y))
+		add_child(border)
+
+		# Text label
+		var lbl := Label.new()
+		lbl.text = billboard_texts[ridge_i]
+		lbl.add_theme_font_size_override("font_size", 5)
+		lbl.add_theme_color_override("font_color", Color(0.15, 0.12, 0.10))
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.position = Vector2(sign_x + 2, sign_y + 2)
+		lbl.size = Vector2(sign_w - 4, sign_h - 4)
+		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+		lbl.z_index = 4
+		add_child(lbl)
 
 func _build_cave_entrances() -> void:
 	cave_entrances.clear()

@@ -98,7 +98,7 @@ func _setup_loot_and_lore() -> void:
 	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
 	lore1.lore_id = "coral_origins"
 	lore1.cave_id = cave_id
-	lore1.lore_text = "Living coral grows in impossible colors. This cavern was once an ocean floor, pushed deep underground by forces beyond comprehension..."
+	lore1.lore_text = "BLACKMAIL FILE — EYES ONLY\n\nThe following officials have been \"cooperative\" since receiving our documentation of their activities:\n- 12 Senators (6R, 6D — perfectly bipartisan!)\n- 34 Representatives\n- 3 Governors\n- 1 very nervous Vice President\n- \"The Consultant\" (who is somehow on BOTH sides of this)"
 	lore1.position = Vector2(900, _get_cave_terrain_y_at(900))
 	add_child(lore1)
 

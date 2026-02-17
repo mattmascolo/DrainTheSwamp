@@ -81,7 +81,7 @@ func _setup_loot_and_lore() -> void:
 	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
 	lore1.lore_id = "strange_symbol"
 	lore1.cave_id = cave_id
-	lore1.lore_text = "Strange markings on the wall... They seem to depict an ancient drainage system. Someone was here before you."
+	lore1.lore_text = "MEMO — CITY HALL — CONFIDENTIAL\n\n\"Re: Swamp Draining Initiative — Make sure the new hire has NO tools, NO budget, and NO way to contact HR. If he asks for a shovel, tell him it's 'on backorder.'\n\n—Mayor K.\""
 	lore1.position = Vector2(400, _get_cave_terrain_y_at(400))
 	add_child(lore1)
 

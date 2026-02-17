@@ -76,7 +76,7 @@ func _setup_loot_and_lore() -> void:
 	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
 	lore1.lore_id = "sinkhole_origin"
 	lore1.cave_id = cave_id
-	lore1.lore_text = "The ground collapsed here long ago. Water seeps from every crack. This sinkhole connects to something deeper..."
+	lore1.lore_text = "SHREDDED DOCUMENT (partially reconstructed)\n\n\"...the important thing is that no one actually DRAINS the...\n...if the public finds out about the [REDACTED] buried under the...\n...Lobbyton agrees we should increase the consulting budget to...\""
 	lore1.position = Vector2(700, _get_cave_terrain_y_at(700))
 	add_child(lore1)
 

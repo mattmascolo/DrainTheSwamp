@@ -19,8 +19,14 @@ var menu_vbox: VBoxContainer = null
 var newspaper_overlay: ColorRect = null
 var newspaper_panel: PanelContainer = null
 var newspaper_prompt: Label = null
+var newspaper_date_label: Label = null
+var newspaper_headline: Label = null
+var newspaper_subhead: Label = null
+var newspaper_body: Label = null
 var showing_newspaper: bool = false
 var newspaper_ready_for_input: bool = false
+var newspaper_index: int = 0
+var newspaper_data: Array = []
 
 # --- Post-process ---
 var post_layer: CanvasLayer = null
@@ -293,7 +299,25 @@ func _create_menu_button(text: String, color: Color) -> Button:
 	return btn
 
 # --- Newspaper ---
+func _init_newspaper_data() -> void:
+	newspaper_data = [
+		{
+			"date": "Vol. XLII, No. 6 — Wednesday, March 13",
+			"headline": "CONGRESS ANNOUNCES HISTORIC \"DRAIN THE SWAMP\" INITIATIVE",
+			"subhead": "Bipartisan bill allocates $200M to swamp removal program",
+			"body": "In a rare show of unity, both parties voted unanimously to fund a comprehensive swamp-draining program. \"This is what the American people voted for,\" said Senator Swampsworth (R), standing beside Congresswoman Lobbyton (D), who added, \"We are fully committed to transparency.\"\n\nThe program's budget includes $180M for \"administrative oversight,\" $19.5M for \"consulting fees,\" and $500 for \"field operations.\" Critics noted the field operations budget could only cover a single employee with no equipment."
+		},
+		{
+			"date": "Vol. XLII, No. 7 — Thursday, March 14",
+			"headline": "GOVERNMENT HIRES LOCAL MAN TO DRAIN ENTIRE SWAMP",
+			"subhead": "\"Just use your hands,\" supervisor reportedly instructed",
+			"body": "The sole employee of the new Swamp Draining Initiative reported for work yesterday to find no office, no tools, and a handwritten note reading \"good luck.\" When asked about equipment, a government liaison shrugged and said, \"Budget constraints.\"\n\nThe man was last seen kneeling at the edge of the swamp, scooping water with his bare hands. Neighbors describe the scene as \"either inspiring or deeply concerning.\" Several elected officials were seen celebrating at a nearby steakhouse."
+		}
+	]
+
 func _build_newspaper(vp_size: Vector2) -> void:
+	_init_newspaper_data()
+
 	# Dark overlay
 	newspaper_overlay = ColorRect.new()
 	newspaper_overlay.size = vp_size
@@ -339,49 +363,44 @@ func _build_newspaper(vp_size: Vector2) -> void:
 	masthead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(masthead)
 
-	# Date
-	var date_label := Label.new()
-	date_label.text = "Vol. XLII, No. 7 — Thursday, March 14"
-	date_label.add_theme_font_size_override("font_size", 8)
-	date_label.add_theme_color_override("font_color", Color(0.4, 0.38, 0.35))
-	date_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(date_label)
+	# Date (dynamic)
+	newspaper_date_label = Label.new()
+	newspaper_date_label.add_theme_font_size_override("font_size", 8)
+	newspaper_date_label.add_theme_color_override("font_color", Color(0.4, 0.38, 0.35))
+	newspaper_date_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(newspaper_date_label)
 
-	# Separator
 	var sep1 := HSeparator.new()
 	sep1.add_theme_stylebox_override("separator", _newspaper_separator_style())
 	vbox.add_child(sep1)
 
-	# Headline
-	var headline := Label.new()
-	headline.text = "LOCAL MAN VOWS TO DRAIN ENTIRE SWAMP"
-	headline.add_theme_font_size_override("font_size", 12)
-	headline.add_theme_color_override("font_color", Color(0.12, 0.10, 0.08))
-	headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	headline.autowrap_mode = TextServer.AUTOWRAP_WORD
-	vbox.add_child(headline)
+	# Headline (dynamic)
+	newspaper_headline = Label.new()
+	newspaper_headline.add_theme_font_size_override("font_size", 12)
+	newspaper_headline.add_theme_color_override("font_color", Color(0.12, 0.10, 0.08))
+	newspaper_headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	newspaper_headline.autowrap_mode = TextServer.AUTOWRAP_WORD
+	vbox.add_child(newspaper_headline)
 
-	# Subhead
-	var subhead := Label.new()
-	subhead.text = "Armed with nothing but a spoon and blind determination"
-	subhead.add_theme_font_size_override("font_size", 9)
-	subhead.add_theme_color_override("font_color", Color(0.35, 0.32, 0.28))
-	subhead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(subhead)
+	# Subhead (dynamic)
+	newspaper_subhead = Label.new()
+	newspaper_subhead.add_theme_font_size_override("font_size", 9)
+	newspaper_subhead.add_theme_color_override("font_color", Color(0.35, 0.32, 0.28))
+	newspaper_subhead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	newspaper_subhead.autowrap_mode = TextServer.AUTOWRAP_WORD
+	vbox.add_child(newspaper_subhead)
 
-	# Separator
 	var sep2 := HSeparator.new()
 	sep2.add_theme_stylebox_override("separator", _newspaper_separator_style())
 	vbox.add_child(sep2)
 
-	# Body text
-	var body := Label.new()
-	body.text = "In what neighbors describe as 'either brave or deeply unhinged,' a local resident announced plans yesterday to drain the swamp at the edge of town.\n\nWhen asked about his qualifications, the man held up a kitchen spoon and said, 'This is all I need.' Authorities have not commented, though several elected officials appeared unusually nervous at the press conference."
-	body.add_theme_font_size_override("font_size", 8)
-	body.add_theme_color_override("font_color", Color(0.18, 0.15, 0.12))
-	body.autowrap_mode = TextServer.AUTOWRAP_WORD
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(body)
+	# Body (dynamic)
+	newspaper_body = Label.new()
+	newspaper_body.add_theme_font_size_override("font_size", 8)
+	newspaper_body.add_theme_color_override("font_color", Color(0.18, 0.15, 0.12))
+	newspaper_body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	newspaper_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(newspaper_body)
 
 	# Prompt
 	newspaper_prompt = Label.new()
@@ -516,11 +535,20 @@ func _start_new_game() -> void:
 	SaveManager.save_game()
 	_show_newspaper()
 
+func _set_newspaper_content(index: int) -> void:
+	var data: Dictionary = newspaper_data[index]
+	newspaper_date_label.text = data["date"]
+	newspaper_headline.text = data["headline"]
+	newspaper_subhead.text = data["subhead"]
+	newspaper_body.text = data["body"]
+
 func _show_newspaper() -> void:
 	showing_newspaper = true
 	newspaper_ready_for_input = false
+	newspaper_index = 0
 	menu_vbox.visible = false
 	newspaper_overlay.visible = true
+	_set_newspaper_content(0)
 
 	# Fade in overlay and panel
 	var tw := create_tween()
@@ -532,11 +560,23 @@ func _show_newspaper() -> void:
 
 func _dismiss_newspaper() -> void:
 	newspaper_ready_for_input = false
-	var tw := create_tween()
-	tw.set_parallel(true)
-	tw.tween_property(newspaper_overlay, "color:a", 0.0, 0.4)
-	tw.tween_property(newspaper_panel, "modulate:a", 0.0, 0.4)
-	tw.set_parallel(false)
-	tw.tween_callback(func() -> void:
-		SceneManager.transition_to_scene("res://scenes/main.tscn")
-	)
+	newspaper_index += 1
+	if newspaper_index < newspaper_data.size():
+		# Fade out panel, swap content, fade back in
+		var tw := create_tween()
+		tw.tween_property(newspaper_panel, "modulate:a", 0.0, 0.3)
+		tw.tween_callback(func() -> void:
+			_set_newspaper_content(newspaper_index)
+		)
+		tw.tween_property(newspaper_panel, "modulate:a", 1.0, 0.3)
+		tw.tween_callback(func() -> void: newspaper_ready_for_input = true)
+	else:
+		# Last newspaper — transition to game
+		var tw := create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(newspaper_overlay, "color:a", 0.0, 0.4)
+		tw.tween_property(newspaper_panel, "modulate:a", 0.0, 0.4)
+		tw.set_parallel(false)
+		tw.tween_callback(func() -> void:
+			SceneManager.transition_to_scene("res://scenes/main.tscn")
+		)

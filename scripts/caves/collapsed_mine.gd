@@ -86,7 +86,7 @@ func _setup_loot_and_lore() -> void:
 	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
 	lore1.lore_id = "mine_history"
 	lore1.cave_id = cave_id
-	lore1.lore_text = "Old mine cart tracks disappear into rubble. This mine was abandoned in a hurry. Equipment lies scattered everywhere."
+	lore1.lore_text = "WIRETAP TRANSCRIPT — CLASSIFIED\n\nSWAMPSWORTH: \"He drained the bog. THE BOG.\"\nLOBBYTON: \"I thought you said he only had hands?\"\nSWAMPSWORTH: \"He bought a BUCKET. With his OWN money.\"\nLOBBYTON: \"...That wasn't supposed to be possible.\""
 	lore1.position = Vector2(850, _get_cave_terrain_y_at(850))
 	add_child(lore1)
 
