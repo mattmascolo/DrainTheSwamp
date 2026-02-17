@@ -76,8 +76,8 @@ func _init() -> void:
 			"pool_index": 1,
 			"loot_data": {
 				"loot_id": "underdark_pool_2",
-				"reward_stat_levels": {"drain_mastery": 15},
-				"reward_text": "An obelisk of pure drain energy! Drain Mastery +15!",
+				"reward_stat_levels": {"scoop_power": 15},
+				"reward_text": "An obelisk of pure drain energy! Scoop Power +15!",
 			},
 		},
 		{

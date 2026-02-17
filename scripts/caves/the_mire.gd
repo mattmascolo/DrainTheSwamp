@@ -67,8 +67,8 @@ func _init() -> void:
 			"pool_index": 1,
 			"loot_data": {
 				"loot_id": "mire_pool_2",
-				"reward_stat_levels": {"drain_mastery": 5},
-				"reward_text": "An ancient relic pulses beneath the mire! Drain Mastery +5!",
+				"reward_stat_levels": {"scoop_power": 5},
+				"reward_text": "An ancient relic pulses beneath the mire! Scoop Power +5!",
 			},
 		},
 	]

@@ -164,15 +164,6 @@ var stat_definitions: Dictionary = {
 		"base_cost": 35.0,
 		"cost_exponent": 1.20,
 		"format": "multiplier"
-	},
-	"drain_mastery": {
-		"name": "Drain Mastery",
-		"base_value": 1.0,
-		"growth_rate": 1.30,
-		"scale": "exponential",
-		"base_cost": 50.0,
-		"cost_exponent": 1.22,
-		"format": "multiplier"
 	}
 }
 
@@ -198,8 +189,7 @@ var stat_levels: Dictionary = {
 	"stamina": 0,
 	"stamina_regen": 0,
 	"water_value": 0,
-	"scoop_power": 0,
-	"drain_mastery": 0
+	"scoop_power": 0
 }
 
 var current_stamina: float = 5.0
@@ -230,37 +220,13 @@ var camel_states: Array = []  # [{state, x, water_carried, source_swamp, state_t
 
 # Upgrade definitions
 var upgrade_definitions: Dictionary = {
-	"rain_collector": {
-		"name": "Rain Collector",
-		"description": "Passive income",
-		"cost": 5000.0,
-		"cost_exponent": 1.3,
-		"max_level": -1,
-		"order": 0
-	},
-	"splash_guard": {
-		"name": "Splash Guard",
-		"description": "Stamina efficiency",
-		"cost": 2000.0,
-		"cost_exponent": 1.20,
-		"max_level": -1,
-		"order": 1
-	},
-	"auto_seller": {
-		"name": "Auto-Seller",
-		"description": "Auto-sell when full",
-		"cost": 10000.0,
-		"cost_exponent": 1.0,
-		"max_level": 1,
-		"order": 2
-	},
 	"auto_scooper": {
 		"name": "Auto-Scooper",
 		"description": "Auto scoop near water",
 		"cost": 500.0,
 		"cost_exponent": 1.25,
 		"max_level": -1,
-		"order": 3
+		"order": 0
 	},
 	"lantern": {
 		"name": "Lantern",
@@ -268,15 +234,12 @@ var upgrade_definitions: Dictionary = {
 		"cost": 50.0,
 		"cost_exponent": 1.30,
 		"max_level": 1,
-		"order": 4
+		"order": 1
 	}
 }
 
 # Upgrade state
 var upgrades_owned: Dictionary = {
-	"rain_collector": 0,
-	"splash_guard": 0,
-	"auto_seller": 0,
 	"auto_scooper": 0,
 	"lantern": 0
 }
@@ -439,8 +402,7 @@ func get_money_multiplier() -> float:
 	return get_stat_value("water_value")
 
 func get_stamina_cost() -> float:
-	var base: float = maxf(2.0 / get_stat_value("drain_mastery"), 0.2)
-	return base * get_splash_guard_multiplier()
+	return 2.0
 
 func get_max_stamina() -> float:
 	return get_stat_value("stamina")
@@ -642,26 +604,6 @@ func get_upgrade_cost(upgrade_id: String) -> float:
 	var defn: Dictionary = upgrade_definitions[upgrade_id]
 	var level: int = upgrades_owned[upgrade_id]
 	return defn["cost"] * pow(defn["cost_exponent"], level)
-
-func get_rain_collector_rate() -> float:
-	var level: int = upgrades_owned["rain_collector"]
-	if level <= 0:
-		return 0.0
-	if level <= 5:
-		return 0.50 * pow(1.30, level - 1)
-	# After L5: sqrt scaling (diminishing returns)
-	var l5_value: float = 0.50 * pow(1.30, 4)  # L5 rate
-	return l5_value * sqrt(float(level - 4))
-
-func get_splash_guard_multiplier() -> float:
-	var level: int = upgrades_owned["splash_guard"]
-	if level <= 0:
-		return 1.0
-	# Asymptotic curve: caps at 75% reduction (floor of 0.25)
-	return 1.0 - 0.75 * (1.0 - exp(-0.25 * level))
-
-func has_auto_seller() -> bool:
-	return upgrades_owned["auto_seller"] > 0
 
 func get_auto_scoop_interval() -> float:
 	var level: int = upgrades_owned["auto_scooper"]
@@ -931,8 +873,7 @@ func reset_game() -> void:
 		"stamina": 0,
 		"stamina_regen": 0,
 		"water_value": 0,
-		"scoop_power": 0,
-		"drain_mastery": 0
+		"scoop_power": 0
 	}
 	current_stamina = get_max_stamina()
 	water_carried = 0.0
@@ -945,9 +886,6 @@ func reset_game() -> void:
 	camel_speed_level = 0
 	camel_states.clear()
 	upgrades_owned = {
-		"rain_collector": 0,
-		"splash_guard": 0,
-		"auto_seller": 0,
 		"auto_scooper": 0,
 		"lantern": 0
 	}
@@ -1022,16 +960,6 @@ func _process(delta: float) -> void:
 							water_carried_changed.emit(water_carried, capacity)
 						hose_state_changed.emit(true, hose_timer)
 
-	# Rain Collector passive income
-	var rain_rate: float = get_rain_collector_rate()
-	if rain_rate > 0.0:
-		money += rain_rate * delta
-		money_changed.emit(money)
-
-	# Auto-Seller: sell when inventory full
-	if has_auto_seller() and is_inventory_full():
-		sell_water()
-
 func get_save_data() -> Dictionary:
 	var swamp_save: Array = []
 	for state in swamp_states:
@@ -1044,7 +972,7 @@ func get_save_data() -> Dictionary:
 		cave_pool_save[cave_id] = pools
 
 	return {
-		"version": 15,
+		"version": 16,
 		"money": money,
 		"current_tool_id": current_tool_id,
 		"tools_owned": tools_owned.duplicate(true),

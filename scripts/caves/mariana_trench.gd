@@ -86,7 +86,6 @@ func _init() -> void:
 					"stamina_regen": 10,
 					"water_value": 10,
 					"scoop_power": 10,
-					"drain_mastery": 10,
 				},
 				"reward_text": "The Trench Core surges through you! ALL stats +10!",
 			},

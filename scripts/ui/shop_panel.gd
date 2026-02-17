@@ -8,7 +8,7 @@ var _dirty: bool = false
 var _refresh_cooldown: float = 0.0
 const REFRESH_INTERVAL: float = 0.3
 
-var current_tab: int = 0  # 0=Tools, 1=Stats, 2=Upgrades
+var current_tab: int = 0  # 0=Tools, 1=Stats
 var tab_buttons: Array[Button] = []
 
 func _ready() -> void:
@@ -59,13 +59,12 @@ func _refresh() -> void:
 	tab_bar.add_theme_constant_override("separation", 4)
 	tab_buttons.clear()
 
-	var tab_names: Array[String] = ["Tools", "Stats", "Upgrades"]
+	var tab_names: Array[String] = ["Tools", "Stats"]
 	var tab_colors: Array[Color] = [
 		Color(0.55, 0.48, 0.2),   # Gold for tools
 		Color(0.3, 0.5, 0.8),     # Blue for stats
-		Color(0.3, 0.65, 0.35),   # Green for upgrades
 	]
-	for i in range(3):
+	for i in range(2):
 		var tab_idx: int = i
 		var btn := Button.new()
 		btn.text = tab_names[i]
@@ -114,13 +113,18 @@ func _refresh() -> void:
 			_build_tools_tab()
 		1:
 			_build_stats_tab()
-		2:
-			_build_upgrades_tab()
 
 # =============================================================================
 # TOOLS TAB
 # =============================================================================
 func _build_tools_tab() -> void:
+	# --- Camel Section (at top) ---
+	_build_camel_section()
+
+	var tool_sep := HSeparator.new()
+	tool_sep.add_theme_constant_override("separation", 8)
+	tool_list.add_child(tool_sep)
+
 	var sorted_tools: Array = GameManager.tool_definitions.keys()
 	sorted_tools.sort_custom(func(a: Variant, b: Variant) -> bool: return GameManager.tool_definitions[a]["cost"] < GameManager.tool_definitions[b]["cost"])
 
@@ -228,11 +232,293 @@ func _build_tools_tab() -> void:
 		row_panel.add_child(entry)
 		tool_list.add_child(row_panel)
 
-	# --- Camel Section ---
-	var sep := HSeparator.new()
-	sep.add_theme_constant_override("separation", 8)
-	tool_list.add_child(sep)
 
+# =============================================================================
+# STATS TAB
+# =============================================================================
+func _build_stats_tab() -> void:
+	# Order: core stats first, then power stats
+	var stat_order: Array[String] = [
+		"carrying_capacity", "movement_speed", "stamina", "stamina_regen",
+		"water_value", "scoop_power"
+	]
+
+	# Core stats header
+	var core_header := Label.new()
+	core_header.text = "-- Core Stats --"
+	core_header.add_theme_font_size_override("font_size", 14)
+	core_header.add_theme_color_override("font_color", Color(0.4, 0.7, 0.9))
+	core_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tool_list.add_child(core_header)
+
+	for i in range(stat_order.size()):
+		var stat_id: String = stat_order[i]
+
+		# Power stats header
+		if stat_id == "water_value":
+			var sep := HSeparator.new()
+			sep.add_theme_constant_override("separation", 6)
+			tool_list.add_child(sep)
+			var power_header := Label.new()
+			power_header.text = "-- Power Stats --"
+			power_header.add_theme_font_size_override("font_size", 14)
+			power_header.add_theme_color_override("font_color", Color(0.9, 0.6, 0.3))
+			power_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			tool_list.add_child(power_header)
+
+		var defn: Dictionary = GameManager.stat_definitions[stat_id]
+		var level: int = GameManager.stat_levels[stat_id]
+		var value: float = GameManager.get_stat_value(stat_id)
+
+		var row_panel := PanelContainer.new()
+		var row_style := StyleBoxFlat.new()
+		row_style.bg_color = Color(0.1, 0.12, 0.18, 0.6)
+		row_style.corner_radius_top_left = 4
+		row_style.corner_radius_top_right = 4
+		row_style.corner_radius_bottom_left = 4
+		row_style.corner_radius_bottom_right = 4
+		row_style.content_margin_left = 8
+		row_style.content_margin_right = 8
+		row_style.content_margin_top = 4
+		row_style.content_margin_bottom = 4
+		row_panel.add_theme_stylebox_override("panel", row_style)
+
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+
+		# Stat info
+		var info_label := Label.new()
+		info_label.add_theme_font_size_override("font_size", 14)
+		info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+		info_label.add_theme_constant_override("shadow_offset_x", 2)
+		info_label.add_theme_constant_override("shadow_offset_y", 2)
+
+		var value_str: String = _format_stat_value(stat_id, defn, value)
+		if level > 0:
+			info_label.text = "%s Lv%d (%s)" % [defn["name"], level, value_str]
+			info_label.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
+		else:
+			info_label.text = "%s (%s)" % [defn["name"], value_str]
+			info_label.add_theme_color_override("font_color", Color(0.5, 0.55, 0.65))
+		row.add_child(info_label)
+
+		# Upgrade button
+		if GameManager.is_stat_maxed(stat_id):
+			var max_label := Label.new()
+			max_label.text = "[MAX]"
+			max_label.add_theme_font_size_override("font_size", 14)
+			max_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
+			row.add_child(max_label)
+		else:
+			var cost: float = GameManager.get_stat_upgrade_cost(stat_id)
+			var up_btn := Button.new()
+			up_btn.add_theme_font_size_override("font_size", 14)
+			up_btn.text = "Up %s" % Economy.format_money(cost)
+			up_btn.custom_minimum_size = Vector2(110, 0)
+			if GameManager.money < cost:
+				up_btn.disabled = true
+			else:
+				up_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
+				var sid: String = stat_id
+				up_btn.pressed.connect(func() -> void: GameManager.upgrade_stat(sid))
+			_style_button(up_btn, Color(0.1, 0.18, 0.3))
+			row.add_child(up_btn)
+
+		# Tooltip
+		row_panel.tooltip_text = _get_stat_tooltip(stat_id, defn, level, value)
+		row_panel.mouse_filter = Control.MOUSE_FILTER_PASS
+
+		row_panel.add_child(row)
+		tool_list.add_child(row_panel)
+
+	# --- Upgrades Section (merged into Stats tab) ---
+	var upg_sep := HSeparator.new()
+	upg_sep.add_theme_constant_override("separation", 6)
+	tool_list.add_child(upg_sep)
+	var upg_header := Label.new()
+	upg_header.text = "-- Upgrades --"
+	upg_header.add_theme_font_size_override("font_size", 14)
+	upg_header.add_theme_color_override("font_color", Color(0.3, 0.65, 0.35))
+	upg_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tool_list.add_child(upg_header)
+
+	var sorted_upgrades: Array = GameManager.upgrade_definitions.keys()
+	sorted_upgrades.sort_custom(func(a: Variant, b: Variant) -> bool: return GameManager.upgrade_definitions[a]["order"] < GameManager.upgrade_definitions[b]["order"])
+
+	for upgrade_id in sorted_upgrades:
+		var uid: String = upgrade_id
+		var udefn: Dictionary = GameManager.upgrade_definitions[uid]
+		var ulevel: int = GameManager.upgrades_owned[uid]
+		var is_maxed: bool = GameManager.is_upgrade_maxed(uid)
+
+		var u_panel := PanelContainer.new()
+		var u_style := StyleBoxFlat.new()
+		u_style.bg_color = Color(0.1, 0.14, 0.1, 0.6)
+		u_style.corner_radius_top_left = 4
+		u_style.corner_radius_top_right = 4
+		u_style.corner_radius_bottom_left = 4
+		u_style.corner_radius_bottom_right = 4
+		u_style.content_margin_left = 8
+		u_style.content_margin_right = 8
+		u_style.content_margin_top = 4
+		u_style.content_margin_bottom = 4
+		u_panel.add_theme_stylebox_override("panel", u_style)
+
+		var u_row := HBoxContainer.new()
+		u_row.add_theme_constant_override("separation", 8)
+
+		var u_info := Label.new()
+		u_info.add_theme_font_size_override("font_size", 14)
+		u_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		u_info.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+		u_info.add_theme_constant_override("shadow_offset_x", 2)
+		u_info.add_theme_constant_override("shadow_offset_y", 2)
+
+		if ulevel > 0:
+			u_info.text = "%s Lv%d" % [udefn["name"], ulevel]
+			u_info.add_theme_color_override("font_color", Color(0.6, 0.95, 0.6))
+		else:
+			u_info.text = "%s" % udefn["name"]
+			u_info.add_theme_color_override("font_color", Color(0.55, 0.6, 0.55))
+		u_row.add_child(u_info)
+
+		if is_maxed:
+			var umax_label := Label.new()
+			umax_label.text = "[MAX]"
+			umax_label.add_theme_font_size_override("font_size", 14)
+			umax_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
+			u_row.add_child(umax_label)
+		else:
+			var u_btn := Button.new()
+			u_btn.add_theme_font_size_override("font_size", 14)
+			var u_cost: float = GameManager.get_upgrade_cost(uid)
+			if ulevel == 0:
+				u_btn.text = "Buy %s" % Economy.format_money(u_cost)
+			else:
+				u_btn.text = "Up %s" % Economy.format_money(u_cost)
+			u_btn.custom_minimum_size = Vector2(110, 0)
+			if GameManager.money < u_cost:
+				u_btn.disabled = true
+			else:
+				u_btn.add_theme_color_override("font_color", Color(0.4, 1.0, 0.5))
+				var u: String = uid
+				u_btn.pressed.connect(func() -> void: GameManager.buy_upgrade(u))
+			_style_button(u_btn, Color(0.08, 0.2, 0.08))
+			u_row.add_child(u_btn)
+
+		u_panel.tooltip_text = _get_upgrade_tooltip(uid, udefn, ulevel)
+		u_panel.mouse_filter = Control.MOUSE_FILTER_PASS
+
+		u_panel.add_child(u_row)
+		tool_list.add_child(u_panel)
+
+func _format_stat_value(stat_id: String, defn: Dictionary, value: float) -> String:
+	var fmt: String = defn.get("format", "value")
+	match fmt:
+		"gal":
+			if value >= 10.0:
+				return "%.1f gal" % value
+			elif value >= 1.0:
+				return "%.2f gal" % value
+			else:
+				return "%.3f gal" % value
+		"multiplier":
+			return "%.2fx" % value
+		"per_sec":
+			return "%.2f/s" % value
+		"percent":
+			return "%.0f%%" % (value * 100.0)
+		_:
+			if value >= 10.0:
+				return "%.1f" % value
+			elif value >= 1.0:
+				return "%.2f" % value
+			else:
+				return "%.3f" % value
+
+func _get_stat_tooltip(stat_id: String, defn: Dictionary, level: int, value: float) -> String:
+	var tip: String = "%s" % defn["name"]
+	var value_str: String = _format_stat_value(stat_id, defn, value)
+	tip += "\nCurrent: %s (Lv%d)" % [value_str, level]
+
+	var next_value: float = GameManager.get_stat_value_at_level(stat_id, level + 1)
+	var next_str: String = _format_stat_value(stat_id, defn, next_value)
+	var growth: float = (defn.get("growth_rate", 1.15) - 1.0) * 100.0
+	tip += "\nNext: %s (+%.0f%%)" % [next_str, growth]
+
+	# Special stat notes
+	match stat_id:
+		"scoop_power":
+			tip += "\nMultiplies all manual tool output"
+		"water_value":
+			tip += "\nMultiplies money earned per gallon"
+
+	var cost: float = GameManager.get_stat_upgrade_cost(stat_id)
+	tip += "\nCost: %s" % Economy.format_money(cost)
+	return tip
+
+# =============================================================================
+# TOOLTIPS
+# =============================================================================
+func _get_upgrade_tooltip(uid: String, defn: Dictionary, level: int) -> String:
+	var tip: String = "%s - %s" % [defn["name"], defn["description"]]
+	match uid:
+		"auto_scooper":
+			var cur_interval: float = GameManager.get_auto_scoop_interval()
+			tip += "\nScoop every %.2fs" % cur_interval
+			var next_interval: float = maxf(2.5 * pow(0.92, level + 1), 0.5)
+			tip += "\nNext: %.2fs (-8%%)" % next_interval
+		"lantern":
+			if level > 0:
+				tip += "\nRadius: %.0fpx, Brightness: %.1f" % [GameManager.get_lantern_radius(), GameManager.get_lantern_energy()]
+			else:
+				tip += "\nAutomatic light during night\n200px radius"
+	if not GameManager.is_upgrade_maxed(uid):
+		tip += "\nCost: %s" % Economy.format_money(GameManager.get_upgrade_cost(uid))
+	return tip
+
+func _get_tool_tooltip(tid: String, defn: Dictionary, owned_data: Dictionary) -> String:
+	var tip: String = "%s" % defn["name"]
+	if defn["type"] == "semi_auto":
+		tip += " (auto-drain)"
+	else:
+		tip += " (manual scoop)"
+
+	if owned_data["owned"]:
+		var level: int = owned_data["level"]
+		var cur_output: float = GameManager.get_tool_output(tid)
+		if defn["type"] == "semi_auto":
+			tip += "\nOutput: %.4f gal/s" % cur_output
+		else:
+			tip += "\nOutput: %.4f gal/scoop" % cur_output
+
+		var next_output: float = defn["base_output"] * pow(1.15, level + 1)
+		if defn["type"] == "manual":
+			next_output *= GameManager.get_stat_value("scoop_power")
+		var gain_pct: float = (next_output / cur_output - 1.0) * 100.0
+		if defn["type"] == "semi_auto":
+			tip += "\nNext Lv%d: %.4f gal/s (+%.0f%%)" % [level + 1, next_output, gain_pct]
+		else:
+			tip += "\nNext Lv%d: %.4f gal (+%.0f%%)" % [level + 1, next_output, gain_pct]
+
+		var cost: float = GameManager.get_tool_upgrade_cost(tid)
+		tip += "\nUpgrade: %s" % Economy.format_money(cost)
+	else:
+		var base_out: float = defn["base_output"]
+		if defn["type"] == "manual":
+			base_out *= GameManager.get_stat_value("scoop_power")
+		if defn["type"] == "semi_auto":
+			tip += "\nBase output: %.4f gal/s" % base_out
+		else:
+			tip += "\nBase output: %.4f gal/scoop" % base_out
+		tip += "\nCost: %s" % Economy.format_money(defn["cost"])
+	return tip
+
+# =============================================================================
+# CAMEL SECTION
+# =============================================================================
+func _build_camel_section() -> void:
 	var camel_header := Label.new()
 	camel_header.text = "-- Camel --"
 	camel_header.add_theme_font_size_override("font_size", 14)
@@ -271,7 +557,6 @@ func _build_tools_tab() -> void:
 	camel_buy_row.add_child(camel_info)
 
 	if GameManager.camel_count >= 1:
-		# Capped at 1
 		var max_label := Label.new()
 		max_label.text = "[MAX]"
 		max_label.add_theme_font_size_override("font_size", 14)
@@ -366,304 +651,6 @@ func _build_tools_tab() -> void:
 
 		upgrade_panel.add_child(up_row)
 		tool_list.add_child(upgrade_panel)
-
-
-# =============================================================================
-# STATS TAB
-# =============================================================================
-func _build_stats_tab() -> void:
-	# Order: core stats first, then power stats
-	var stat_order: Array[String] = [
-		"carrying_capacity", "movement_speed", "stamina", "stamina_regen",
-		"water_value", "scoop_power", "drain_mastery"
-	]
-
-	# Core stats header
-	var core_header := Label.new()
-	core_header.text = "-- Core Stats --"
-	core_header.add_theme_font_size_override("font_size", 14)
-	core_header.add_theme_color_override("font_color", Color(0.4, 0.7, 0.9))
-	core_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tool_list.add_child(core_header)
-
-	for i in range(stat_order.size()):
-		var stat_id: String = stat_order[i]
-
-		# Power stats header
-		if stat_id == "water_value":
-			var sep := HSeparator.new()
-			sep.add_theme_constant_override("separation", 6)
-			tool_list.add_child(sep)
-			var power_header := Label.new()
-			power_header.text = "-- Power Stats --"
-			power_header.add_theme_font_size_override("font_size", 14)
-			power_header.add_theme_color_override("font_color", Color(0.9, 0.6, 0.3))
-			power_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			tool_list.add_child(power_header)
-
-		var defn: Dictionary = GameManager.stat_definitions[stat_id]
-		var level: int = GameManager.stat_levels[stat_id]
-		var value: float = GameManager.get_stat_value(stat_id)
-
-		var row_panel := PanelContainer.new()
-		var row_style := StyleBoxFlat.new()
-		row_style.bg_color = Color(0.1, 0.12, 0.18, 0.6)
-		row_style.corner_radius_top_left = 4
-		row_style.corner_radius_top_right = 4
-		row_style.corner_radius_bottom_left = 4
-		row_style.corner_radius_bottom_right = 4
-		row_style.content_margin_left = 8
-		row_style.content_margin_right = 8
-		row_style.content_margin_top = 4
-		row_style.content_margin_bottom = 4
-		row_panel.add_theme_stylebox_override("panel", row_style)
-
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-
-		# Stat info
-		var info_label := Label.new()
-		info_label.add_theme_font_size_override("font_size", 14)
-		info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		info_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-		info_label.add_theme_constant_override("shadow_offset_x", 2)
-		info_label.add_theme_constant_override("shadow_offset_y", 2)
-
-		var value_str: String = _format_stat_value(stat_id, defn, value)
-		if level > 0:
-			info_label.text = "%s Lv%d (%s)" % [defn["name"], level, value_str]
-			info_label.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
-		else:
-			info_label.text = "%s (%s)" % [defn["name"], value_str]
-			info_label.add_theme_color_override("font_color", Color(0.5, 0.55, 0.65))
-		row.add_child(info_label)
-
-		# Upgrade button
-		if GameManager.is_stat_maxed(stat_id):
-			var max_label := Label.new()
-			max_label.text = "[MAX]"
-			max_label.add_theme_font_size_override("font_size", 14)
-			max_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
-			row.add_child(max_label)
-		else:
-			var cost: float = GameManager.get_stat_upgrade_cost(stat_id)
-			var up_btn := Button.new()
-			up_btn.add_theme_font_size_override("font_size", 14)
-			up_btn.text = "Up %s" % Economy.format_money(cost)
-			up_btn.custom_minimum_size = Vector2(110, 0)
-			if GameManager.money < cost:
-				up_btn.disabled = true
-			else:
-				up_btn.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0))
-				var sid: String = stat_id
-				up_btn.pressed.connect(func() -> void: GameManager.upgrade_stat(sid))
-			_style_button(up_btn, Color(0.1, 0.18, 0.3))
-			row.add_child(up_btn)
-
-		# Tooltip
-		row_panel.tooltip_text = _get_stat_tooltip(stat_id, defn, level, value)
-		row_panel.mouse_filter = Control.MOUSE_FILTER_PASS
-
-		row_panel.add_child(row)
-		tool_list.add_child(row_panel)
-
-func _format_stat_value(stat_id: String, defn: Dictionary, value: float) -> String:
-	var fmt: String = defn.get("format", "value")
-	match fmt:
-		"gal":
-			if value >= 10.0:
-				return "%.1f gal" % value
-			elif value >= 1.0:
-				return "%.2f gal" % value
-			else:
-				return "%.3f gal" % value
-		"multiplier":
-			return "%.2fx" % value
-		"per_sec":
-			return "%.2f/s" % value
-		"percent":
-			return "%.0f%%" % (value * 100.0)
-		_:
-			if value >= 10.0:
-				return "%.1f" % value
-			elif value >= 1.0:
-				return "%.2f" % value
-			else:
-				return "%.3f" % value
-
-func _get_stat_tooltip(stat_id: String, defn: Dictionary, level: int, value: float) -> String:
-	var tip: String = "%s" % defn["name"]
-	var value_str: String = _format_stat_value(stat_id, defn, value)
-	tip += "\nCurrent: %s (Lv%d)" % [value_str, level]
-
-	var next_value: float = GameManager.get_stat_value_at_level(stat_id, level + 1)
-	var next_str: String = _format_stat_value(stat_id, defn, next_value)
-	var growth: float = (defn.get("growth_rate", 1.15) - 1.0) * 100.0
-	tip += "\nNext: %s (+%.0f%%)" % [next_str, growth]
-
-	# Special stat notes
-	match stat_id:
-		"drain_mastery":
-			var stamina_cost: float = maxf(2.0 / value, 0.2)
-			tip += "\nStamina cost: %.2f per scoop" % stamina_cost
-		"scoop_power":
-			tip += "\nMultiplies all manual tool output"
-		"water_value":
-			tip += "\nMultiplies money earned per gallon"
-
-	var cost: float = GameManager.get_stat_upgrade_cost(stat_id)
-	tip += "\nCost: %s" % Economy.format_money(cost)
-	return tip
-
-# =============================================================================
-# UPGRADES TAB
-# =============================================================================
-func _build_upgrades_tab() -> void:
-	var sorted_upgrades: Array = GameManager.upgrade_definitions.keys()
-	sorted_upgrades.sort_custom(func(a: Variant, b: Variant) -> bool: return GameManager.upgrade_definitions[a]["order"] < GameManager.upgrade_definitions[b]["order"])
-
-	for upgrade_id in sorted_upgrades:
-		var uid: String = upgrade_id
-		var udefn: Dictionary = GameManager.upgrade_definitions[uid]
-		var level: int = GameManager.upgrades_owned[uid]
-		var is_maxed: bool = GameManager.is_upgrade_maxed(uid)
-
-		var u_panel := PanelContainer.new()
-		var u_style := StyleBoxFlat.new()
-		u_style.bg_color = Color(0.1, 0.14, 0.1, 0.6)
-		u_style.corner_radius_top_left = 4
-		u_style.corner_radius_top_right = 4
-		u_style.corner_radius_bottom_left = 4
-		u_style.corner_radius_bottom_right = 4
-		u_style.content_margin_left = 8
-		u_style.content_margin_right = 8
-		u_style.content_margin_top = 4
-		u_style.content_margin_bottom = 4
-		u_panel.add_theme_stylebox_override("panel", u_style)
-
-		var u_row := HBoxContainer.new()
-		u_row.add_theme_constant_override("separation", 8)
-
-		var u_info := Label.new()
-		u_info.add_theme_font_size_override("font_size", 14)
-		u_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		u_info.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-		u_info.add_theme_constant_override("shadow_offset_x", 2)
-		u_info.add_theme_constant_override("shadow_offset_y", 2)
-
-		if level > 0:
-			u_info.text = "%s Lv%d" % [udefn["name"], level]
-			u_info.add_theme_color_override("font_color", Color(0.6, 0.95, 0.6))
-		else:
-			u_info.text = "%s" % udefn["name"]
-			u_info.add_theme_color_override("font_color", Color(0.55, 0.6, 0.55))
-		u_row.add_child(u_info)
-
-		if is_maxed:
-			var max_label := Label.new()
-			max_label.text = "[MAX]"
-			max_label.add_theme_font_size_override("font_size", 14)
-			max_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
-			u_row.add_child(max_label)
-		else:
-			var u_btn := Button.new()
-			u_btn.add_theme_font_size_override("font_size", 14)
-			var u_cost: float = GameManager.get_upgrade_cost(uid)
-			if level == 0:
-				u_btn.text = "Buy %s" % Economy.format_money(u_cost)
-			else:
-				u_btn.text = "Up %s" % Economy.format_money(u_cost)
-			u_btn.custom_minimum_size = Vector2(110, 0)
-			if GameManager.money < u_cost:
-				u_btn.disabled = true
-			else:
-				u_btn.add_theme_color_override("font_color", Color(0.4, 1.0, 0.5))
-				var u: String = uid
-				u_btn.pressed.connect(func() -> void: GameManager.buy_upgrade(u))
-			_style_button(u_btn, Color(0.08, 0.2, 0.08))
-			u_row.add_child(u_btn)
-
-		u_panel.tooltip_text = _get_upgrade_tooltip(uid, udefn, level)
-		u_panel.mouse_filter = Control.MOUSE_FILTER_PASS
-
-		u_panel.add_child(u_row)
-		tool_list.add_child(u_panel)
-
-# =============================================================================
-# TOOLTIPS
-# =============================================================================
-func _get_upgrade_tooltip(uid: String, defn: Dictionary, level: int) -> String:
-	var tip: String = "%s - %s" % [defn["name"], defn["description"]]
-	match uid:
-		"rain_collector":
-			if level > 0:
-				tip += "\nCurrent: $%.2f/s" % GameManager.get_rain_collector_rate()
-				var next_rate: float = 0.50 * pow(1.30, level)
-				tip += "\nNext: $%.2f/s (+30%%)" % next_rate
-			else:
-				tip += "\nBase: $0.50/s, +30% per level"
-		"splash_guard":
-			if level > 0:
-				tip += "\nStamina cost: %.0f%%" % (GameManager.get_splash_guard_multiplier() * 100.0)
-				var next_mult: float = 1.0 - 0.75 * (1.0 - exp(-0.25 * (level + 1)))
-				tip += "\nNext: %.0f%%" % (next_mult * 100.0)
-			else:
-				tip += "\nReduces stamina cost (cap 75%% reduction)"
-		"auto_seller":
-			if level > 0:
-				tip += "\nActive! Auto-sells when inventory full."
-			else:
-				tip += "\nAuto-sell water when inventory full\nNo walking needed!"
-		"auto_scooper":
-			var cur_interval: float = GameManager.get_auto_scoop_interval()
-			tip += "\nScoop every %.2fs" % cur_interval
-			var next_interval: float = maxf(2.5 * pow(0.92, level + 1), 0.5)
-			tip += "\nNext: %.2fs (-8%%)" % next_interval
-		"lantern":
-			if level > 0:
-				tip += "\nRadius: %.0fpx, Brightness: %.1f" % [GameManager.get_lantern_radius(), GameManager.get_lantern_energy()]
-			else:
-				tip += "\nAutomatic light during night\n200px radius"
-	if not GameManager.is_upgrade_maxed(uid):
-		tip += "\nCost: %s" % Economy.format_money(GameManager.get_upgrade_cost(uid))
-	return tip
-
-func _get_tool_tooltip(tid: String, defn: Dictionary, owned_data: Dictionary) -> String:
-	var tip: String = "%s" % defn["name"]
-	if defn["type"] == "semi_auto":
-		tip += " (auto-drain)"
-	else:
-		tip += " (manual scoop)"
-
-	if owned_data["owned"]:
-		var level: int = owned_data["level"]
-		var cur_output: float = GameManager.get_tool_output(tid)
-		if defn["type"] == "semi_auto":
-			tip += "\nOutput: %.4f gal/s" % cur_output
-		else:
-			tip += "\nOutput: %.4f gal/scoop" % cur_output
-
-		var next_output: float = defn["base_output"] * pow(1.15, level + 1)
-		if defn["type"] == "manual":
-			next_output *= GameManager.get_stat_value("scoop_power")
-		var gain_pct: float = (next_output / cur_output - 1.0) * 100.0
-		if defn["type"] == "semi_auto":
-			tip += "\nNext Lv%d: %.4f gal/s (+%.0f%%)" % [level + 1, next_output, gain_pct]
-		else:
-			tip += "\nNext Lv%d: %.4f gal (+%.0f%%)" % [level + 1, next_output, gain_pct]
-
-		var cost: float = GameManager.get_tool_upgrade_cost(tid)
-		tip += "\nUpgrade: %s" % Economy.format_money(cost)
-	else:
-		var base_out: float = defn["base_output"]
-		if defn["type"] == "manual":
-			base_out *= GameManager.get_stat_value("scoop_power")
-		if defn["type"] == "semi_auto":
-			tip += "\nBase output: %.4f gal/s" % base_out
-		else:
-			tip += "\nBase output: %.4f gal/scoop" % base_out
-		tip += "\nCost: %s" % Economy.format_money(defn["cost"])
-	return tip
 
 func _style_button(btn: Button, bg_color: Color, affordable: bool = true) -> void:
 	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
