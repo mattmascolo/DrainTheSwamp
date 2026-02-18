@@ -38,6 +38,20 @@ func _build_buttons() -> void:
 	_style_button(resume_btn, Color(0.08, 0.22, 0.1))
 	button_list.add_child(resume_btn)
 
+	var touch_btn := Button.new()
+	touch_btn.add_theme_font_size_override("font_size", 16)
+	var touch_on: bool = GameManager.touch_controls_enabled
+	touch_btn.text = "Touch Controls: " + ("ON" if touch_on else "OFF")
+	touch_btn.custom_minimum_size = Vector2(160, 28)
+	touch_btn.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
+	touch_btn.pressed.connect(func() -> void:
+		GameManager.touch_controls_enabled = not GameManager.touch_controls_enabled
+		TouchControls.set_enabled(GameManager.touch_controls_enabled)
+		_build_buttons()
+	)
+	_style_button(touch_btn, Color(0.1, 0.15, 0.22))
+	button_list.add_child(touch_btn)
+
 	var sep := HSeparator.new()
 	button_list.add_child(sep)
 

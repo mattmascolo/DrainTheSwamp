@@ -246,6 +246,9 @@ var upgrades_owned: Dictionary = {
 	"lantern": 0
 }
 
+# Device preference (not reset with game)
+var touch_controls_enabled: bool = false
+
 # --- Cave Definitions ---
 const CAVE_DEFINITIONS: Dictionary = {
 	"muddy_hollow": {"name": "Muddy Hollow", "swamp_index": 0, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/muddy_hollow.tscn", "order": 0},
@@ -992,7 +995,8 @@ func get_save_data() -> Dictionary:
 		"upgrades_owned": upgrades_owned.duplicate(true),
 		"cave_data": cave_data.duplicate(true),
 		"cave_pool_states": cave_pool_save,
-		"cycle_progress": cycle_progress
+		"cycle_progress": cycle_progress,
+		"touch_controls_enabled": touch_controls_enabled
 	}
 
 func load_save_data(data: Dictionary) -> void:
@@ -1064,6 +1068,9 @@ func load_save_data(data: Dictionary) -> void:
 				for i in range(mini(saved_pools.size(), cave_pool_states[k].size())):
 					cave_pool_states[k][i]["gallons_drained"] = saved_pools[i].get("gallons_drained", 0.0)
 					cave_pool_states[k][i]["completed"] = saved_pools[i].get("completed", false)
+
+	# Device preference
+	touch_controls_enabled = data.get("touch_controls_enabled", false)
 
 	# Version migration
 	var save_version: int = int(data.get("version", 1))
