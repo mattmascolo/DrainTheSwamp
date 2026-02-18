@@ -97,7 +97,7 @@ func _setup_loot_and_lore() -> void:
 	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
 	lore1.lore_id = "underdark_warning"
 	lore1.cave_id = cave_id
-	lore1.lore_text = "EMERGENCY MEETING MINUTES — LOCATION: [CLASSIFIED]\nATTENDEES: Everyone who matters\n\nSWAMPSWORTH: \"He's at the bayou. THE BAYOU.\"\nLOBBYTON: \"How? We took away his permit!\"\nMAYOR KICKBACK: \"He never had a permit!\"\nTHE CONSULTANT: \"My $500,000 report recommended patience.\"\nSWAMPSWORTH: \"YOUR REPORT WAS THREE PAGES OF 'MAYBE WAIT?'\"\nALL: [unintelligible shouting]\n\nRESOLUTION: \"Pray he doesn't reach the Atlantic.\""
+	lore1.lore_text = "EMERGENCY MEETING MINUTES — LOCATION: [CLASSIFIED]\nATTENDEES: Everyone who matters\n\nSWAMPSWORTH: \"He's at the bayou. THE BAYOU.\"\nLOBBYTON: \"How? We took away his permit!\"\nMAYOR KICKBACK: \"He never had a permit!\"\nTHE CONSULTANT: \"My $500,000 report recommended patience.\"\nSWAMPSWORTH: \"YOUR REPORT WAS THREE PAGES OF 'MAYBE WAIT?'\"\nGOODWELL: \"Gentlemen, I believe I can help. For a modest consulting fee.\"\nALL: [unintelligible shouting]\n\nRESOLUTION: \"Pray he doesn't reach the Atlantic.\""
 	lore1.position = Vector2(1000, _get_cave_terrain_y_at(1000))
 	add_child(lore1)
 

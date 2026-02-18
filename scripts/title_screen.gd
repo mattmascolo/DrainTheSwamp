@@ -351,6 +351,20 @@ func _build_newspaper(vp_size: Vector2) -> void:
 	paper_style.content_margin_bottom = 12
 	newspaper_panel.add_theme_stylebox_override("panel", paper_style)
 
+	# Corner fold — small triangle in top-right corner
+	var panel_x: float = newspaper_panel.position.x
+	var panel_y: float = newspaper_panel.position.y
+	var fold_size: float = 14.0
+	var corner_fold := Polygon2D.new()
+	corner_fold.polygon = PackedVector2Array([
+		Vector2(panel_x + panel_w - fold_size, panel_y),
+		Vector2(panel_x + panel_w, panel_y),
+		Vector2(panel_x + panel_w, panel_y + fold_size),
+	])
+	corner_fold.color = Color(0.78, 0.74, 0.64)
+	corner_fold.z_index = 1
+	newspaper_overlay.add_child(corner_fold)
+
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 4)
 	newspaper_panel.add_child(vbox)

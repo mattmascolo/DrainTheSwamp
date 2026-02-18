@@ -273,6 +273,14 @@ var jeff_node: Node2D = null
 var jeff_area: Area2D = null
 var player_near_jeff: bool = false
 var endgame_triggered: bool = false
+var politician_nodes: Array[Node2D] = []
+# Consultant reports
+var report_areas: Array[Dictionary] = []  # {area: Area2D, text: String, near: bool, hint: Label}
+# Wanted poster
+var wanted_poster: Node2D = null
+# Helicopter
+var helicopter_timer: float = 0.0
+var helicopter_active: Node2D = null
 # Second pass visuals
 var moon: Node2D = null
 var moon_glow: Polygon2D = null
@@ -513,7 +521,7 @@ func _ready() -> void:
 	_build_left_trees()
 	_build_right_boundary()
 	_build_island_house()
-	_build_jeff()
+	_build_island_politicians()
 	_build_post_processing()
 	_build_distance_fog()
 	_build_weather()
@@ -524,6 +532,7 @@ func _ready() -> void:
 	_build_player_shadow()
 	_build_cave_entrances()
 	_build_billboards()
+	_build_consultant_reports()
 	_init_drain_thresholds()
 
 	GameManager.water_level_changed.connect(_on_water_level_changed)
@@ -3287,178 +3296,566 @@ func _build_left_trees() -> void:
 
 # --- Island with house at the right end ---
 func _build_island_house() -> void:
-	# Island terrain is already in terrain_points (indices 217-222)
-	# Find the island center — midpoint of the flat top
 	var island_cx: float = 5660.0
 	var island_y: float = 484.0  # Ground level on the flat top
+	var mw: float = 80.0  # Mansion width
+	var mh: float = 40.0  # Mansion height (two stories)
+	var mx: float = island_cx - mw * 0.5  # Mansion left edge
 
-	# --- House ---
-	# Foundation
+	# Foundation / platform
 	var foundation := ColorRect.new()
-	foundation.position = Vector2(island_cx - 18, island_y - 4)
-	foundation.size = Vector2(36, 6)
+	foundation.position = Vector2(mx - 4, island_y - 4)
+	foundation.size = Vector2(mw + 8, 6)
 	foundation.color = Color(0.4, 0.38, 0.32)
 	foundation.z_index = 2
 	add_child(foundation)
 
-	# Walls
+	# Main wall (two-story)
 	var wall := ColorRect.new()
-	wall.position = Vector2(island_cx - 14, island_y - 30)
-	wall.size = Vector2(28, 26)
-	wall.color = Color(0.52, 0.38, 0.22)
+	wall.position = Vector2(mx, island_y - mh)
+	wall.size = Vector2(mw, mh)
+	wall.color = Color(0.55, 0.45, 0.30)
 	wall.z_index = 3
 	add_child(wall)
 
-	# Plank lines
-	for i in range(4):
-		var plank := ColorRect.new()
-		plank.position = Vector2(island_cx - 14, island_y - 30 + i * 6 + 3)
-		plank.size = Vector2(28, 1)
-		plank.color = Color(0.42, 0.30, 0.16, 0.35)
-		plank.z_index = 3
-		add_child(plank)
+	# Floor divider line (between stories)
+	var floor_div := ColorRect.new()
+	floor_div.position = Vector2(mx, island_y - mh * 0.5)
+	floor_div.size = Vector2(mw, 1)
+	floor_div.color = Color(0.42, 0.34, 0.22, 0.5)
+	floor_div.z_index = 3
+	add_child(floor_div)
 
-	# Door
+	# Bottom windows (4 across)
+	for wi in range(4):
+		var win := ColorRect.new()
+		var wx: float = mx + 8 + wi * 18
+		win.position = Vector2(wx, island_y - 16)
+		win.size = Vector2(8, 8)
+		win.color = Color(0.6, 0.75, 0.85, 0.8)
+		win.z_index = 4
+		add_child(win)
+		# Window frame cross
+		var wh := ColorRect.new()
+		wh.position = Vector2(wx, island_y - 12)
+		wh.size = Vector2(8, 1)
+		wh.color = Color(0.42, 0.34, 0.22)
+		wh.z_index = 5
+		add_child(wh)
+		var wv := ColorRect.new()
+		wv.position = Vector2(wx + 4, island_y - 16)
+		wv.size = Vector2(1, 8)
+		wv.color = Color(0.42, 0.34, 0.22)
+		wv.z_index = 5
+		add_child(wv)
+
+	# Top windows (3 across)
+	for wi in range(3):
+		var win := ColorRect.new()
+		var wx: float = mx + 14 + wi * 22
+		win.position = Vector2(wx, island_y - 36)
+		win.size = Vector2(8, 8)
+		win.color = Color(0.6, 0.75, 0.85, 0.8)
+		win.z_index = 4
+		add_child(win)
+		var wh := ColorRect.new()
+		wh.position = Vector2(wx, island_y - 32)
+		wh.size = Vector2(8, 1)
+		wh.color = Color(0.42, 0.34, 0.22)
+		wh.z_index = 5
+		add_child(wh)
+
+	# Door (centered, taller)
 	var door := ColorRect.new()
-	door.position = Vector2(island_cx - 4, island_y - 16)
-	door.size = Vector2(8, 12)
+	door.position = Vector2(island_cx - 5, island_y - 16)
+	door.size = Vector2(10, 16)
 	door.color = Color(0.28, 0.18, 0.10)
 	door.z_index = 4
 	add_child(door)
 
-	# Window
-	var window := ColorRect.new()
-	window.position = Vector2(island_cx + 6, island_y - 24)
-	window.size = Vector2(5, 5)
-	window.color = Color(0.6, 0.75, 0.85, 0.8)
-	window.z_index = 4
-	add_child(window)
+	# Door handle
+	var dhandle := ColorRect.new()
+	dhandle.position = Vector2(island_cx + 2, island_y - 8)
+	dhandle.size = Vector2(2, 2)
+	dhandle.color = Color(0.7, 0.6, 0.3)
+	dhandle.z_index = 5
+	add_child(dhandle)
 
-	# Roof (triangle as Polygon2D)
+	# Columns flanking door (2 thin rectangles)
+	for ci in [-1, 1]:
+		var col := ColorRect.new()
+		col.position = Vector2(island_cx + ci * 8 - 1, island_y - 20)
+		col.size = Vector2(2, 20)
+		col.color = Color(0.72, 0.68, 0.58)
+		col.z_index = 4
+		add_child(col)
+
+	# Balcony on second floor (small overhang)
+	var balcony := Polygon2D.new()
+	balcony.polygon = PackedVector2Array([
+		Vector2(island_cx - 14, island_y - mh * 0.5),
+		Vector2(island_cx + 14, island_y - mh * 0.5),
+		Vector2(island_cx + 14, island_y - mh * 0.5 + 3),
+		Vector2(island_cx - 14, island_y - mh * 0.5 + 3),
+	])
+	balcony.color = Color(0.62, 0.55, 0.42)
+	balcony.z_index = 5
+	add_child(balcony)
+
+	# Balcony railing
+	var railing := Line2D.new()
+	railing.width = 1.0
+	railing.default_color = Color(0.5, 0.45, 0.35, 0.8)
+	railing.z_index = 5
+	railing.add_point(Vector2(island_cx - 14, island_y - mh * 0.5 - 6))
+	railing.add_point(Vector2(island_cx - 14, island_y - mh * 0.5))
+	add_child(railing)
+	var railing2 := Line2D.new()
+	railing2.width = 1.0
+	railing2.default_color = Color(0.5, 0.45, 0.35, 0.8)
+	railing2.z_index = 5
+	railing2.add_point(Vector2(island_cx + 14, island_y - mh * 0.5 - 6))
+	railing2.add_point(Vector2(island_cx + 14, island_y - mh * 0.5))
+	add_child(railing2)
+	var railing_top := Line2D.new()
+	railing_top.width = 1.0
+	railing_top.default_color = Color(0.5, 0.45, 0.35, 0.8)
+	railing_top.z_index = 5
+	railing_top.add_point(Vector2(island_cx - 14, island_y - mh * 0.5 - 6))
+	railing_top.add_point(Vector2(island_cx + 14, island_y - mh * 0.5 - 6))
+	add_child(railing_top)
+
+	# Wider triangular roof with apex
 	var roof := Polygon2D.new()
 	roof.polygon = PackedVector2Array([
-		Vector2(island_cx - 18, island_y - 30),
-		Vector2(island_cx, island_y - 48),
-		Vector2(island_cx + 18, island_y - 30),
+		Vector2(mx - 4, island_y - mh),
+		Vector2(island_cx, island_y - mh - 22),
+		Vector2(mx + mw + 4, island_y - mh),
 	])
 	roof.color = Color(0.55, 0.22, 0.12)
 	roof.z_index = 5
 	add_child(roof)
 
+	# Weathervane on roof apex
+	var vane_pole := ColorRect.new()
+	vane_pole.position = Vector2(island_cx, island_y - mh - 22 - 8)
+	vane_pole.size = Vector2(1, 8)
+	vane_pole.color = Color(0.35, 0.30, 0.25)
+	vane_pole.z_index = 6
+	add_child(vane_pole)
+	var vane_arrow := Line2D.new()
+	vane_arrow.width = 1.0
+	vane_arrow.default_color = Color(0.35, 0.30, 0.25)
+	vane_arrow.z_index = 6
+	vane_arrow.add_point(Vector2(island_cx - 4, island_y - mh - 28))
+	vane_arrow.add_point(Vector2(island_cx + 4, island_y - mh - 28))
+	add_child(vane_arrow)
+
 	# Chimney
 	var chimney := ColorRect.new()
-	chimney.position = Vector2(island_cx + 8, island_y - 48)
-	chimney.size = Vector2(5, 12)
+	chimney.position = Vector2(mx + mw - 12, island_y - mh - 16)
+	chimney.size = Vector2(6, 16)
 	chimney.color = Color(0.38, 0.32, 0.28)
 	chimney.z_index = 4
 	add_child(chimney)
 
-	# Small tree next to house
-	var tree_x: float = island_cx - 30
+	# Dock/pier — wooden planks extending left from island shore
+	var dock_y: float = island_y + 2
+	for di in range(6):
+		var plank := ColorRect.new()
+		plank.position = Vector2(mx - 50 + di * 9, dock_y - 2)
+		plank.size = Vector2(8, 3)
+		plank.color = Color(0.45, 0.35, 0.22, 0.85)
+		plank.z_index = 2
+		add_child(plank)
+	# Dock support posts
+	for di in [0, 2, 4]:
+		var post := ColorRect.new()
+		post.position = Vector2(mx - 50 + di * 9 + 3, dock_y)
+		post.size = Vector2(2, 8)
+		post.color = Color(0.35, 0.28, 0.18, 0.7)
+		post.z_index = 1
+		add_child(post)
+
+	# Palm tree (tropical island feel)
+	var tree_x: float = island_cx + 50
 	var tree_trunk := ColorRect.new()
-	tree_trunk.position = Vector2(tree_x, island_y - 28)
-	tree_trunk.size = Vector2(3, 28)
-	tree_trunk.color = Color(0.15, 0.10, 0.05)
+	tree_trunk.position = Vector2(tree_x, island_y - 32)
+	tree_trunk.size = Vector2(3, 32)
+	tree_trunk.color = Color(0.35, 0.25, 0.12)
 	tree_trunk.z_index = 2
 	add_child(tree_trunk)
+	# Palm fronds
+	for fi in range(5):
+		var frond := Line2D.new()
+		frond.width = 2.0
+		var fa: float = -PI * 0.7 + fi * (PI * 0.4 / 4.0)
+		frond.default_color = Color(0.15, 0.35, 0.10)
+		frond.z_index = 3
+		frond.add_point(Vector2(tree_x + 1, island_y - 32))
+		frond.add_point(Vector2(tree_x + 1 + cos(fa) * 14, island_y - 32 + sin(fa) * 10))
+		add_child(frond)
 
-	var tree_canopy := Polygon2D.new()
-	var canopy_pts := PackedVector2Array()
-	for a in range(7):
-		var angle: float = TAU * float(a) / 7.0
-		canopy_pts.append(Vector2(
-			tree_x + 1.5 + cos(angle) * 12.0,
-			island_y - 36 + sin(angle) * 10.0
-		))
-	tree_canopy.polygon = canopy_pts
-	tree_canopy.color = Color(0.08, 0.22, 0.06)
-	tree_canopy.z_index = 3
-	add_child(tree_canopy)
+func _build_island_politicians() -> void:
+	var island_cx: float = 5660.0
+	var island_y: float = 484.0
+	politician_nodes.clear()
 
-func _build_jeff() -> void:
-	var jeff_x: float = 5670.0
-	var jeff_y: float = 484.0  # Ground level on island
+	# Character definitions: name, suit_color, head_color, feature_func
+	# Semi-circle in front of mansion door. Jeff in center.
+	var positions: Array[Vector2] = [
+		Vector2(island_cx - 24, island_y),  # Lobbyton (far left)
+		Vector2(island_cx - 16, island_y),  # Kickback
+		Vector2(island_cx - 8, island_y),   # Consultant
+		Vector2(island_cx, island_y),        # Jeff (center)
+		Vector2(island_cx + 8, island_y),   # Swampsworth
+		Vector2(island_cx + 16, island_y),  # Spinwell
+		Vector2(island_cx + 24, island_y),  # Goodwell (far right)
+	]
 
-	jeff_node = Node2D.new()
-	jeff_node.position = Vector2(jeff_x, jeff_y)
-	jeff_node.z_index = 6
-	add_child(jeff_node)
+	# Build each politician figure
+	for pi in range(7):
+		var pnode := Node2D.new()
+		pnode.position = positions[pi]
+		pnode.z_index = 6
+		add_child(pnode)
+		politician_nodes.append(pnode)
 
-	# Body
-	var body := ColorRect.new()
-	body.position = Vector2(-3, -16)
-	body.size = Vector2(6, 12)
-	body.color = Color(0.15, 0.15, 0.35)  # Dark suit
-	jeff_node.add_child(body)
+		var suit_color: Color
+		var leg_color: Color
+		var head_color := Color(0.85, 0.70, 0.55)
+		var has_hair: bool = true
 
-	# Head
-	var head := Polygon2D.new()
-	var head_pts := PackedVector2Array()
-	for i in range(8):
-		var angle: float = TAU * float(i) / 8.0
-		head_pts.append(Vector2(cos(angle) * 3.5, -20 + sin(angle) * 3.5))
-	head.polygon = head_pts
-	head.color = Color(0.85, 0.70, 0.55)
-	jeff_node.add_child(head)
+		match pi:
+			0:  # Lobbyton — blue blazer, hair bun
+				suit_color = Color(0.18, 0.22, 0.45)
+				leg_color = Color(0.15, 0.18, 0.38)
+			1:  # Kickback — brown suit
+				suit_color = Color(0.40, 0.28, 0.15)
+				leg_color = Color(0.32, 0.22, 0.12)
+			2:  # Consultant — gray trenchcoat
+				suit_color = Color(0.38, 0.38, 0.36)
+				leg_color = Color(0.30, 0.30, 0.28)
+			3:  # Jeff — dark suit
+				suit_color = Color(0.15, 0.15, 0.35)
+				leg_color = Color(0.12, 0.12, 0.30)
+			4:  # Swampsworth — dark suit, bald, red tie
+				suit_color = Color(0.18, 0.18, 0.20)
+				leg_color = Color(0.15, 0.15, 0.18)
+				has_hair = false
+			5:  # Spinwell — tan suit
+				suit_color = Color(0.55, 0.48, 0.35)
+				leg_color = Color(0.45, 0.38, 0.28)
+			6:  # Goodwell — dark suit (corrupted by endgame)
+				suit_color = Color(0.18, 0.18, 0.22)
+				leg_color = Color(0.15, 0.15, 0.18)
 
-	# Legs
-	var left_leg := ColorRect.new()
-	left_leg.position = Vector2(-3, -4)
-	left_leg.size = Vector2(2, 4)
-	left_leg.color = Color(0.12, 0.12, 0.30)
-	jeff_node.add_child(left_leg)
+		# Body
+		var body := ColorRect.new()
+		body.position = Vector2(-3, -16)
+		body.size = Vector2(6, 12)
+		body.color = suit_color
+		pnode.add_child(body)
 
-	var right_leg := ColorRect.new()
-	right_leg.position = Vector2(1, -4)
-	right_leg.size = Vector2(2, 4)
-	right_leg.color = Color(0.12, 0.12, 0.30)
-	jeff_node.add_child(right_leg)
+		# Arms
+		var arm_l := ColorRect.new()
+		arm_l.position = Vector2(-5, -15)
+		arm_l.size = Vector2(2, 8)
+		arm_l.color = suit_color.darkened(0.1)
+		pnode.add_child(arm_l)
+		var arm_r := ColorRect.new()
+		arm_r.position = Vector2(3, -15)
+		arm_r.size = Vector2(2, 8)
+		arm_r.color = suit_color.darkened(0.1)
+		pnode.add_child(arm_r)
 
-	# Interaction Area2D
+		# Head
+		var head := Polygon2D.new()
+		var head_pts := PackedVector2Array()
+		for hi in range(8):
+			var angle: float = TAU * float(hi) / 8.0
+			head_pts.append(Vector2(cos(angle) * 3.5, -20 + sin(angle) * 3.5))
+		head.polygon = head_pts
+		head.color = head_color
+		pnode.add_child(head)
+
+		# Hair (if not bald)
+		if has_hair:
+			var hair := ColorRect.new()
+			hair.position = Vector2(-3.5, -24)
+			hair.size = Vector2(7, 3)
+			hair.color = Color(0.2, 0.15, 0.10)
+			pnode.add_child(hair)
+
+		# Legs
+		var ll := ColorRect.new()
+		ll.position = Vector2(-3, -4)
+		ll.size = Vector2(2, 4)
+		ll.color = leg_color
+		pnode.add_child(ll)
+		var rl := ColorRect.new()
+		rl.position = Vector2(1, -4)
+		rl.size = Vector2(2, 4)
+		rl.color = leg_color
+		pnode.add_child(rl)
+
+		# Distinguishing features
+		match pi:
+			0:  # Lobbyton — hair bun
+				var bun := Polygon2D.new()
+				var bun_pts := PackedVector2Array()
+				for bi in range(6):
+					var ba: float = TAU * float(bi) / 6.0
+					bun_pts.append(Vector2(cos(ba) * 2.5, -24 + sin(ba) * 2.5))
+				bun.polygon = bun_pts
+				bun.color = Color(0.25, 0.18, 0.12)
+				pnode.add_child(bun)
+			1:  # Kickback — gold chain
+				var chain := ColorRect.new()
+				chain.position = Vector2(-2, -14)
+				chain.size = Vector2(4, 1)
+				chain.color = Color(0.85, 0.75, 0.2)
+				pnode.add_child(chain)
+			2:  # Consultant — briefcase in hand
+				var case := ColorRect.new()
+				case.position = Vector2(5, -8)
+				case.size = Vector2(4, 3)
+				case.color = Color(0.30, 0.22, 0.12)
+				pnode.add_child(case)
+			3:  # Jeff — sunglasses
+				var glasses := ColorRect.new()
+				glasses.position = Vector2(-3, -21)
+				glasses.size = Vector2(6, 2)
+				glasses.color = Color(0.05, 0.05, 0.05)
+				pnode.add_child(glasses)
+			4:  # Swampsworth — red tie, wide stance
+				var tie := ColorRect.new()
+				tie.position = Vector2(-1, -15)
+				tie.size = Vector2(2, 8)
+				tie.color = Color(0.7, 0.12, 0.10)
+				pnode.add_child(tie)
+				# Wider stance — move legs apart
+				ll.position.x = -4
+				rl.position.x = 2
+			5:  # Spinwell — clipboard
+				var clip := ColorRect.new()
+				clip.position = Vector2(-7, -12)
+				clip.size = Vector2(3, 5)
+				clip.color = Color(0.82, 0.78, 0.68)
+				pnode.add_child(clip)
+			6:  # Goodwell — (no extra feature, was corrupted)
+				pass
+
+	# Jeff is at index 3 — use as interaction target
+	jeff_node = politician_nodes[3]
+
+	# Interaction Area2D covers the whole group
 	jeff_area = Area2D.new()
 	jeff_area.collision_layer = 0
 	jeff_area.collision_mask = 1
 	var col := CollisionShape2D.new()
 	var shape := RectangleShape2D.new()
-	shape.size = Vector2(40, 40)
+	shape.size = Vector2(70, 40)
 	col.shape = shape
-	col.position = Vector2(0, -10)
+	col.position = Vector2(island_cx, island_y - 10)
 	jeff_area.add_child(col)
-	jeff_node.add_child(jeff_area)
+	add_child(jeff_area)
 	jeff_area.body_entered.connect(func(_body: Node2D) -> void: player_near_jeff = true)
 	jeff_area.body_exited.connect(func(_body: Node2D) -> void: player_near_jeff = false)
+
+func _spawn_helicopter() -> void:
+	var cam_h: Camera2D = get_viewport().get_camera_2d()
+	var cam_h_x: float = cam_h.get_screen_center_position().x if cam_h else 320.0
+	var start_x: float = cam_h_x - 380.0
+	var sky_y: float = 20.0
+
+	helicopter_active = Node2D.new()
+	helicopter_active.position = Vector2(start_x, sky_y)
+	helicopter_active.z_index = 15
+	add_child(helicopter_active)
+
+	# Body
+	var body := Polygon2D.new()
+	body.polygon = PackedVector2Array([
+		Vector2(-12, -3), Vector2(-8, -5), Vector2(8, -5), Vector2(12, -3),
+		Vector2(12, 2), Vector2(8, 4), Vector2(-8, 4), Vector2(-14, 2),
+	])
+	body.color = Color(0.15, 0.18, 0.15, 0.9)
+	helicopter_active.add_child(body)
+
+	# Tail boom
+	var tail := Polygon2D.new()
+	tail.polygon = PackedVector2Array([
+		Vector2(-14, -1), Vector2(-24, -3), Vector2(-24, 0), Vector2(-14, 2),
+	])
+	tail.color = Color(0.18, 0.20, 0.18, 0.85)
+	helicopter_active.add_child(tail)
+
+	# Tail rotor
+	var tail_rotor := ColorRect.new()
+	tail_rotor.size = Vector2(1, 6)
+	tail_rotor.position = Vector2(-24, -5)
+	tail_rotor.color = Color(0.3, 0.32, 0.3, 0.7)
+	helicopter_active.add_child(tail_rotor)
+
+	# Main rotor (rotates)
+	var rotor := Line2D.new()
+	rotor.name = "rotor"
+	rotor.width = 1.0
+	rotor.default_color = Color(0.3, 0.32, 0.3, 0.8)
+	rotor.add_point(Vector2(-16, 0))
+	rotor.add_point(Vector2(16, 0))
+	rotor.position = Vector2(0, -6)
+	helicopter_active.add_child(rotor)
+
+	# GOVT label
+	var govt_lbl := Label.new()
+	govt_lbl.text = "GOVT"
+	govt_lbl.add_theme_font_size_override("font_size", 4)
+	govt_lbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.5, 0.7))
+	govt_lbl.position = Vector2(-8, -4)
+	helicopter_active.add_child(govt_lbl)
+
+	# Skids
+	var skid_l := ColorRect.new()
+	skid_l.size = Vector2(10, 1)
+	skid_l.position = Vector2(-6, 5)
+	skid_l.color = Color(0.25, 0.25, 0.25, 0.8)
+	helicopter_active.add_child(skid_l)
 
 func _trigger_endgame() -> void:
 	endgame_triggered = true
 
-	# BONK! screen shake + flash
-	_screen_shake(8.0, 0.5)
-	SceneManager.flash_white(0.3)
+	# Freeze player
+	var players_eg: Array[Node] = get_tree().get_nodes_in_group("player")
+	if players_eg.size() > 0 and is_instance_valid(players_eg[0]):
+		players_eg[0].set_physics_process(false)
 
-	# BONK text
+	var player_pos: Vector2 = jeff_node.position + Vector2(-20, 0)
+	if players_eg.size() > 0 and is_instance_valid(players_eg[0]):
+		player_pos = players_eg[0].position
+
+	var tw := create_tween()
+
+	# Step 1: Dramatic pause (0.5s)
+	tw.tween_interval(0.5)
+
+	# Step 2: Hammer appears above player
+	var hammer := Node2D.new()
+	hammer.position = Vector2(player_pos.x + 4, player_pos.y - 40)
+	hammer.z_index = 12
+	# Handle (brown)
+	var handle := ColorRect.new()
+	handle.position = Vector2(-1, 0)
+	handle.size = Vector2(2, 18)
+	handle.color = Color(0.55, 0.35, 0.15)
+	hammer.add_child(handle)
+	# Head (gray rectangle)
+	var hammer_head := ColorRect.new()
+	hammer_head.position = Vector2(-5, -4)
+	hammer_head.size = Vector2(10, 6)
+	hammer_head.color = Color(0.55, 0.55, 0.58)
+	hammer.add_child(hammer_head)
+	hammer.modulate.a = 0.0
+	add_child(hammer)
+
+	tw.tween_property(hammer, "modulate:a", 1.0, 0.15)
+
+	# Step 3: Hammer swings down (rotation tween, 0.2s)
+	tw.tween_property(hammer, "rotation", deg_to_rad(120), 0.2).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+
+	# Step 4: MEGA BONK — heavy shake + white flash + giant text
+	tw.tween_callback(func() -> void:
+		_screen_shake(12.0, 0.8)
+		SceneManager.flash_white(0.4)
+		hammer.queue_free()
+	)
+
+	# BONK text with bounce
 	var bonk_label := Label.new()
 	bonk_label.text = "BONK!"
-	bonk_label.add_theme_font_size_override("font_size", 32)
-	bonk_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.1))
-	bonk_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.9))
+	bonk_label.add_theme_font_size_override("font_size", 40)
+	bonk_label.add_theme_color_override("font_color", Color(1.0, 0.15, 0.05))
+	bonk_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.95))
 	bonk_label.add_theme_constant_override("shadow_offset_x", 3)
 	bonk_label.add_theme_constant_override("shadow_offset_y", 3)
 	bonk_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	bonk_label.position = Vector2(jeff_node.position.x - 40, jeff_node.position.y - 60)
-	bonk_label.size = Vector2(80, 40)
-	bonk_label.z_index = 10
+	bonk_label.position = Vector2(jeff_node.position.x - 50, jeff_node.position.y - 70)
+	bonk_label.size = Vector2(100, 50)
+	bonk_label.z_index = 15
+	bonk_label.scale = Vector2(2.0, 2.0)
+	bonk_label.pivot_offset = Vector2(50, 25)
 	add_child(bonk_label)
 
-	# Jeff falls over
-	var tw_jeff := create_tween()
-	tw_jeff.tween_property(jeff_node, "rotation", deg_to_rad(90), 0.3).set_ease(Tween.EASE_OUT)
-	tw_jeff.tween_property(jeff_node, "modulate:a", 0.3, 0.5)
+	# Bounce scale: start big, settle to normal
+	tw.tween_property(bonk_label, "scale", Vector2(1.0, 1.0), 0.3).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BOUNCE)
 
-	# After a brief pause, show credits newspaper
-	var tw_credits := create_tween()
-	tw_credits.tween_interval(2.0)
-	tw_credits.tween_callback(func() -> void:
+	# Step 5: Launch all politicians (except Goodwell) simultaneously
+	tw.tween_callback(func() -> void:
+		# politician_nodes: [Lobbyton(0), Kickback(1), Consultant(2), Jeff(3), Swampsworth(4), Spinwell(5), Goodwell(6)]
+		# Launch directions: relative Vector2 targets over 0.8s
+		var launch_targets: Array[Vector2] = [
+			Vector2(-180, -200),  # Lobbyton: up-left
+			Vector2(-160, -80),   # Kickback: tumbles left
+			Vector2(0, -280),     # Consultant: straight up
+			Vector2(120, -220),   # Jeff: up-right (classic)
+			Vector2(200, -60),    # Swampsworth: hard right
+			Vector2(40, -260),    # Spinwell: spins then up
+		]
+		for li in range(6):
+			var pn: Node2D = politician_nodes[li]
+			var target: Vector2 = pn.position + launch_targets[li]
+			var launch_tw := create_tween()
+			launch_tw.set_parallel(true)
+			launch_tw.tween_property(pn, "position", target, 0.8).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+			# Spin them as they fly
+			var spin_amount: float = randf_range(360.0, 720.0) * (1.0 if li % 2 == 0 else -1.0)
+			launch_tw.tween_property(pn, "rotation_degrees", spin_amount, 0.8)
+			launch_tw.tween_property(pn, "modulate:a", 0.0, 0.8).set_delay(0.4)
+
+		# Spinwell (5) gets extra spin before launch — already handled by larger spin_amount
+
+		# Consultant (2) briefcase falls separately
+		if politician_nodes.size() > 2:
+			var consul: Node2D = politician_nodes[2]
+			# Find the briefcase child (it's a ColorRect at position 5,-8)
+			for ch in consul.get_children():
+				if ch is ColorRect and ch.position.x > 4 and ch.size.x < 6:
+					var brief := ch as ColorRect
+					# Reparent briefcase to world so it falls independently
+					var brief_world_pos: Vector2 = consul.position + brief.position
+					consul.remove_child(brief)
+					brief.position = brief_world_pos
+					brief.z_index = 6
+					add_child(brief)
+					var brief_tw := create_tween()
+					brief_tw.tween_property(brief, "position:y", brief_world_pos.y + 40, 1.2).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+					brief_tw.parallel().tween_property(brief, "rotation_degrees", 180.0, 1.2)
+					brief_tw.parallel().tween_property(brief, "modulate:a", 0.0, 1.2).set_delay(0.6)
+					break
+	)
+
+	# Step 6: Goodwell launches last — slight delay, straight up slowly (dramatic)
+	tw.tween_interval(0.4)
+	tw.tween_callback(func() -> void:
+		if politician_nodes.size() > 6:
+			var goodwell: Node2D = politician_nodes[6]
+			var gw_tw := create_tween()
+			gw_tw.set_parallel(true)
+			gw_tw.tween_property(goodwell, "position:y", goodwell.position.y - 300, 1.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+			gw_tw.tween_property(goodwell, "rotation_degrees", 180.0, 1.5)
+			gw_tw.tween_property(goodwell, "modulate:a", 0.0, 1.5).set_delay(0.8)
+	)
+
+	# Step 7: Comedic pause (1.5s) — empty island
+	tw.tween_interval(1.5)
+	tw.tween_callback(func() -> void:
 		bonk_label.queue_free()
+	)
+
+	# Step 8: Pause then show credits
+	tw.tween_interval(0.5)
+	tw.tween_callback(func() -> void:
 		_show_credits_newspaper()
 	)
 
@@ -3477,8 +3874,8 @@ func _show_credits_newspaper() -> void:
 	credits_layer.add_child(overlay)
 
 	var panel := PanelContainer.new()
-	var panel_w: float = 420.0
-	var panel_h: float = 300.0
+	var panel_w: float = 440.0
+	var panel_h: float = 340.0
 	panel.position = Vector2((vp_size.x - panel_w) * 0.5, (vp_size.y - panel_h) * 0.5)
 	panel.size = Vector2(panel_w, panel_h)
 	panel.modulate = Color(1, 1, 1, 0)
@@ -3535,7 +3932,7 @@ func _show_credits_newspaper() -> void:
 	vbox.add_child(headline)
 
 	var subhead := Label.new()
-	subhead.text = "Drains entire ocean, walks to island, delivers justice"
+	subhead.text = "Drains entire ocean, walks to island, bonks everyone"
 	subhead.add_theme_font_size_override("font_size", 9)
 	subhead.add_theme_color_override("font_color", Color(0.35, 0.32, 0.28))
 	subhead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -3550,8 +3947,8 @@ func _show_credits_newspaper() -> void:
 	vbox.add_child(sep2)
 
 	var body := Label.new()
-	body.text = "In what experts are calling \"the most productive use of government funds in history,\" the lone employee of the Swamp Draining Initiative has completed his mission by draining the Atlantic Ocean, walking to a private island, and delivering a decisive bonk to its sole occupant.\n\nThe $500 field operations budget has now yielded results worth billions. All 47 implicated politicians remain at large. The Consultant has submitted a final invoice for $500,000.\n\nThe swamp drainer has declined all interviews, stating only: \"I'm going home.\""
-	body.add_theme_font_size_override("font_size", 8)
+	body.text = "In a stunning conclusion to the Swamp Draining Initiative, the lone employee completed his mission by walking to a private island and delivering a single, decisive bonk to all seven occupants simultaneously.\n\nWHERE ARE THEY NOW:\n\nSENATOR SWAMPSWORTH — Arrested in Bermuda. Claims he was \"just visiting.\" Awaiting trial in a building with no air conditioning.\n\nCONGRESSWOMAN LOBBYTON — Turned state's witness. Published memoir \"I Never Actually Cared\" which debuted at #1.\n\nTHE CONSULTANT — Submitted one final invoice: $500,000 for \"closure consulting.\" It was three pages of \"congratulations.\"\n\nMAYOR KICKBACK — Recalled by voters. Now manages a car wash. Skims from the tip jar.\n\nPRESS SECRETARY SPINWELL — Hired by a pharmaceutical company. Says the transition was \"seamless.\"\n\nJEFF — No comment.\n\nCONGRESSMAN GOODWELL — Promoted to Senate Majority Leader. Says he \"learned a lot\" and \"will do things differently.\""
+	body.add_theme_font_size_override("font_size", 7)
 	body.add_theme_color_override("font_color", Color(0.18, 0.15, 0.12))
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -3565,7 +3962,7 @@ func _show_credits_newspaper() -> void:
 	vbox.add_child(credits)
 
 	var prompt := Label.new()
-	prompt.text = "[Press any key to return to title]"
+	prompt.text = "[Press any key to continue]"
 	prompt.add_theme_font_size_override("font_size", 10)
 	prompt.add_theme_color_override("font_color", Color(0.9, 0.75, 0.4))
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -3588,7 +3985,218 @@ func _show_credits_newspaper() -> void:
 func _wait_for_credits_dismiss(overlay: ColorRect, panel: PanelContainer, layer: CanvasLayer, prompt: Label) -> void:
 	var elapsed_ref: Array[float] = [0.0]
 	var dismissed: Array[bool] = [false]
-	# Use a timer to poll for input and animate prompt
+	var check_fn: Callable
+	check_fn = func(delta_val: float) -> void:
+		if dismissed[0]:
+			return
+		elapsed_ref[0] += delta_val
+		prompt.modulate.a = 0.5 + 0.5 * sin(elapsed_ref[0] * 2.0)
+		if Input.is_action_just_pressed("scoop") or Input.is_action_just_pressed("ui_cancel") or Input.is_action_just_pressed("ui_accept"):
+			dismissed[0] = true
+			var tw_out := create_tween()
+			tw_out.set_parallel(true)
+			tw_out.tween_property(overlay, "color:a", 0.0, 0.5)
+			tw_out.tween_property(panel, "modulate:a", 0.0, 0.5)
+			tw_out.set_parallel(false)
+			tw_out.tween_interval(0.3)
+			tw_out.tween_callback(func() -> void:
+				layer.queue_free()
+				_show_refill_cinematic()
+			)
+	get_tree().process_frame.connect(func() -> void:
+		if is_instance_valid(layer):
+			check_fn.call(get_process_delta_time())
+	)
+
+func _show_refill_cinematic() -> void:
+	# Post-credits: camera pans across landscape while pools refill, then final newspaper
+	var cam: Camera2D = get_viewport().get_camera_2d()
+	if not cam:
+		_show_final_newspaper()
+		return
+
+	# Fade to black
+	var fade_layer := CanvasLayer.new()
+	fade_layer.layer = 94
+	add_child(fade_layer)
+	var fade_rect := ColorRect.new()
+	fade_rect.size = get_viewport_rect().size
+	fade_rect.color = Color(0, 0, 0, 0)
+	fade_rect.mouse_filter = Control.MOUSE_FILTER_STOP
+	fade_layer.add_child(fade_rect)
+
+	var tw := create_tween()
+	tw.tween_property(fade_rect, "color:a", 1.0, 0.5)
+	tw.tween_interval(0.5)
+
+	# Detach camera from player and start panning
+	tw.tween_callback(func() -> void:
+		# Position camera at leftmost pool
+		cam.position = Vector2(200, 200)
+		# Disable camera following player
+		var players_rc: Array[Node] = get_tree().get_nodes_in_group("player")
+		if players_rc.size() > 0 and is_instance_valid(players_rc[0]):
+			players_rc[0].visible = false
+	)
+
+	# Fade back in
+	tw.tween_property(fade_rect, "color:a", 0.0, 0.8)
+
+	# Pan camera right across the landscape (x=200 to x=2000 over 4 seconds)
+	tw.tween_property(cam, "position:x", 2000.0, 4.0).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+
+	# During the pan, refill water polygons by emitting signals
+	tw.parallel().tween_callback(func() -> void:
+		_animate_pool_refill()
+	).set_delay(0.5)
+
+	# Pause at end
+	tw.tween_interval(1.0)
+
+	# Fade to black again
+	tw.tween_property(fade_rect, "color:a", 1.0, 0.5)
+	tw.tween_interval(0.3)
+
+	# Show final newspaper
+	tw.tween_callback(func() -> void:
+		fade_layer.queue_free()
+		_show_final_newspaper()
+	)
+
+func _animate_pool_refill() -> void:
+	# Gradually raise water levels across all pools over ~3 seconds
+	# We do this by tweening water polygon top vertices downward (raising water level visually)
+	for i in range(SWAMP_COUNT):
+		if i >= water_polygons.size():
+			break
+		var water_poly: Polygon2D = water_polygons[i]
+		if not is_instance_valid(water_poly):
+			continue
+		# Make water visible and animate alpha up
+		water_poly.visible = true
+		var refill_tw := create_tween()
+		var delay_val: float = float(i) * 0.25  # Stagger each pool
+		refill_tw.tween_property(water_poly, "modulate:a", 1.0, 0.8).set_delay(delay_val)
+
+func _show_final_newspaper() -> void:
+	# Goodwell "Refill the Swamp" newspaper
+	var final_layer := CanvasLayer.new()
+	final_layer.layer = 95
+	add_child(final_layer)
+
+	var vp_size: Vector2 = get_viewport_rect().size
+
+	var overlay := ColorRect.new()
+	overlay.size = vp_size
+	overlay.color = Color(0, 0, 0, 0.0)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	final_layer.add_child(overlay)
+
+	var panel := PanelContainer.new()
+	var panel_w: float = 420.0
+	var panel_h: float = 300.0
+	panel.position = Vector2((vp_size.x - panel_w) * 0.5, (vp_size.y - panel_h) * 0.5)
+	panel.size = Vector2(panel_w, panel_h)
+	panel.modulate = Color(1, 1, 1, 0)
+
+	var paper_style := StyleBoxFlat.new()
+	paper_style.bg_color = Color(0.94, 0.90, 0.82)
+	paper_style.border_color = Color(0.3, 0.25, 0.2)
+	paper_style.border_width_top = 2
+	paper_style.border_width_bottom = 2
+	paper_style.border_width_left = 2
+	paper_style.border_width_right = 2
+	paper_style.corner_radius_top_left = 2
+	paper_style.corner_radius_top_right = 2
+	paper_style.corner_radius_bottom_left = 2
+	paper_style.corner_radius_bottom_right = 2
+	paper_style.content_margin_left = 16
+	paper_style.content_margin_right = 16
+	paper_style.content_margin_top = 12
+	paper_style.content_margin_bottom = 12
+	panel.add_theme_stylebox_override("panel", paper_style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	panel.add_child(vbox)
+
+	var masthead := Label.new()
+	masthead.text = "THE SWAMP GAZETTE"
+	masthead.add_theme_font_size_override("font_size", 16)
+	masthead.add_theme_color_override("font_color", Color(0.15, 0.12, 0.10))
+	masthead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(masthead)
+
+	var date_lbl := Label.new()
+	date_lbl.text = "SPECIAL EVENING EDITION"
+	date_lbl.add_theme_font_size_override("font_size", 8)
+	date_lbl.add_theme_color_override("font_color", Color(0.4, 0.38, 0.35))
+	date_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(date_lbl)
+
+	var sep1 := HSeparator.new()
+	var sep_style := StyleBoxFlat.new()
+	sep_style.bg_color = Color(0.3, 0.25, 0.2, 0.5)
+	sep_style.content_margin_top = 2
+	sep_style.content_margin_bottom = 2
+	sep1.add_theme_stylebox_override("separator", sep_style)
+	vbox.add_child(sep1)
+
+	var headline := Label.new()
+	headline.text = "SENATE MAJORITY LEADER GOODWELL ANNOUNCES \"REFILL THE SWAMP\" INITIATIVE"
+	headline.add_theme_font_size_override("font_size", 12)
+	headline.add_theme_color_override("font_color", Color(0.12, 0.10, 0.08))
+	headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	headline.autowrap_mode = TextServer.AUTOWRAP_WORD
+	vbox.add_child(headline)
+
+	var subhead := Label.new()
+	subhead.text = "\"Our precious wetlands must be restored,\" says former reformer"
+	subhead.add_theme_font_size_override("font_size", 9)
+	subhead.add_theme_color_override("font_color", Color(0.35, 0.32, 0.28))
+	subhead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subhead.autowrap_mode = TextServer.AUTOWRAP_WORD
+	vbox.add_child(subhead)
+
+	var sep2 := HSeparator.new()
+	var sep_style2 := StyleBoxFlat.new()
+	sep_style2.bg_color = Color(0.3, 0.25, 0.2, 0.5)
+	sep_style2.content_margin_top = 2
+	sep_style2.content_margin_bottom = 2
+	sep2.add_theme_stylebox_override("separator", sep_style2)
+	vbox.add_child(sep2)
+
+	var body := Label.new()
+	body.text = "In his first act as Senate Majority Leader, Congressman Goodwell signed an executive order to refill all previously drained bodies of water. \"The swamp is a national treasure,\" he said, standing at the same podium where he once called it \"a cesspool of corruption.\"\n\nThe Refill Initiative has a budget of $400M. $399.5M is allocated to \"administrative oversight.\" $500 is earmarked for \"a nice thank-you card for the drainer.\"\n\nThe drainer could not be reached for comment. He was last seen buying a bigger bucket."
+	body.add_theme_font_size_override("font_size", 8)
+	body.add_theme_color_override("font_color", Color(0.18, 0.15, 0.12))
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(body)
+
+	var prompt := Label.new()
+	prompt.text = "[Press any key to return to title]"
+	prompt.add_theme_font_size_override("font_size", 10)
+	prompt.add_theme_color_override("font_color", Color(0.9, 0.75, 0.4))
+	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(prompt)
+
+	overlay.add_child(panel)
+
+	# Fade in
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(overlay, "color:a", 0.85, 0.8)
+	tw.tween_property(panel, "modulate:a", 1.0, 0.8)
+	tw.set_parallel(false)
+	tw.tween_interval(0.5)
+	tw.tween_callback(func() -> void:
+		_wait_for_final_dismiss(overlay, panel, final_layer, prompt)
+	)
+
+func _wait_for_final_dismiss(overlay: ColorRect, panel: PanelContainer, layer: CanvasLayer, prompt: Label) -> void:
+	var elapsed_ref: Array[float] = [0.0]
+	var dismissed: Array[bool] = [false]
 	var check_fn: Callable
 	check_fn = func(delta_val: float) -> void:
 		if dismissed[0]:
@@ -3607,7 +4215,6 @@ func _wait_for_credits_dismiss(overlay: ColorRect, panel: PanelContainer, layer:
 				layer.queue_free()
 				SceneManager.transition_to_scene("res://scenes/title_screen.tscn")
 			)
-	# Connect to tree process
 	get_tree().process_frame.connect(func() -> void:
 		if is_instance_valid(layer):
 			check_fn.call(get_process_delta_time())
@@ -4077,6 +4684,20 @@ func _on_swamp_completed(swamp_index: int, reward: float) -> void:
 	_screen_shake(5.0, 0.3)
 	# Phase 7c: Milestone flash — golden vignette pulse + brief scale bounce
 	_milestone_flash()
+	# Show wanted poster after pool 4
+	if swamp_index == 4 and wanted_poster:
+		wanted_poster.visible = true
+	# Government sabotage — pools 3, 5, 7 trigger water add-back to next pool
+	if swamp_index in [3, 5, 7]:
+		var next_pool: int = swamp_index + 1
+		if next_pool < GameManager.swamp_definitions.size() and not GameManager.is_swamp_completed(next_pool):
+			var next_total: float = GameManager.swamp_definitions[next_pool]["total_gallons"]
+			var sabotage_amount: float = next_total * 0.07  # 7% add-back
+			GameManager.swamp_states[next_pool]["gallons_drained"] = maxf(
+				GameManager.swamp_states[next_pool]["gallons_drained"] - sabotage_amount, 0.0)
+			GameManager.water_level_changed.emit(next_pool)
+			# Visual feedback — screen shake + splash
+			_screen_shake(2.0, 0.2)
 	# Show reward text
 	if reward > 0.0:
 		var geo: Dictionary = _get_swamp_geometry(swamp_index)
@@ -4305,6 +4926,65 @@ func _build_shop() -> void:
 
 	shop_area.body_entered.connect(_on_shop_body_entered)
 	shop_area.body_exited.connect(_on_shop_body_exited)
+
+	# Wanted poster — hidden until pool 4 drained
+	wanted_poster = Node2D.new()
+	wanted_poster.position = Vector2(sx + 42, shop_y - 38)
+	wanted_poster.rotation_degrees = 4.0
+	wanted_poster.z_index = 5
+	wanted_poster.visible = GameManager.is_swamp_completed(4)
+	add_child(wanted_poster)
+
+	var poster_bg := ColorRect.new()
+	poster_bg.size = Vector2(20, 28)
+	poster_bg.position = Vector2(-10, -14)
+	poster_bg.color = Color(0.90, 0.85, 0.72)
+	wanted_poster.add_child(poster_bg)
+
+	var wanted_header := Label.new()
+	wanted_header.text = "WANTED"
+	wanted_header.add_theme_font_size_override("font_size", 5)
+	wanted_header.add_theme_color_override("font_color", Color(0.7, 0.15, 0.1))
+	wanted_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wanted_header.position = Vector2(-10, -13)
+	wanted_header.size = Vector2(20, 8)
+	wanted_poster.add_child(wanted_header)
+
+	# Stick figure sketch
+	var head_c := ColorRect.new()
+	head_c.size = Vector2(4, 4)
+	head_c.position = Vector2(-2, -4)
+	head_c.color = Color(0.2, 0.15, 0.1)
+	wanted_poster.add_child(head_c)
+	var body_l := ColorRect.new()
+	body_l.size = Vector2(1, 6)
+	body_l.position = Vector2(0, 0)
+	body_l.color = Color(0.2, 0.15, 0.1)
+	wanted_poster.add_child(body_l)
+	var arm_l := ColorRect.new()
+	arm_l.size = Vector2(6, 1)
+	arm_l.position = Vector2(-3, 2)
+	arm_l.color = Color(0.2, 0.15, 0.1)
+	wanted_poster.add_child(arm_l)
+	var leg_l := ColorRect.new()
+	leg_l.size = Vector2(1, 4)
+	leg_l.position = Vector2(-2, 6)
+	leg_l.color = Color(0.2, 0.15, 0.1)
+	wanted_poster.add_child(leg_l)
+	var leg_r := ColorRect.new()
+	leg_r.size = Vector2(1, 4)
+	leg_r.position = Vector2(2, 6)
+	leg_r.color = Color(0.2, 0.15, 0.1)
+	wanted_poster.add_child(leg_r)
+
+	var reward_lbl := Label.new()
+	reward_lbl.text = "$500"
+	reward_lbl.add_theme_font_size_override("font_size", 4)
+	reward_lbl.add_theme_color_override("font_color", Color(0.2, 0.15, 0.1))
+	reward_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	reward_lbl.position = Vector2(-10, 9)
+	reward_lbl.size = Vector2(20, 6)
+	wanted_poster.add_child(reward_lbl)
 
 func _on_shop_body_entered(body: Node2D) -> void:
 	if body is CharacterBody2D and body.has_method("set_near_shop"):
@@ -4962,6 +5642,31 @@ func _process(delta: float) -> void:
 	if player_near_jeff and not endgame_triggered and Input.is_action_just_pressed("scoop"):
 		if GameManager.is_swamp_completed(9):
 			_trigger_endgame()
+
+	# Consultant reports — check scoop action
+	if Input.is_action_just_pressed("scoop"):
+		for rd in report_areas:
+			if rd["near"]:
+				SceneManager.show_popup(rd["text"])
+				break
+
+	# Helicopter flyover — after pool 4 drained
+	if GameManager.is_swamp_completed(4):
+		helicopter_timer += delta
+		if helicopter_timer >= 60.0 and helicopter_active == null:
+			helicopter_timer = 0.0
+			_spawn_helicopter()
+		if helicopter_active != null:
+			helicopter_active.position.x += 160.0 * delta
+			# Rotate rotor
+			var rotor_line: Node = helicopter_active.get_node_or_null("rotor")
+			if rotor_line:
+				rotor_line.rotation += 25.0 * delta
+			var cam_heli: Camera2D = get_viewport().get_camera_2d()
+			var cam_heli_x: float = cam_heli.get_screen_center_position().x if cam_heli else 320.0
+			if helicopter_active.position.x > cam_heli_x + 400:
+				helicopter_active.queue_free()
+				helicopter_active = null
 
 	# Continuous sell while player stands in shop area
 	if player_in_shop_area and is_instance_valid(shop_player_ref):
@@ -5946,6 +6651,11 @@ func _build_billboards() -> void:
 		"SWAMPSWORTH &\nLOBBYTON AGREE:\nSTOP HERE",
 		"POINT OF NO RETURN\nALL POLITICIANS HAVE\nFLED THE COUNTRY",
 	]
+	# Partisan tint colors — odd ridges red (Swampsworth), even ridges blue (Lobbyton)
+	var red_tint := Color(0.90, 0.82, 0.78)
+	var blue_tint := Color(0.78, 0.82, 0.90)
+	var rng_bb := RandomNumberGenerator.new()
+	rng_bb.seed = 54321
 
 	for ridge_i in range(SWAMP_COUNT - 1):
 		var ridge_start: int = SWAMP_RANGES[ridge_i][1]
@@ -5957,58 +6667,167 @@ func _build_billboards() -> void:
 		if ground_y < 0:
 			continue
 
-		# Post (vertical line)
-		var post_h: float = 32.0
+		var sign_rotation: float = rng_bb.randf_range(-3.0, 3.0)
+		var sign_tint: Color = red_tint if (ridge_i % 2 == 0) else blue_tint
+
+		# Post (wider, 3px)
+		var post_h: float = 38.0
 		var post := Polygon2D.new()
 		post.polygon = PackedVector2Array([
-			Vector2(ridge_mid_x - 1, ground_y),
-			Vector2(ridge_mid_x + 1, ground_y),
-			Vector2(ridge_mid_x + 1, ground_y - post_h),
-			Vector2(ridge_mid_x - 1, ground_y - post_h),
+			Vector2(ridge_mid_x - 1.5, ground_y),
+			Vector2(ridge_mid_x + 1.5, ground_y),
+			Vector2(ridge_mid_x + 1.5, ground_y - post_h),
+			Vector2(ridge_mid_x - 1.5, ground_y - post_h),
 		])
 		post.color = Color(0.35, 0.25, 0.18)
 		post.z_index = 3
 		add_child(post)
 
-		# Sign panel
-		var sign_w: float = 50.0
-		var sign_h: float = 28.0
+		# Crossbar where post meets sign
+		var crossbar := Polygon2D.new()
+		var cb_y: float = ground_y - post_h
+		crossbar.polygon = PackedVector2Array([
+			Vector2(ridge_mid_x - 6, cb_y - 0.5),
+			Vector2(ridge_mid_x + 6, cb_y - 0.5),
+			Vector2(ridge_mid_x + 6, cb_y + 1.0),
+			Vector2(ridge_mid_x - 6, cb_y + 1.0),
+		])
+		crossbar.color = Color(0.35, 0.25, 0.18)
+		crossbar.z_index = 3
+		add_child(crossbar)
+
+		# Sign panel (bigger: 70x40)
+		var sign_w: float = 70.0
+		var sign_h: float = 40.0
 		var sign_x: float = ridge_mid_x - sign_w * 0.5
 		var sign_y: float = ground_y - post_h - sign_h
+
+		var sign_container := Node2D.new()
+		sign_container.rotation_degrees = sign_rotation
+		sign_container.position = Vector2(ridge_mid_x, sign_y + sign_h * 0.5)
+		sign_container.z_index = 3
+		add_child(sign_container)
+
 		var sign_bg := Polygon2D.new()
 		sign_bg.polygon = PackedVector2Array([
-			Vector2(sign_x, sign_y),
-			Vector2(sign_x + sign_w, sign_y),
-			Vector2(sign_x + sign_w, sign_y + sign_h),
-			Vector2(sign_x, sign_y + sign_h),
+			Vector2(-sign_w * 0.5, -sign_h * 0.5),
+			Vector2(sign_w * 0.5, -sign_h * 0.5),
+			Vector2(sign_w * 0.5, sign_h * 0.5),
+			Vector2(-sign_w * 0.5, sign_h * 0.5),
 		])
-		sign_bg.color = Color(0.85, 0.80, 0.65)
-		sign_bg.z_index = 3
-		add_child(sign_bg)
+		sign_bg.color = sign_tint
+		sign_container.add_child(sign_bg)
 
 		# Sign border
 		var border := Line2D.new()
 		border.width = 1.0
 		border.default_color = Color(0.3, 0.25, 0.18, 0.8)
-		border.z_index = 4
-		border.add_point(Vector2(sign_x, sign_y))
-		border.add_point(Vector2(sign_x + sign_w, sign_y))
-		border.add_point(Vector2(sign_x + sign_w, sign_y + sign_h))
-		border.add_point(Vector2(sign_x, sign_y + sign_h))
-		border.add_point(Vector2(sign_x, sign_y))
-		add_child(border)
+		border.z_index = 1
+		border.add_point(Vector2(-sign_w * 0.5, -sign_h * 0.5))
+		border.add_point(Vector2(sign_w * 0.5, -sign_h * 0.5))
+		border.add_point(Vector2(sign_w * 0.5, sign_h * 0.5))
+		border.add_point(Vector2(-sign_w * 0.5, sign_h * 0.5))
+		border.add_point(Vector2(-sign_w * 0.5, -sign_h * 0.5))
+		sign_container.add_child(border)
 
 		# Text label
 		var lbl := Label.new()
 		lbl.text = billboard_texts[ridge_i]
-		lbl.add_theme_font_size_override("font_size", 5)
+		lbl.add_theme_font_size_override("font_size", 7)
 		lbl.add_theme_color_override("font_color", Color(0.15, 0.12, 0.10))
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lbl.position = Vector2(sign_x + 2, sign_y + 2)
-		lbl.size = Vector2(sign_w - 4, sign_h - 4)
+		lbl.position = Vector2(-sign_w * 0.5 + 3, -sign_h * 0.5 + 2)
+		lbl.size = Vector2(sign_w - 6, sign_h - 4)
 		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-		lbl.z_index = 4
-		add_child(lbl)
+		lbl.z_index = 1
+		sign_container.add_child(lbl)
+
+func _build_consultant_reports() -> void:
+	var report_texts: Array[String] = [
+		"THE CONSULTANT — QUARTERLY REPORT #1\n\nAfter extensive analysis of the swamp drainage situation, I recommend continued monitoring of all variables. A follow-up study is warranted. Budget request: $500,000.\n\n[14 pages of appendices not included]",
+		"THE CONSULTANT — QUARTERLY REPORT #7\n\nSituation unchanged. Recommend patience. See previous reports for details.\n\nBudget request: $500,000.\n\n[No appendices]",
+		"THE CONSULTANT — QUARTERLY REPORT #14\n\nStill wet. Will advise.\n\n$500,000 please.",
+		"THE CONSULTANT — QUARTERLY REPORT #21\n\nidk maybe wait?\n\n-TC\n\nP.S. Invoice attached.",
+	]
+	# Place on odd ridges: 1, 3, 5, 7 (0-indexed from SWAMP_RANGES)
+	var ridge_indices: Array[int] = [0, 2, 4, 6]
+	for ri in range(ridge_indices.size()):
+		var ridge_i: int = ridge_indices[ri]
+		var ridge_start: int = SWAMP_RANGES[ridge_i][1]
+		var ridge_end: int = SWAMP_RANGES[ridge_i + 1][0]
+		if ridge_start >= terrain_points.size() or ridge_end >= terrain_points.size():
+			continue
+		# Offset from billboard center so they don't overlap
+		var ridge_mid_x: float = (terrain_points[ridge_start].x + terrain_points[ridge_end].x) * 0.5 + 30.0
+		var ground_y: float = _get_terrain_y_at(ridge_mid_x)
+		if ground_y < 0:
+			continue
+
+		var root := Node2D.new()
+		root.position = Vector2(ridge_mid_x, ground_y)
+		root.z_index = 3
+		add_child(root)
+
+		# Crumpled paper visual — tan irregular polygon
+		var paper := Polygon2D.new()
+		paper.polygon = PackedVector2Array([
+			Vector2(-5, -3), Vector2(-3, -6), Vector2(2, -5),
+			Vector2(5, -4), Vector2(6, -1), Vector2(4, 2),
+			Vector2(1, 4), Vector2(-4, 3), Vector2(-6, 0),
+		])
+		paper.color = Color(0.82, 0.76, 0.62, 0.85)
+		root.add_child(paper)
+
+		# Crinkle lines
+		var line1 := Line2D.new()
+		line1.width = 0.5
+		line1.default_color = Color(0.65, 0.58, 0.45, 0.4)
+		line1.add_point(Vector2(-3, -2))
+		line1.add_point(Vector2(3, 1))
+		root.add_child(line1)
+
+		var line2 := Line2D.new()
+		line2.width = 0.5
+		line2.default_color = Color(0.65, 0.58, 0.45, 0.3)
+		line2.add_point(Vector2(-1, -4))
+		line2.add_point(Vector2(2, 3))
+		root.add_child(line2)
+
+		# Interaction area
+		var area := Area2D.new()
+		area.collision_layer = 0
+		area.collision_mask = 1
+		var coll := CollisionShape2D.new()
+		var shape := RectangleShape2D.new()
+		shape.size = Vector2(20, 20)
+		coll.shape = shape
+		coll.position = Vector2(0, -2)
+		area.add_child(coll)
+		root.add_child(area)
+
+		var hint := Label.new()
+		hint.text = "[SPACE]"
+		hint.add_theme_font_size_override("font_size", 10)
+		hint.add_theme_color_override("font_color", Color(0.8, 0.75, 0.6, 0.8))
+		hint.position = Vector2(-16, -20)
+		hint.z_index = 8
+		hint.visible = false
+		root.add_child(hint)
+
+		var report_data: Dictionary = {"area": area, "text": report_texts[ri], "near": false, "hint": hint}
+		report_areas.append(report_data)
+
+		var r_idx: int = ri
+		area.body_entered.connect(func(body: Node2D) -> void:
+			if body is CharacterBody2D:
+				report_areas[r_idx]["near"] = true
+				report_areas[r_idx]["hint"].visible = true
+		)
+		area.body_exited.connect(func(body: Node2D) -> void:
+			if body is CharacterBody2D:
+				report_areas[r_idx]["near"] = false
+				report_areas[r_idx]["hint"].visible = false
+		)
 
 func _build_cave_entrances() -> void:
 	cave_entrances.clear()

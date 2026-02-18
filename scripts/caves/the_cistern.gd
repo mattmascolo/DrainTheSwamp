@@ -97,7 +97,7 @@ func _setup_loot_and_lore() -> void:
 	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
 	lore1.lore_id = "cistern_builders"
 	lore1.cave_id = cave_id
-	lore1.lore_text = "OFFSHORE ACCOUNT RECORDS — CAYMAN ISLANDS BRANCH\n\nAccount: SW4MP-FUND-2024\nDeposits:\n- $2.4M from \"Anonymous Concerned Citizens PAC\"\n- $800K from \"Americans for Swamp Preservation\"\n- $3.1M from [NAME REDACTED BY COURT ORDER]\n\nWithdrawals:\n- $6.3M to \"Senator Swampsworth Personal Savings\"\n\nNote from bank: \"Please stop labeling transfers as 'swamp stuff'\""
+	lore1.lore_text = "OFFSHORE ACCOUNT RECORDS — CAYMAN ISLANDS BRANCH\n\nAccount: SW4MP-FUND-2024\nDeposits:\n- $2.4M from \"Anonymous Concerned Citizens PAC\"\n- $800K from \"Americans for Swamp Preservation\"\n- $3.1M from [NAME REDACTED BY COURT ORDER]\n\nWithdrawals:\n- $6.3M to \"Senator Swampsworth Personal Savings\"\n\nNote from bank: \"Please stop labeling transfers as 'swamp stuff'\"\n\nRecent addition: Account GW-REFORM-2024, \"Goodwell Clean Government Fund\" — Deposits: $400K from \"concerned citizens.\" Withdrawals: $400K to personal investment account."
 	lore1.position = Vector2(800, _get_cave_terrain_y_at(800))
 	add_child(lore1)
 
