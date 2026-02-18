@@ -116,10 +116,12 @@ func _on_button_pressed(which: String) -> void:
 		"<":
 			if not _left_pressed:
 				_left_pressed = true
+				_cancel_scoop_this_frame = true
 				Input.action_press("move_left")
 		">":
 			if not _right_pressed:
 				_right_pressed = true
+				_cancel_scoop_this_frame = true
 				Input.action_press("move_right")
 		"SCOOP":
 			if not _scoop_pressed:
@@ -141,27 +143,13 @@ func _on_button_released(which: String) -> void:
 				_scoop_pressed = false
 				Input.action_release("scoop")
 
-func _input(event: InputEvent) -> void:
-	if not enabled or not _container.visible:
-		return
-	# When a touch lands on an arrow button, the emulated mouse click also
-	# triggers scoop. Flag it so _physics_process can cancel before player sees it.
-	if event is InputEventScreenTouch and event.pressed:
-		if _point_on_arrow(event.position):
-			_cancel_scoop_this_frame = true
-
 func _physics_process(_delta: float) -> void:
 	# Runs before player (priority -1 vs 0) to cancel spurious scoops
+	# caused by touch-to-mouse emulation when pressing arrow buttons
 	if _cancel_scoop_this_frame:
 		_cancel_scoop_this_frame = false
-		# Only cancel if scoop wasn't intentionally pressed via SCOOP button
 		if not _scoop_pressed:
 			Input.action_release("scoop")
-
-func _point_on_arrow(pos: Vector2) -> bool:
-	var left_rect := Rect2(left_btn.position, LEFT_SIZE)
-	var right_rect := Rect2(right_btn.position, RIGHT_SIZE)
-	return left_rect.has_point(pos) or right_rect.has_point(pos)
 
 func _process(_delta: float) -> void:
 	if not enabled:
