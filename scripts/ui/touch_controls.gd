@@ -4,7 +4,6 @@ var enabled: bool = false
 var _left_pressed: bool = false
 var _right_pressed: bool = false
 var _scoop_pressed: bool = false
-var _scoop_mouse_events: Array = []
 
 var left_btn: TouchScreenButton
 var right_btn: TouchScreenButton
@@ -111,10 +110,15 @@ func _on_button_pressed(which: String) -> void:
 			if not _left_pressed:
 				_left_pressed = true
 				Input.action_press("move_left")
+				# The emulated mouse click from this touch already pressed scoop.
+				# Undo it immediately — this runs during input processing, before
+				# any _physics_process sees it.
+				Input.action_release("scoop")
 		">":
 			if not _right_pressed:
 				_right_pressed = true
 				Input.action_press("move_right")
+				Input.action_release("scoop")
 		"SCOOP":
 			if not _scoop_pressed:
 				_scoop_pressed = true
@@ -173,27 +177,8 @@ func set_enabled(value: bool) -> void:
 func _activate() -> void:
 	enabled = true
 	_container.visible = true
-	# Remove mouse click from scoop action so touch-to-mouse emulation
-	# can't trigger scoop. The SCOOP button uses Input.action_press()
-	# which bypasses InputMap and still works. GUI buttons (shop panels,
-	# menus, popups) use Godot's GUI system and are NOT affected.
-	_remove_mouse_from_scoop()
 
 func _deactivate() -> void:
 	enabled = false
 	_container.visible = false
 	_release_all()
-	_restore_mouse_to_scoop()
-
-func _remove_mouse_from_scoop() -> void:
-	_scoop_mouse_events.clear()
-	for event in InputMap.action_get_events("scoop"):
-		if event is InputEventMouseButton:
-			_scoop_mouse_events.append(event)
-	for event in _scoop_mouse_events:
-		InputMap.action_erase_event("scoop", event)
-
-func _restore_mouse_to_scoop() -> void:
-	for event in _scoop_mouse_events:
-		InputMap.action_add_event("scoop", event)
-	_scoop_mouse_events.clear()
