@@ -24,8 +24,10 @@ jobs:
 
       - name: Setup export templates
         run: |
+          mkdir -p /github/home/.local/share/godot/export_templates/4.4.stable
+          cp /root/.local/share/godot/templates/4.4.stable/* /github/home/.local/share/godot/export_templates/4.4.stable/ || true
           mkdir -p /root/.local/share/godot/export_templates/4.4.stable
-          mv /root/.local/share/godot/templates/4.4.stable/* /root/.local/share/godot/export_templates/4.4.stable/ || true
+          cp /root/.local/share/godot/templates/4.4.stable/* /root/.local/share/godot/export_templates/4.4.stable/ || true
 
       - name: Import project
         run: godot --headless --import 2>&1 || true
