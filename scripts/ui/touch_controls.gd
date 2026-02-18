@@ -173,10 +173,8 @@ func set_enabled(value: bool) -> void:
 func _activate() -> void:
 	enabled = true
 	_container.visible = true
-	Input.emulate_mouse_from_touch = false
 
 func _deactivate() -> void:
 	enabled = false
 	_container.visible = false
 	_release_all()
-	Input.emulate_mouse_from_touch = true
