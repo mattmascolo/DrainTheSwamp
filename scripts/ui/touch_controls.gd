@@ -4,7 +4,7 @@ var enabled: bool = false
 var _left_pressed: bool = false
 var _right_pressed: bool = false
 var _scoop_pressed: bool = false
-var _cancel_scoop_this_frame: bool = false
+var _scoop_mouse_events: Array = []
 
 var left_btn: TouchScreenButton
 var right_btn: TouchScreenButton
@@ -12,24 +12,18 @@ var scoop_btn: TouchScreenButton
 
 var _container: Control
 
-const LEFT_SIZE := Vector2(50, 50)
-const RIGHT_SIZE := Vector2(50, 50)
-const SCOOP_SIZE := Vector2(72, 72)
-
 func _ready() -> void:
 	layer = 12
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	# Run physics before player (default 0) so we can cancel spurious scoops
-	process_physics_priority = -1
 
 	_container = Control.new()
 	_container.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_container)
 
-	left_btn = _create_button("<", LEFT_SIZE, 20)
-	right_btn = _create_button(">", RIGHT_SIZE, 20)
-	scoop_btn = _create_button("SCOOP", SCOOP_SIZE, 14)
+	left_btn = _create_button("<", Vector2(50, 50), 20)
+	right_btn = _create_button(">", Vector2(50, 50), 20)
+	scoop_btn = _create_button("SCOOP", Vector2(72, 72), 14)
 
 	# Viewport is 640x360, position above bottom bar
 	left_btn.position = Vector2(8, 260)
@@ -116,12 +110,10 @@ func _on_button_pressed(which: String) -> void:
 		"<":
 			if not _left_pressed:
 				_left_pressed = true
-				_cancel_scoop_this_frame = true
 				Input.action_press("move_left")
 		">":
 			if not _right_pressed:
 				_right_pressed = true
-				_cancel_scoop_this_frame = true
 				Input.action_press("move_right")
 		"SCOOP":
 			if not _scoop_pressed:
@@ -142,14 +134,6 @@ func _on_button_released(which: String) -> void:
 			if _scoop_pressed:
 				_scoop_pressed = false
 				Input.action_release("scoop")
-
-func _physics_process(_delta: float) -> void:
-	# Runs before player (priority -1 vs 0) to cancel spurious scoops
-	# caused by touch-to-mouse emulation when pressing arrow buttons
-	if _cancel_scoop_this_frame:
-		_cancel_scoop_this_frame = false
-		if not _scoop_pressed:
-			Input.action_release("scoop")
 
 func _process(_delta: float) -> void:
 	if not enabled:
@@ -179,6 +163,8 @@ func _release_all() -> void:
 		Input.action_release("scoop")
 
 func set_enabled(value: bool) -> void:
+	if value == enabled:
+		return
 	if value:
 		_activate()
 	else:
@@ -187,8 +173,27 @@ func set_enabled(value: bool) -> void:
 func _activate() -> void:
 	enabled = true
 	_container.visible = true
+	# Remove mouse click from scoop action so touch-to-mouse emulation
+	# can't trigger scoop. The SCOOP button uses Input.action_press()
+	# which bypasses InputMap and still works. GUI buttons (shop panels,
+	# menus, popups) use Godot's GUI system and are NOT affected.
+	_remove_mouse_from_scoop()
 
 func _deactivate() -> void:
 	enabled = false
 	_container.visible = false
 	_release_all()
+	_restore_mouse_to_scoop()
+
+func _remove_mouse_from_scoop() -> void:
+	_scoop_mouse_events.clear()
+	for event in InputMap.action_get_events("scoop"):
+		if event is InputEventMouseButton:
+			_scoop_mouse_events.append(event)
+	for event in _scoop_mouse_events:
+		InputMap.action_erase_event("scoop", event)
+
+func _restore_mouse_to_scoop() -> void:
+	for event in _scoop_mouse_events:
+		InputMap.action_add_event("scoop", event)
+	_scoop_mouse_events.clear()
