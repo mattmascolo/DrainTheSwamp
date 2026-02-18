@@ -4,6 +4,7 @@ var enabled: bool = false
 var _left_pressed: bool = false
 var _right_pressed: bool = false
 var _scoop_pressed: bool = false
+var _scoop_mouse_events: Array = []
 
 var left_btn: TouchScreenButton
 var right_btn: TouchScreenButton
@@ -20,12 +21,11 @@ func _ready() -> void:
 	_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_container)
 
-	left_btn = _create_button("<", Vector2(50, 50))
-	right_btn = _create_button(">", Vector2(50, 50))
-	scoop_btn = _create_button("SCOOP", Vector2(72, 72))
+	left_btn = _create_button("<", Vector2(50, 50), 20)
+	right_btn = _create_button(">", Vector2(50, 50), 20)
+	scoop_btn = _create_button("SCOOP", Vector2(72, 72), 14)
 
-	# Position: left side bottom, above bottom bar (~40px from bottom)
-	# Viewport is 640x360
+	# Viewport is 640x360, position above bottom bar
 	left_btn.position = Vector2(8, 260)
 	right_btn.position = Vector2(66, 260)
 	scoop_btn.position = Vector2(560, 248)
@@ -45,18 +45,14 @@ func _ready() -> void:
 	else:
 		_deactivate()
 
-func _create_button(text: String, btn_size: Vector2) -> TouchScreenButton:
+func _create_button(text: String, btn_size: Vector2, font_size: int) -> TouchScreenButton:
 	var btn := TouchScreenButton.new()
 
-	# Create a texture from a styled rect
 	var img := Image.create(int(btn_size.x), int(btn_size.y), false, Image.FORMAT_RGBA8)
 	var bg_color := Color(0.15, 0.2, 0.25, 0.45)
 	var border_color := Color(0.4, 0.5, 0.6, 0.5)
-	var radius: int = 6
 
-	# Fill background
 	img.fill(bg_color)
-	# Draw border (top, bottom, left, right edges)
 	for x in range(int(btn_size.x)):
 		for y in range(2):
 			img.set_pixel(x, y, border_color)
@@ -66,10 +62,8 @@ func _create_button(text: String, btn_size: Vector2) -> TouchScreenButton:
 			img.set_pixel(x, y, border_color)
 			img.set_pixel(int(btn_size.x) - 1 - x, y, border_color)
 
-	var tex := ImageTexture.create_from_image(img)
-	btn.texture_normal = tex
+	btn.texture_normal = ImageTexture.create_from_image(img)
 
-	# Pressed state
 	var img_pressed := Image.create(int(btn_size.x), int(btn_size.y), false, Image.FORMAT_RGBA8)
 	img_pressed.fill(Color(0.25, 0.35, 0.45, 0.6))
 	for x in range(int(btn_size.x)):
@@ -84,22 +78,27 @@ func _create_button(text: String, btn_size: Vector2) -> TouchScreenButton:
 
 	btn.passby_press = true
 
-	# Add label as child
+	# Label inside a Control wrapper so alignment works
+	# (TouchScreenButton is Node2D — anchors don't work on direct children)
+	var label_wrap := Control.new()
+	label_wrap.position = Vector2.ZERO
+	label_wrap.size = btn_size
+	label_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	var label := Label.new()
 	label.text = text
+	label.position = Vector2.ZERO
+	label.size = btn_size
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	label.size = btn_size
+	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", Color(0.85, 0.9, 0.95, 0.8))
 	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 	label.add_theme_constant_override("shadow_offset_x", 1)
 	label.add_theme_constant_override("shadow_offset_y", 1)
-	if text == "SCOOP":
-		label.add_theme_font_size_override("font_size", 14)
-	else:
-		label.add_theme_font_size_override("font_size", 20)
-	btn.add_child(label)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label_wrap.add_child(label)
+	btn.add_child(label_wrap)
 
 	btn.pressed.connect(_on_button_pressed.bind(text))
 	btn.released.connect(_on_button_released.bind(text))
@@ -139,7 +138,6 @@ func _on_button_released(which: String) -> void:
 func _process(_delta: float) -> void:
 	if not enabled:
 		return
-	# Hide when UI panel is open or player not found (title screen)
 	var player: Node = _get_player()
 	var should_show: bool = player != null and not player.ui_panel_open
 	if _container.visible != should_show:
@@ -173,8 +171,24 @@ func set_enabled(value: bool) -> void:
 func _activate() -> void:
 	enabled = true
 	_container.visible = true
+	# Remove mouse click from scoop action so emulated touch-clicks
+	# don't trigger scoop/shop/cave when pressing arrow buttons
+	_remove_mouse_from_scoop()
 
 func _deactivate() -> void:
 	enabled = false
 	_container.visible = false
 	_release_all()
+	_restore_mouse_to_scoop()
+
+func _remove_mouse_from_scoop() -> void:
+	_scoop_mouse_events.clear()
+	for event in InputMap.action_get_events("scoop"):
+		if event is InputEventMouseButton:
+			_scoop_mouse_events.append(event)
+			InputMap.action_erase_event("scoop", event)
+
+func _restore_mouse_to_scoop() -> void:
+	for event in _scoop_mouse_events:
+		InputMap.action_add_event("scoop", event)
+	_scoop_mouse_events.clear()
