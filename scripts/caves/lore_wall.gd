@@ -83,4 +83,4 @@ func _process(delta: float) -> void:
 
 func _read_lore() -> void:
 	GameManager.lore_read.emit(cave_id, lore_id)
-	SceneManager.show_popup(lore_text)
+	SceneManager.show_lore_popup(lore_text)

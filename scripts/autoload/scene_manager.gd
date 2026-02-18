@@ -32,6 +32,10 @@ var showing_newspaper: bool = false
 var newspaper_ready_for_input: bool = false
 var milestone_newspapers: Array = []
 
+# --- Lore popup ---
+var lore_layer: CanvasLayer = null
+var showing_lore: bool = false
+
 func _ready() -> void:
 	# Fade overlay — layer 100, full-screen black, starts transparent
 	fade_layer = CanvasLayer.new()
@@ -116,13 +120,12 @@ func _process(delta: float) -> void:
 		_newspaper_elapsed += delta
 		newspaper_prompt.modulate.a = 0.5 + 0.5 * sin(_newspaper_elapsed * 2.0)
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	if not showing_newspaper or not newspaper_ready_for_input:
 		return
-	if event is InputEventKey and event.pressed and not event.echo:
+	if (event is InputEventKey and event.pressed and not event.echo) or (event is InputEventMouseButton and event.pressed):
 		_dismiss_milestone_newspaper()
-	elif event is InputEventMouseButton and event.pressed:
-		_dismiss_milestone_newspaper()
+		get_viewport().set_input_as_handled()
 
 func show_popup(text: String, auto_close_time: float = 0.0) -> void:
 	popup_label.text = text
@@ -136,6 +139,126 @@ func show_popup(text: String, auto_close_time: float = 0.0) -> void:
 func _close_popup() -> void:
 	cave_popup.visible = false
 	popup_auto_close = 0.0
+
+func show_document_popup(text: String, title: String = "CAVE INSCRIPTION") -> void:
+	if showing_lore:
+		return
+
+	showing_lore = true
+	lore_layer = CanvasLayer.new()
+	lore_layer.layer = 90
+	add_child(lore_layer)
+
+	var vp_size: Vector2 = get_viewport().get_visible_rect().size
+
+	var overlay := ColorRect.new()
+	overlay.size = vp_size
+	overlay.color = Color(0, 0, 0, 0.0)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	lore_layer.add_child(overlay)
+
+	var panel := PanelContainer.new()
+	var panel_w: float = 380.0
+	var panel_h: float = 240.0
+	panel.position = Vector2((vp_size.x - panel_w) * 0.5, (vp_size.y - panel_h) * 0.5)
+	panel.size = Vector2(panel_w, panel_h)
+	panel.modulate = Color(1, 1, 1, 0)
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.92, 0.88, 0.78)
+	style.border_color = Color(0.3, 0.25, 0.2)
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.corner_radius_top_left = 2
+	style.corner_radius_top_right = 2
+	style.corner_radius_bottom_left = 2
+	style.corner_radius_bottom_right = 2
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 12
+	style.content_margin_bottom = 12
+	panel.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	panel.add_child(vbox)
+
+	var title_lbl := Label.new()
+	title_lbl.text = title
+	title_lbl.add_theme_font_size_override("font_size", 11)
+	title_lbl.add_theme_color_override("font_color", Color(0.15, 0.12, 0.10))
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title_lbl)
+
+	var sep := HSeparator.new()
+	var sep_style := StyleBoxFlat.new()
+	sep_style.bg_color = Color(0.3, 0.25, 0.2, 0.5)
+	sep_style.content_margin_top = 2
+	sep_style.content_margin_bottom = 2
+	sep.add_theme_stylebox_override("separator", sep_style)
+	vbox.add_child(sep)
+
+	var body := Label.new()
+	body.text = text
+	body.add_theme_font_size_override("font_size", 8)
+	body.add_theme_color_override("font_color", Color(0.18, 0.15, 0.12))
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(body)
+
+	var prompt := Label.new()
+	prompt.text = "[Press any key to close]"
+	prompt.add_theme_font_size_override("font_size", 9)
+	prompt.add_theme_color_override("font_color", Color(0.9, 0.75, 0.4))
+	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(prompt)
+
+	overlay.add_child(panel)
+
+	# Fade in
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(overlay, "color:a", 0.7, 0.4)
+	tw.tween_property(panel, "modulate:a", 1.0, 0.4)
+	tw.set_parallel(false)
+	tw.tween_interval(0.3)
+	tw.tween_callback(func() -> void:
+		_wait_for_lore_dismiss(overlay, panel, prompt)
+	)
+
+func show_lore_popup(text: String) -> void:
+	show_document_popup(text, "CAVE INSCRIPTION")
+
+func _wait_for_lore_dismiss(overlay: ColorRect, panel: PanelContainer, prompt: Label) -> void:
+	var elapsed_ref: Array[float] = [0.0]
+	var dismissed: Array[bool] = [false]
+	var layer_ref: CanvasLayer = lore_layer
+	var check_fn: Callable
+	check_fn = func(delta_val: float) -> void:
+		if dismissed[0]:
+			return
+		elapsed_ref[0] += delta_val
+		prompt.modulate.a = 0.5 + 0.5 * sin(elapsed_ref[0] * 2.0)
+		if Input.is_action_just_pressed("scoop") or Input.is_action_just_pressed("ui_cancel") or Input.is_action_just_pressed("ui_accept"):
+			dismissed[0] = true
+			var tw_out := create_tween()
+			tw_out.set_parallel(true)
+			tw_out.tween_property(overlay, "color:a", 0.0, 0.3)
+			tw_out.tween_property(panel, "modulate:a", 0.0, 0.3)
+			tw_out.set_parallel(false)
+			tw_out.tween_interval(0.2)
+			tw_out.tween_callback(func() -> void:
+				layer_ref.queue_free()
+				showing_lore = false
+				lore_layer = null
+			)
+	get_tree().process_frame.connect(func() -> void:
+		if is_instance_valid(layer_ref):
+			check_fn.call(get_process_delta_time())
+	)
 
 func _on_loot_collected(_cave_id: String, _loot_id: String, reward_text: String) -> void:
 	show_popup(reward_text, 3.0)

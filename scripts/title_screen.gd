@@ -509,15 +509,12 @@ func _process(delta: float) -> void:
 		(post_rect.material as ShaderMaterial).set_shader_parameter("time", elapsed)
 
 # --- Input ---
-func _unhandled_input(event: InputEvent) -> void:
-	if not showing_newspaper:
+func _input(event: InputEvent) -> void:
+	if not showing_newspaper or not newspaper_ready_for_input:
 		return
-	if not newspaper_ready_for_input:
-		return
-	if event is InputEventKey and event.pressed and not event.echo:
+	if (event is InputEventKey and event.pressed and not event.echo) or (event is InputEventMouseButton and event.pressed):
 		_dismiss_newspaper()
-	elif event is InputEventMouseButton and event.pressed:
-		_dismiss_newspaper()
+		get_viewport().set_input_as_handled()
 
 # --- Button callbacks ---
 func _on_new_game() -> void:
