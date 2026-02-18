@@ -55,33 +55,16 @@ func _init() -> void:
 		{
 			"x_range": [350.0, 700.0],
 			"pool_index": 0,
-			"loot_data": {
-				"loot_id": "mine_pool_1",
-				"reward_money": 40000.0,
-				"reward_text": "The flooded mine shaft drains! +$40,000",
-			},
+			"loot_data": {},
 		},
 		{
 			"x_range": [1100.0, 1460.0],
 			"pool_index": 1,
-			"loot_data": {
-				"loot_id": "mine_pool_2",
-				"reward_tool_unlock": "wheelbarrow",
-				"reward_text": "A wheelbarrow emerges from the drained pool! Gained a Wheelbarrow!",
-			},
+			"loot_data": {},
 		},
 	]
 
 func _setup_loot_and_lore() -> void:
-	# Efficiency module past pools at x=1650
-	var loot1 = preload("res://scripts/caves/loot_node.gd").new()
-	loot1.loot_id = "efficiency_module"
-	loot1.cave_id = cave_id
-	loot1.reward_stat_levels = {"water_value": 5}
-	loot1.reward_text = "Found an efficiency module! Water Value +5 levels!"
-	loot1.position = Vector2(1650, _get_cave_terrain_y_at(1650))
-	add_child(loot1)
-
 	# Mine history lore at x=850 (on ridge between pools)
 	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
 	lore1.lore_id = "mine_history"
@@ -89,6 +72,14 @@ func _setup_loot_and_lore() -> void:
 	lore1.lore_text = "WIRETAP TRANSCRIPT — CLASSIFIED\n\nSWAMPSWORTH: \"He drained the bog. THE BOG.\"\nLOBBYTON: \"I thought you said he only had hands?\"\nSWAMPSWORTH: \"He bought a BUCKET. With his OWN money.\"\nLOBBYTON: \"...That wasn't supposed to be possible.\""
 	lore1.position = Vector2(850, _get_cave_terrain_y_at(850))
 	add_child(lore1)
+
+	# Consultant report — crumpled paper near the back
+	var report1 = preload("res://scripts/caves/lore_wall.gd").new()
+	report1.lore_id = "consultant_report_21"
+	report1.cave_id = cave_id
+	report1.lore_text = "THE CONSULTANT — QUARTERLY REPORT #21\n\nidk maybe wait?\n\n-TC\n\nP.S. Invoice attached."
+	report1.position = Vector2(1600, _get_cave_terrain_y_at(1600))
+	add_child(report1)
 
 	# Wooden beam supports (mine theme decorations) — only on non-pool terrain
 	var beam_positions: Array[float] = [150.0, 780.0, 920.0, 1550.0, 1700.0]

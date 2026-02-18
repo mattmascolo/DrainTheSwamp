@@ -56,20 +56,12 @@ func _init() -> void:
 		{
 			"x_range": [450.0, 800.0],
 			"pool_index": 0,
-			"loot_data": {
-				"loot_id": "mire_pool_1",
-				"reward_money": 200000.0,
-				"reward_text": "The murky pool drains to reveal treasure! +$200,000",
-			},
+			"loot_data": {},
 		},
 		{
 			"x_range": [1200.0, 1600.0],
 			"pool_index": 1,
-			"loot_data": {
-				"loot_id": "mire_pool_2",
-				"reward_stat_levels": {"scoop_power": 5},
-				"reward_text": "An ancient relic pulses beneath the mire! Scoop Power +5!",
-			},
+			"loot_data": {},
 		},
 	]
 
@@ -81,15 +73,6 @@ func _setup_loot_and_lore() -> void:
 	lore1.lore_text = "INTERNAL MEMO — LOBBYING FIRM \"SWAMP FRIENDS LLC\"\n\nClient List (DO NOT SHARE):\n- SwampCo Industries (Senator Swampsworth, chair)\n- Definitely-Not-A-Shell-Company LLC (Congresswoman Lobbyton)\n- The Consultant (services: \"consulting\")\n- 47 other politicians from both parties\n\nALL CLIENTS HAVE ASSETS STORED IN THE SWAMP. DO NOT LET IT DRAIN."
 	lore1.position = Vector2(1000, _get_cave_terrain_y_at(1000))
 	add_child(lore1)
-
-	# Swamp treasure past pools at x=1800
-	var loot1 = preload("res://scripts/caves/loot_node.gd").new()
-	loot1.loot_id = "swamp_treasure"
-	loot1.cave_id = cave_id
-	loot1.reward_money = 500000.0
-	loot1.reward_text = "Found a chest buried in the muck! +$500,000"
-	loot1.position = Vector2(1800, _get_cave_terrain_y_at(1800))
-	add_child(loot1)
 
 	# Tangled vines and hanging moss (mire theme)
 	for i in range(12):

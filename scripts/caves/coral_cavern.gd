@@ -66,30 +66,17 @@ func _init() -> void:
 		{
 			"x_range": [370.0, 750.0],
 			"pool_index": 0,
-			"loot_data": {
-				"loot_id": "coral_pool_1",
-				"reward_money": 50000000.0,
-				"reward_text": "A pearl-encrusted treasure chest! +$50,000,000",
-			},
+			"loot_data": {},
 		},
 		{
 			"x_range": [1080.0, 1470.0],
 			"pool_index": 1,
-			"loot_data": {
-				"loot_id": "coral_pool_2",
-				"reward_stat_levels": {"water_value": 12},
-				"reward_text": "A prismatic crystal refracts pure value! Water Value +12!",
-			},
+			"loot_data": {},
 		},
 		{
 			"x_range": [1880.0, 2240.0],
 			"pool_index": 2,
-			"loot_data": {
-				"loot_id": "coral_pool_3",
-				"reward_money": 10000000.0,
-				"reward_stat_levels": {"stamina": 5},
-				"reward_text": "Coral treasures and ancient energy! +$10M, Stamina +5!",
-			},
+			"loot_data": {},
 		},
 	]
 

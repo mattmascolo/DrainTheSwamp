@@ -57,20 +57,12 @@ func _init() -> void:
 		{
 			"x_range": [460.0, 850.0],
 			"pool_index": 0,
-			"loot_data": {
-				"loot_id": "grotto_pool_1",
-				"reward_money": 2000000.0,
-				"reward_text": "Sunken riches emerge from the grotto! +$2,000,000",
-			},
+			"loot_data": {},
 		},
 		{
 			"x_range": [1310.0, 1740.0],
 			"pool_index": 1,
-			"loot_data": {
-				"loot_id": "grotto_pool_2",
-				"reward_stat_levels": {"carrying_capacity": 8},
-				"reward_text": "A waterlogged relic expands your capacity! Carrying Capacity +8!",
-			},
+			"loot_data": {},
 		},
 	]
 
@@ -82,15 +74,6 @@ func _setup_loot_and_lore() -> void:
 	lore1.lore_text = "REDACTED GOVERNMENT FILE\n\nSubject: Operation Wet Blanket\nObjective: Slow down the drainer without attracting media attention\n\nProposed methods:\n- Release more water into swamp (REJECTED — too obvious)\n- Revoke his \"swamp access permit\" (NOTE: he doesn't have one)\n- Declare swamp a \"protected wetland\" (IN PROGRESS)\n- Bribe him (FAILED — \"he just bought another shovel with it\")"
 	lore1.position = Vector2(1100, _get_cave_terrain_y_at(1100))
 	add_child(lore1)
-
-	# Extra loot past pools at x=2050
-	var loot1 = preload("res://scripts/caves/loot_node.gd").new()
-	loot1.loot_id = "sunken_riches_extra"
-	loot1.cave_id = cave_id
-	loot1.reward_money = 500000.0
-	loot1.reward_text = "Found extra sunken riches! +$500,000"
-	loot1.position = Vector2(2050, _get_cave_terrain_y_at(2050))
-	add_child(loot1)
 
 	# Dripping water features (grotto theme)
 	for i in range(15):

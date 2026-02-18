@@ -153,7 +153,7 @@ var stat_definitions: Dictionary = {
 		"scale": "exponential",
 		"base_cost": 50.0,
 		"cost_exponent": 1.22,
-		"max_value": 1000.0,
+		"max_value": 100.0,
 		"format": "multiplier"
 	},
 	"scoop_power": {
@@ -163,6 +163,7 @@ var stat_definitions: Dictionary = {
 		"scale": "exponential",
 		"base_cost": 35.0,
 		"cost_exponent": 1.20,
+		"max_value": 100.0,
 		"format": "multiplier"
 	}
 }
@@ -213,7 +214,7 @@ const CAMEL_UPGRADE_EXPONENT: float = 1.35
 const CAMEL_SPEED_MAX_LEVEL: int = 8
 
 # Camel state
-var camel_unlocked: bool = false  # Unlocked by completing the Marsh (pool 3)
+var camel_unlocked: bool = false  # Unlocked by finding camel in Gator Den cave
 var camel_count: int = 0
 var camel_capacity_level: int = 0
 var camel_speed_level: int = 0
@@ -450,10 +451,6 @@ func _drain_swamp(swamp_index: int, gallons: float) -> float:
 			money += reward
 			money_changed.emit(money)
 		swamp_completed.emit(swamp_index, reward)
-		# Unlock camel when Marsh (pool index 2) is completed
-		if swamp_index == 2 and not camel_unlocked:
-			camel_unlocked = true
-			camel_changed.emit()
 
 	return actual
 
@@ -1035,8 +1032,8 @@ func load_save_data(data: Dictionary) -> void:
 	camel_count = int(data.get("camel_count", 0))
 	camel_capacity_level = int(data.get("camel_capacity_level", 0))
 	camel_speed_level = int(data.get("camel_speed_level", 0))
-	# Migration: old saves without camel_unlocked — unlock if they own a camel or Marsh is done
-	if not camel_unlocked and (camel_count > 0 or is_swamp_completed(2)):
+	# Migration: old saves — unlock camel if they own one, Marsh done, or found cave loot
+	if not camel_unlocked and (camel_count > 0 or is_swamp_completed(2) or is_loot_collected("gator_den", "gator_camel")):
 		camel_unlocked = true
 	_init_camel_states()
 

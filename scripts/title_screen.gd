@@ -222,6 +222,11 @@ func _build_menu(vp_size: Vector2) -> void:
 	btn_continue.visible = FileAccess.file_exists("user://save_data.json")
 	menu_vbox.add_child(btn_continue)
 
+	# Test Endgame (dev tool)
+	var btn_test_endgame := _create_menu_button("Test Endgame", Color(1.0, 0.3, 0.3))
+	btn_test_endgame.pressed.connect(_on_test_endgame)
+	menu_vbox.add_child(btn_test_endgame)
+
 	# Quit
 	btn_quit = _create_menu_button("Quit", Color(0.6, 0.6, 0.6))
 	btn_quit.pressed.connect(_on_quit)
@@ -535,6 +540,40 @@ func _on_cancel_new_game() -> void:
 
 func _on_continue() -> void:
 	# SaveManager already loaded the save in its _ready(), just transition
+	SceneManager.transition_to_scene("res://scenes/main.tscn")
+
+func _on_test_endgame() -> void:
+	# Dev tool: set up game state with Atlantic nearly drained
+	GameManager.reset_game()
+
+	# Mark pools 0-8 as fully drained
+	for i in range(9):
+		var total: float = GameManager.swamp_definitions[i]["total_gallons"]
+		GameManager.swamp_states[i]["gallons_drained"] = total
+		GameManager.swamp_states[i]["completed"] = true
+
+	# Atlantic (pool 9): drain all but 0.0001 gallons
+	var atlantic_total: float = GameManager.swamp_definitions[9]["total_gallons"]
+	GameManager.swamp_states[9]["gallons_drained"] = atlantic_total - 0.0001
+
+	# Give player good tools so they can finish in one scoop
+	GameManager.money = 999999999.0
+	GameManager.current_tool_id = "hose"
+	for tool_id in GameManager.tools_owned:
+		GameManager.tools_owned[tool_id]["owned"] = true
+		GameManager.tools_owned[tool_id]["level"] = 10
+	GameManager.stat_levels["carrying_capacity"] = 20
+	GameManager.stat_levels["movement_speed"] = 20
+	GameManager.stat_levels["scoop_power"] = 20
+	GameManager.stat_levels["water_value"] = 20
+	GameManager.camel_unlocked = true
+	GameManager.camel_count = 3
+
+	# Unlock all caves
+	for cave_id in GameManager.cave_data:
+		GameManager.cave_data[cave_id]["unlocked"] = true
+
+	SaveManager.save_game()
 	SceneManager.transition_to_scene("res://scenes/main.tscn")
 
 func _on_quit() -> void:

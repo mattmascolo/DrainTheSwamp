@@ -66,29 +66,17 @@ func _init() -> void:
 		{
 			"x_range": [340.0, 660.0],
 			"pool_index": 0,
-			"loot_data": {
-				"loot_id": "cistern_pool_1",
-				"reward_money": 10000000.0,
-				"reward_text": "Cracked open a sealed cistern vault! +$10,000,000",
-			},
+			"loot_data": {},
 		},
 		{
 			"x_range": [940.0, 1260.0],
 			"pool_index": 1,
-			"loot_data": {
-				"loot_id": "cistern_pool_2",
-				"reward_tool_unlock": "water_wagon",
-				"reward_text": "A Water Wagon blueprint emerges! Gained a Water Wagon!",
-			},
+			"loot_data": {},
 		},
 		{
 			"x_range": [1650.0, 2010.0],
 			"pool_index": 2,
-			"loot_data": {
-				"loot_id": "cistern_pool_3",
-				"reward_stat_levels": {"scoop_power": 10},
-				"reward_text": "A power amplifier surges through you! Scoop Power +10!",
-			},
+			"loot_data": {},
 		},
 	]
 

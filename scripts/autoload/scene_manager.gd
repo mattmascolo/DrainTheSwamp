@@ -31,6 +31,8 @@ var newspaper_photo_label: Label = null
 var showing_newspaper: bool = false
 var newspaper_ready_for_input: bool = false
 var milestone_newspapers: Array = []
+var endgame_newspaper_queue: Array = []
+var endgame_active: bool = false
 
 # --- Lore popup ---
 var lore_layer: CanvasLayer = null
@@ -261,11 +263,12 @@ func _wait_for_lore_dismiss(overlay: ColorRect, panel: PanelContainer, prompt: L
 	)
 
 func _on_loot_collected(_cave_id: String, _loot_id: String, reward_text: String) -> void:
-	show_popup(reward_text, 3.0)
+	show_document_popup(reward_text, "CAVE DISCOVERY")
 
 func _on_swamp_completed(swamp_index: int, _reward: float) -> void:
-	if swamp_index == 2:
-		show_popup("A stray camel wanders out of the drained marsh!\nCamel now available in the Shop.", 5.0)
+	# Skip milestone newspaper for Atlantic (pool 9) — endgame cinematic handles it
+	if swamp_index == 9:
+		return
 	# Show milestone newspaper after a short delay
 	if swamp_index >= 0 and swamp_index < milestone_newspapers.size():
 		var idx: int = swamp_index
@@ -560,6 +563,30 @@ func _show_milestone_newspaper(swamp_index: int) -> void:
 func _dismiss_milestone_newspaper() -> void:
 	newspaper_ready_for_input = false
 	showing_newspaper = false
+	# If there are more endgame newspapers queued, show the next one
+	if endgame_active and endgame_newspaper_queue.size() > 0:
+		var next_data: Dictionary = endgame_newspaper_queue.pop_front()
+		var tw := create_tween()
+		tw.tween_property(newspaper_panel, "modulate:a", 0.0, 0.3)
+		tw.tween_callback(func() -> void:
+			_show_newspaper_data(next_data)
+		)
+		return
+	# If endgame sequence just finished, go to title
+	if endgame_active:
+		endgame_active = false
+		var tw := create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(newspaper_overlay, "color:a", 0.0, 0.5)
+		tw.tween_property(newspaper_panel, "modulate:a", 0.0, 0.5)
+		tw.set_parallel(false)
+		tw.tween_interval(0.3)
+		tw.tween_callback(func() -> void:
+			newspaper_overlay.visible = false
+			transition_to_scene("res://scenes/title_screen.tscn")
+		)
+		return
+	# Normal milestone dismiss
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(newspaper_overlay, "color:a", 0.0, 0.4)
@@ -568,6 +595,45 @@ func _dismiss_milestone_newspaper() -> void:
 	tw.tween_callback(func() -> void:
 		newspaper_overlay.visible = false
 	)
+
+func show_endgame_newspapers(newspapers: Array) -> void:
+	if newspapers.size() == 0:
+		return
+	endgame_active = true
+	endgame_newspaper_queue = newspapers.duplicate()
+	var first: Dictionary = endgame_newspaper_queue.pop_front()
+	_show_newspaper_data(first)
+
+func _show_newspaper_data(data: Dictionary) -> void:
+	newspaper_date_label.text = data.get("date", "SPECIAL EDITION")
+	newspaper_headline.text = data.get("headline", "")
+	newspaper_subhead.text = data.get("subhead", "")
+	newspaper_body.text = data.get("body", "")
+	# Aged paper for endgame
+	newspaper_paper_style.bg_color = Color(0.82, 0.76, 0.60)
+	newspaper_corner_fold.color = Color(0.82, 0.76, 0.60).darkened(0.15)
+	newspaper_coffee_stain.visible = true
+	newspaper_coffee_stain.position = Vector2(310, 210)
+	newspaper_coffee_stain.color.a = 0.12
+	if data.has("photo"):
+		newspaper_photo_label.text = data["photo"]
+		newspaper_photo_label.visible = true
+	else:
+		newspaper_photo_label.visible = false
+	# Update prompt text
+	if endgame_newspaper_queue.size() > 0:
+		newspaper_prompt.text = "[Press any key to continue]"
+	else:
+		newspaper_prompt.text = "[Press any key to return to title]"
+	showing_newspaper = true
+	newspaper_ready_for_input = false
+	newspaper_overlay.visible = true
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(newspaper_overlay, "color:a", 0.7, 0.5)
+	tw.tween_property(newspaper_panel, "modulate:a", 1.0, 0.5)
+	tw.set_parallel(false)
+	tw.tween_callback(func() -> void: newspaper_ready_for_input = true)
 
 # --- Scene Transitions ---
 func transition_to_scene(scene_path: String, use_pixelate: bool = false) -> void:

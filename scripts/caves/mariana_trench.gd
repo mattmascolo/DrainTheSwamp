@@ -68,37 +68,17 @@ func _init() -> void:
 		{
 			"x_range": [420.0, 890.0],
 			"pool_index": 0,
-			"loot_data": {
-				"loot_id": "trench_pool_1",
-				"reward_money": 1000000000.0,
-				"reward_text": "The abyssal treasure! +$1,000,000,000",
-			},
+			"loot_data": {},
 		},
 		{
 			"x_range": [1360.0, 1790.0],
 			"pool_index": 1,
-			"loot_data": {
-				"loot_id": "trench_pool_2",
-				"reward_stat_levels": {
-					"carrying_capacity": 10,
-					"movement_speed": 10,
-					"stamina": 10,
-					"stamina_regen": 10,
-					"water_value": 10,
-					"scoop_power": 10,
-				},
-				"reward_text": "The Trench Core surges through you! ALL stats +10!",
-			},
+			"loot_data": {},
 		},
 		{
 			"x_range": [2260.0, 2700.0],
 			"pool_index": 2,
-			"loot_data": {
-				"loot_id": "trench_pool_3",
-				"reward_money": 500000000.0,
-				"reward_stat_levels": {"water_value": 15},
-				"reward_text": "The deepest secret! +$500M, Water Value +15!",
-			},
+			"loot_data": {},
 		},
 	]
 

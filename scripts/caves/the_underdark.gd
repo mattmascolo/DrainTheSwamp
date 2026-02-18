@@ -65,30 +65,17 @@ func _init() -> void:
 		{
 			"x_range": [400.0, 820.0],
 			"pool_index": 0,
-			"loot_data": {
-				"loot_id": "underdark_pool_1",
-				"reward_money": 250000000.0,
-				"reward_text": "An ancient hoard from a forgotten age! +$250,000,000",
-			},
+			"loot_data": {},
 		},
 		{
 			"x_range": [1170.0, 1610.0],
 			"pool_index": 1,
-			"loot_data": {
-				"loot_id": "underdark_pool_2",
-				"reward_stat_levels": {"scoop_power": 15},
-				"reward_text": "An obelisk of pure drain energy! Scoop Power +15!",
-			},
+			"loot_data": {},
 		},
 		{
 			"x_range": [1940.0, 2380.0],
 			"pool_index": 2,
-			"loot_data": {
-				"loot_id": "underdark_pool_3",
-				"reward_money": 50000000.0,
-				"reward_stat_levels": {"scoop_power": 8},
-				"reward_text": "The void yields its secrets! +$50M, Scoop Power +8!",
-			},
+			"loot_data": {},
 		},
 	]
 

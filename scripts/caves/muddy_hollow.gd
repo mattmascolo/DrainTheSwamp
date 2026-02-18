@@ -49,34 +49,11 @@ func _init() -> void:
 		{
 			"x_range": [560.0, 800.0],
 			"pool_index": 0,
-			"loot_data": {
-				"loot_id": "muddy_pool_loot",
-				"reward_money": 200.0,
-				"reward_stat_levels": {"movement_speed": 2},
-				"reward_text": "The pool reveals hidden treasures! +$200, Move Speed +2!",
-			},
+			"loot_data": {},
 		},
 	]
 
 func _setup_loot_and_lore() -> void:
-	# Old lantern near entrance at x=150
-	var lantern_loot = preload("res://scripts/caves/loot_node.gd").new()
-	lantern_loot.loot_id = "old_lantern"
-	lantern_loot.cave_id = cave_id
-	lantern_loot.reward_upgrades = {"lantern": 3}
-	lantern_loot.reward_text = "Found a powerful old lantern! The darkness recedes..."
-	lantern_loot.position = Vector2(150, _get_cave_terrain_y_at(150))
-	add_child(lantern_loot)
-
-	# Old toolbox at x=1100 — unlocks Spoon for free
-	var loot2 = preload("res://scripts/caves/loot_node.gd").new()
-	loot2.loot_id = "old_toolbox"
-	loot2.cave_id = cave_id
-	loot2.reward_tool_unlock = "spoon"
-	loot2.reward_text = "Found an old toolbox! Gained a Spoon!"
-	loot2.position = Vector2(1100, _get_cave_terrain_y_at(1100))
-	add_child(loot2)
-
 	# Strange symbol lore wall at x=400
 	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
 	lore1.lore_id = "strange_symbol"
@@ -84,6 +61,14 @@ func _setup_loot_and_lore() -> void:
 	lore1.lore_text = "MEMO — CITY HALL — CONFIDENTIAL\n\n\"Re: Swamp Draining Initiative — Make sure the new hire has NO tools, NO budget, and NO way to contact HR. If he asks for a shovel, tell him it's 'on backorder.'\n\n—Mayor K.\""
 	lore1.position = Vector2(400, _get_cave_terrain_y_at(400))
 	add_child(lore1)
+
+	# Consultant report — crumpled paper on the ground past the pool
+	var report1 = preload("res://scripts/caves/lore_wall.gd").new()
+	report1.lore_id = "consultant_report_1"
+	report1.cave_id = cave_id
+	report1.lore_text = "THE CONSULTANT — QUARTERLY REPORT #1\n\nAfter extensive analysis of the swamp drainage situation, I recommend continued monitoring of all variables. A follow-up study is warranted. Budget request: $500,000.\n\n[14 pages of appendices not included]"
+	report1.position = Vector2(1000, _get_cave_terrain_y_at(1000))
+	add_child(report1)
 
 	# Mud puddles (decorative) — only on non-pool terrain
 	for i in range(5):

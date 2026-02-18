@@ -7,6 +7,7 @@ extends Node2D
 @export var reward_upgrades: Dictionary = {}  # {upgrade_id: levels_to_add}
 @export var reward_tool_unlock: String = ""  # tool_id to grant ownership for free
 @export var reward_stat_levels: Dictionary = {}  # {stat_id: levels_to_add}
+@export var reward_camel_unlock: bool = false
 @export var reward_text: String = ""
 
 var player_in_range: bool = false
@@ -113,15 +114,21 @@ func _collect() -> void:
 	if reward_money > 0.0:
 		GameManager.money += reward_money
 		GameManager.money_changed.emit(GameManager.money)
-	# Grant tool ownership
+	# Grant tool ownership — or level up if already owned
 	if reward_tool_unlock != "" and GameManager.tools_owned.has(reward_tool_unlock):
-		GameManager.tools_owned[reward_tool_unlock]["owned"] = true
+		if GameManager.tools_owned[reward_tool_unlock]["owned"]:
+			# Already own it — grant a free level instead
+			GameManager.tools_owned[reward_tool_unlock]["level"] += 1
+			GameManager.tool_upgraded.emit(reward_tool_unlock, GameManager.tools_owned[reward_tool_unlock]["level"])
+		else:
+			GameManager.tools_owned[reward_tool_unlock]["owned"] = true
 		GameManager.tool_changed.emit(GameManager.tool_definitions[GameManager.current_tool_id])
+	# Grant extra tool levels
 	for tool_id: String in reward_tool_levels:
 		var levels: int = reward_tool_levels[tool_id]
-		for l in range(levels):
-			if GameManager.tools_owned.has(tool_id) and GameManager.tools_owned[tool_id]["owned"]:
-				GameManager.tools_owned[tool_id]["level"] += 1
+		if GameManager.tools_owned.has(tool_id) and GameManager.tools_owned[tool_id]["owned"]:
+			GameManager.tools_owned[tool_id]["level"] += levels
+			GameManager.tool_upgraded.emit(tool_id, GameManager.tools_owned[tool_id]["level"])
 	for upgrade_id: String in reward_upgrades:
 		var levels: int = reward_upgrades[upgrade_id]
 		if GameManager.upgrades_owned.has(upgrade_id):
@@ -137,6 +144,12 @@ func _collect() -> void:
 			if ml >= 0 and GameManager.stat_levels[stat_id] > ml:
 				GameManager.stat_levels[stat_id] = ml
 			GameManager.stat_upgraded.emit(stat_id, GameManager.stat_levels[stat_id])
+
+	# Unlock camel
+	if reward_camel_unlock and not GameManager.camel_unlocked:
+		GameManager.camel_unlocked = true
+		GameManager.camel_count = 1
+		GameManager.camel_changed.emit()
 
 	# Mark collected in GameManager
 	GameManager.collect_loot(cave_id, loot_id, reward_text)

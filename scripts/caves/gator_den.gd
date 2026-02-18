@@ -48,34 +48,11 @@ func _init() -> void:
 		{
 			"x_range": [600.0, 900.0],
 			"pool_index": 0,
-			"loot_data": {
-				"loot_id": "gator_pool_loot",
-				"reward_money": 1000.0,
-				"reward_stat_levels": {"stamina": 3},
-				"reward_text": "Drained the gator's pool! +$1,000, Stamina +3!",
-			},
+			"loot_data": {},
 		},
 	]
 
 func _setup_loot_and_lore() -> void:
-	# Rusty Bucket at x=300 — unlocks Bucket for free
-	var loot1 = preload("res://scripts/caves/loot_node.gd").new()
-	loot1.loot_id = "rusty_bucket"
-	loot1.cave_id = cave_id
-	loot1.reward_tool_unlock = "bucket"
-	loot1.reward_text = "Found a rusty bucket! Gained a Bucket!"
-	loot1.position = Vector2(300, _get_cave_terrain_y_at(300))
-	add_child(loot1)
-
-	# Lantern upgrade at x=1200
-	var loot2 = preload("res://scripts/caves/loot_node.gd").new()
-	loot2.loot_id = "old_lamp"
-	loot2.cave_id = cave_id
-	loot2.reward_upgrades = {"lantern": 2}
-	loot2.reward_text = "Found an old lamp! Lantern upgraded!"
-	loot2.position = Vector2(1200, _get_cave_terrain_y_at(1200))
-	add_child(loot2)
-
 	# Gator warning lore at x=450
 	var lore1 = preload("res://scripts/caves/lore_wall.gd").new()
 	lore1.lore_id = "gator_warning"
@@ -83,6 +60,23 @@ func _setup_loot_and_lore() -> void:
 	lore1.lore_text = "EXPENSE REPORT — SENATOR SWAMPSWORTH\n\nDonor Dinner at The Capital Grille ... $14,200\n\"Swamp Research\" Trip to Bahamas ... $48,000\nActual swamp-related expenses ... $0.00\n\nTOTAL: $62,200 (charged to Swamp Initiative fund)"
 	lore1.position = Vector2(450, _get_cave_terrain_y_at(450))
 	add_child(lore1)
+
+	# Camel unlock — found past the pool
+	var camel_loot = preload("res://scripts/caves/loot_node.gd").new()
+	camel_loot.loot_id = "gator_camel"
+	camel_loot.cave_id = cave_id
+	camel_loot.reward_camel_unlock = true
+	camel_loot.reward_text = "A LOST CAMEL\n\nHalf-starved and knee-deep in muck, a camel blinks at you from behind a pile of gator bones.\n\nHow it got here is anyone's guess.\n\nBut it's yours now."
+	camel_loot.position = Vector2(1050, _get_cave_terrain_y_at(1050))
+	add_child(camel_loot)
+
+	# Consultant report — crumpled paper near the back
+	var report1 = preload("res://scripts/caves/lore_wall.gd").new()
+	report1.lore_id = "consultant_report_7"
+	report1.cave_id = cave_id
+	report1.lore_text = "THE CONSULTANT — QUARTERLY REPORT #7\n\nSituation unchanged. Recommend patience. See previous reports for details.\n\nBudget request: $500,000.\n\n[No appendices]"
+	report1.position = Vector2(1200, _get_cave_terrain_y_at(1200))
+	add_child(report1)
 
 	# Scattered bones (decorative)
 	for i in range(8):

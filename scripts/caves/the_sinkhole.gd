@@ -54,20 +54,12 @@ func _init() -> void:
 		{
 			"x_range": [300.0, 600.0],
 			"pool_index": 0,
-			"loot_data": {
-				"loot_id": "sinkhole_pool_1",
-				"reward_money": 8000.0,
-				"reward_text": "The first pool drains away! +$8,000",
-			},
+			"loot_data": {},
 		},
 		{
 			"x_range": [900.0, 1220.0],
 			"pool_index": 1,
-			"loot_data": {
-				"loot_id": "sinkhole_pool_2",
-				"reward_stat_levels": {"scoop_power": 4},
-				"reward_text": "The deep pool reveals a power crystal! Scoop Power +4!",
-			},
+			"loot_data": {},
 		},
 	]
 
@@ -80,14 +72,13 @@ func _setup_loot_and_lore() -> void:
 	lore1.position = Vector2(700, _get_cave_terrain_y_at(700))
 	add_child(lore1)
 
-	# Waterlogged safe past the pools at x=1400
-	var loot1 = preload("res://scripts/caves/loot_node.gd").new()
-	loot1.loot_id = "waterlogged_safe"
-	loot1.cave_id = cave_id
-	loot1.reward_money = 5000.0
-	loot1.reward_text = "Cracked open a waterlogged safe! +$5,000"
-	loot1.position = Vector2(1400, _get_cave_terrain_y_at(1400))
-	add_child(loot1)
+	# Consultant report — crumpled paper past the second pool
+	var report1 = preload("res://scripts/caves/lore_wall.gd").new()
+	report1.lore_id = "consultant_report_14"
+	report1.cave_id = cave_id
+	report1.lore_text = "THE CONSULTANT — QUARTERLY REPORT #14\n\nStill wet. Will advise.\n\n$500,000 please."
+	report1.position = Vector2(1350, _get_cave_terrain_y_at(1350))
+	add_child(report1)
 
 	# Extra water puddles (wet theme) — on ridges only
 	for i in range(6):

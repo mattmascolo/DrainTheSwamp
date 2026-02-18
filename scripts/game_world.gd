@@ -51,25 +51,25 @@ var terrain_points: Array[Vector2] = [
 	Vector2(842, 248),   # exit slope
 	Vector2(862, 232),   # exit top
 	# Ridge 3 — jagged peak — indices 36-38
-	Vector2(895, 224), Vector2(925, 218), Vector2(960, 238),
-	# Bog (15 pts) — indices 39-53: steep jagged entry, stair-steps
+	Vector2(895, 224), Vector2(925, 218), Vector2(960, 250),
+	# Bog (15 pts) — indices 39-53: stair-steps, max slope ~33°
 	Vector2(1020, 296),  # entry top
-	Vector2(1036, 310),  # steep entry
-	Vector2(1048, 304),  # crack ledge
-	Vector2(1062, 316),  # deeper ledge
-	Vector2(1080, 320),  # stair
-	Vector2(1098, 318),  # step back
-	Vector2(1118, 324),  # basin
-	Vector2(1140, 326),  # deepest
-	Vector2(1162, 322),  # rise
-	Vector2(1180, 324),  # second crack
-	Vector2(1198, 318),  # stair step up
-	Vector2(1215, 314),  # ledge
-	Vector2(1230, 310),  # exit ledge
-	Vector2(1244, 306),  # exit slope
-	Vector2(1262, 284),  # exit top
+	Vector2(1042, 308),  # entry slope (dx=22,dy=12 → 29°)
+	Vector2(1060, 304),  # crack ledge (dx=18,dy=4 up)
+	Vector2(1080, 314),  # deeper ledge (dx=20,dy=10 → 27°)
+	Vector2(1100, 320),  # stair (dx=20,dy=6 → 17°)
+	Vector2(1118, 318),  # step back (dx=18,dy=2 up)
+	Vector2(1138, 324),  # basin (dx=20,dy=6 → 17°)
+	Vector2(1160, 326),  # deepest (dx=22,dy=2)
+	Vector2(1182, 322),  # rise (dx=22,dy=4 up)
+	Vector2(1200, 324),  # second crack (dx=18,dy=2)
+	Vector2(1218, 318),  # stair step up (dx=18,dy=6 up → 18°)
+	Vector2(1236, 314),  # ledge (dx=18,dy=4 up)
+	Vector2(1254, 310),  # exit ledge (dx=18,dy=4 up)
+	Vector2(1272, 306),  # exit slope (dx=18,dy=4 up)
+	Vector2(1300, 290),  # exit top (dx=28,dy=16 up → 30°)
 	# Ridge 4 — cracked flat — indices 54-57
-	Vector2(1300, 276), Vector2(1330, 280), Vector2(1360, 278), Vector2(1395, 294),
+	Vector2(1320, 280), Vector2(1345, 276), Vector2(1370, 278), Vector2(1400, 294),
 	# Swamp (17 pts) — indices 58-74: lopsided canyon, left cliff, gradual right slope
 	Vector2(1450, 340),  # entry top (steep left cliff)
 	Vector2(1462, 360),  # steep drop
@@ -274,8 +274,6 @@ var jeff_area: Area2D = null
 var player_near_jeff: bool = false
 var endgame_triggered: bool = false
 var politician_nodes: Array[Node2D] = []
-# Consultant reports
-var report_areas: Array[Dictionary] = []  # {area: Area2D, text: String, near: bool, hint: Label}
 # Wanted poster
 var wanted_poster: Node2D = null
 # Helicopter
@@ -532,7 +530,6 @@ func _ready() -> void:
 	_build_player_shadow()
 	_build_cave_entrances()
 	_build_billboards()
-	_build_consultant_reports()
 	_init_drain_thresholds()
 
 	GameManager.water_level_changed.connect(_on_water_level_changed)
@@ -3732,609 +3729,43 @@ func _spawn_helicopter() -> void:
 	helicopter_active.add_child(skid_l)
 
 func _trigger_endgame() -> void:
+	if endgame_triggered:
+		return
 	endgame_triggered = true
 
 	# Freeze player
 	var players_eg: Array[Node] = get_tree().get_nodes_in_group("player")
 	if players_eg.size() > 0 and is_instance_valid(players_eg[0]):
 		players_eg[0].set_physics_process(false)
+		players_eg[0].set_process_unhandled_input(false)
 
-	var player_pos: Vector2 = jeff_node.position + Vector2(-20, 0)
-	var player_node: Node2D = null
-	if players_eg.size() > 0 and is_instance_valid(players_eg[0]):
-		player_pos = players_eg[0].position
-		player_node = players_eg[0] as Node2D
-
-	var tw := create_tween()
-
-	# Step 1: Dramatic pause — player approaches (0.8s)
-	tw.tween_interval(0.8)
-
-	# Step 2: Hammer appears above player (the player is about to bonk them)
-	var hammer := Node2D.new()
-	hammer.position = Vector2(player_pos.x + 4, player_pos.y - 40)
-	hammer.z_index = 12
-	var handle := ColorRect.new()
-	handle.position = Vector2(-1, 0)
-	handle.size = Vector2(2, 18)
-	handle.color = Color(0.55, 0.35, 0.15)
-	hammer.add_child(handle)
-	var hammer_head := ColorRect.new()
-	hammer_head.position = Vector2(-5, -4)
-	hammer_head.size = Vector2(10, 6)
-	hammer_head.color = Color(0.55, 0.55, 0.58)
-	hammer.add_child(hammer_head)
-	hammer.modulate.a = 0.0
-	add_child(hammer)
-
-	tw.tween_property(hammer, "modulate:a", 1.0, 0.15)
-
-	# Step 3: Hammer starts to swing... but is INTERRUPTED
-	tw.tween_property(hammer, "rotation", deg_to_rad(45), 0.15).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
-
-	# Step 4: CIA helicopter swoops in fast from the right
-	var cia_heli := Node2D.new()
-	var island_center_x: float = jeff_node.position.x
-	cia_heli.position = Vector2(island_center_x + 500, 30.0)
-	cia_heli.z_index = 16
-	add_child(cia_heli)
-
-	# Helicopter body (bigger than the GOVT one — this is serious)
-	var heli_body := Polygon2D.new()
-	heli_body.polygon = PackedVector2Array([
-		Vector2(-16, -4), Vector2(-10, -7), Vector2(10, -7), Vector2(16, -4),
-		Vector2(16, 3), Vector2(10, 6), Vector2(-10, 6), Vector2(-18, 3),
+	# Tell the story through newspapers
+	SceneManager.show_endgame_newspapers([
+		{
+			"date": "SPECIAL EDITION",
+			"headline": "IT'S GONE. HE ACTUALLY DID IT.",
+			"subhead": "Lone government employee drains the Atlantic Ocean with his bare hands",
+			"body": "In what experts are calling \"the most pointlessly determined act in human history,\" the sole employee of the Swamp Draining Initiative has drained the Atlantic Ocean.\n\nThe man, whose name has been redacted from all government records, began with a puddle and a pair of hands. He ended with an empty ocean basin and what neighbors describe as \"a thousand-yard stare.\"\n\n\"We gave him no tools, no budget, and no support,\" said a visibly shaken government spokesperson. \"We honestly thought he'd quit after the first day.\"\n\nThe ocean floor is now visible for the first time in recorded history. Several previously unknown species have been discovered, all of them \"very confused.\""
+		},
+		{
+			"date": "SPECIAL EDITION — BREAKING",
+			"headline": "DRAINER ARRESTED IN DRAMATIC ISLAND RAID",
+			"subhead": "CIA intercepts lone employee moments before confrontation with officials",
+			"body": "CIA operatives intercepted the drainer on the private island moments before he could confront officials. The drainer, armed with what witnesses described as \"a shotgun and an attitude,\" was airlifted from the scene in federal custody.\n\nSenate Majority Leader Goodwell issued a statement: \"This individual was a rogue actor who threatened the safety of hardworking public servants. We are grateful to the CIA for their swift action.\"\n\nThe drainer reportedly said nothing during the arrest. Witnesses say he simply looked back at the empty ocean basin and nodded once.\n\nCharges include \"environmental terrorism,\" \"illegal possession of a shotgun in a wetland,\" and \"misappropriation of government spoon.\""
+		},
+		{
+			"date": "SPECIAL EDITION — WHERE ARE THEY NOW",
+			"headline": "OFFICIALS EXONERATED, DRAINER FORGOTTEN",
+			"subhead": "All implicated politicians pardoned; swamp ordered refilled at taxpayer expense",
+			"body": "SENATE MAJORITY LEADER GOODWELL — Issued blanket pardons for all implicated officials. \"There was no corruption. There was never any corruption. Focus on what matters.\"\n\nSENATOR SWAMPSWORTH — Fully exonerated. Appointed head of new \"Wetlands Restoration Committee.\" Budget: $600M.\n\nCONGRESSWOMAN LOBBYTON — Published memoir \"I Was The Victim\" which debuted at #1. Currently suing the drainer for defamation.\n\nTHE CONSULTANT — Hired to lead investigation into the drainer. Budget: $2M. Report due \"eventually.\"\n\nMAYOR KICKBACK — Reinstated. Awarded Medal of Public Service for \"enduring the swamp crisis.\"\n\nPRESS SECRETARY SPINWELL — Promoted. Now leads campaign to rebrand draining as \"aquatic vandalism.\"\n\nJEFF — No comment.\n\nTHE DRAINER — Held at undisclosed location. His court-appointed attorney says he is \"doing fine\" and \"has requested a larger spoon, which was denied.\""
+		},
+		{
+			"date": "SPECIAL EVENING EDITION",
+			"headline": "GOODWELL: \"IT WAS ALL FAKE. MOVE ON.\"",
+			"subhead": "Swamp ordered refilled. Public told to \"focus on more important things.\"",
+			"body": "Senate Majority Leader Goodwell held a press conference today declaring the entire swamp scandal \"fabricated\" and urging citizens to \"focus on more important things.\"\n\n\"There was no island. There were no officials. The swamp was always fine,\" Goodwell said, standing ankle-deep in swamp water. \"This was a coordinated hoax by one disgruntled employee with a spoon.\"\n\nAll seven officials have been pardoned and reinstated. The swamp has been ordered refilled at a cost of $400M to taxpayers. The drainer's $500 field operations budget has been reclassified as \"misappropriated funds\" and added to his growing list of charges.\n\nThe swamp is back. It was always going to come back.\n\n\nDRAIN THE SWAMP\nThanks for playing."
+		},
 	])
-	heli_body.color = Color(0.08, 0.08, 0.08, 0.95)
-	cia_heli.add_child(heli_body)
-
-	var heli_tail := Polygon2D.new()
-	heli_tail.polygon = PackedVector2Array([
-		Vector2(-18, -2), Vector2(-32, -4), Vector2(-32, 1), Vector2(-18, 3),
-	])
-	heli_tail.color = Color(0.10, 0.10, 0.10, 0.9)
-	cia_heli.add_child(heli_tail)
-
-	var heli_tail_rotor := ColorRect.new()
-	heli_tail_rotor.size = Vector2(1, 8)
-	heli_tail_rotor.position = Vector2(-32, -7)
-	heli_tail_rotor.color = Color(0.3, 0.3, 0.3, 0.7)
-	cia_heli.add_child(heli_tail_rotor)
-
-	var heli_rotor := Line2D.new()
-	heli_rotor.name = "cia_rotor"
-	heli_rotor.width = 1.5
-	heli_rotor.default_color = Color(0.3, 0.3, 0.3, 0.8)
-	heli_rotor.add_point(Vector2(-20, 0))
-	heli_rotor.add_point(Vector2(20, 0))
-	heli_rotor.position = Vector2(0, -8)
-	cia_heli.add_child(heli_rotor)
-
-	var cia_lbl := Label.new()
-	cia_lbl.text = "CIA"
-	cia_lbl.add_theme_font_size_override("font_size", 5)
-	cia_lbl.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 0.8))
-	cia_lbl.position = Vector2(-6, -5)
-	cia_heli.add_child(cia_lbl)
-
-	var heli_skid := ColorRect.new()
-	heli_skid.size = Vector2(14, 1)
-	heli_skid.position = Vector2(-8, 7)
-	heli_skid.color = Color(0.2, 0.2, 0.2, 0.8)
-	cia_heli.add_child(heli_skid)
-
-	# Animate rotor spinning via process frame
-	var cia_rotor_ref: Array[float] = [0.0]
-	get_tree().process_frame.connect(func() -> void:
-		if is_instance_valid(heli_rotor):
-			cia_rotor_ref[0] += get_process_delta_time() * 25.0
-			heli_rotor.rotation = cia_rotor_ref[0]
-	)
-
-	# Helicopter zooms in from right, hovers over player
-	var hover_x: float = player_pos.x + 10
-	tw.tween_property(cia_heli, "position", Vector2(hover_x, player_pos.y - 50), 0.6).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-
-	# Screen shake as helicopter arrives
-	tw.tween_callback(func() -> void:
-		_screen_shake(6.0, 0.5)
-		# Hammer drops — the player is interrupted
-		var drop_tw := create_tween()
-		drop_tw.tween_property(hammer, "rotation", deg_to_rad(180), 0.3)
-		drop_tw.parallel().tween_property(hammer, "position:y", hammer.position.y + 60, 0.4).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
-		drop_tw.parallel().tween_property(hammer, "modulate:a", 0.0, 0.4)
-		drop_tw.tween_callback(hammer.queue_free)
-	)
-
-	# Step 5: CIA agents rappel down (two dark figures)
-	tw.tween_interval(0.4)
-
-	var agent1 := Node2D.new()
-	agent1.z_index = 14
-	agent1.modulate.a = 0.0
-	add_child(agent1)
-	var agent1_body := ColorRect.new()
-	agent1_body.size = Vector2(5, 10)
-	agent1_body.position = Vector2(-2, -5)
-	agent1_body.color = Color(0.05, 0.05, 0.05)
-	agent1.add_child(agent1_body)
-	var agent1_head := ColorRect.new()
-	agent1_head.size = Vector2(4, 4)
-	agent1_head.position = Vector2(-2, -9)
-	agent1_head.color = Color(0.08, 0.08, 0.08)
-	agent1.add_child(agent1_head)
-	agent1.position = Vector2(player_pos.x - 8, player_pos.y - 45)
-
-	var agent2 := Node2D.new()
-	agent2.z_index = 14
-	agent2.modulate.a = 0.0
-	add_child(agent2)
-	var agent2_body := ColorRect.new()
-	agent2_body.size = Vector2(5, 10)
-	agent2_body.position = Vector2(-2, -5)
-	agent2_body.color = Color(0.05, 0.05, 0.05)
-	agent2.add_child(agent2_body)
-	var agent2_head := ColorRect.new()
-	agent2_head.size = Vector2(4, 4)
-	agent2_head.position = Vector2(-2, -9)
-	agent2_head.color = Color(0.08, 0.08, 0.08)
-	agent2.add_child(agent2_head)
-	agent2.position = Vector2(player_pos.x + 12, player_pos.y - 45)
-
-	# Agents drop down to player level
-	tw.tween_callback(func() -> void:
-		agent1.modulate.a = 1.0
-		agent2.modulate.a = 1.0
-		var a1_tw := create_tween()
-		a1_tw.tween_property(agent1, "position:y", player_pos.y, 0.35).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
-		var a2_tw := create_tween()
-		a2_tw.tween_property(agent2, "position:y", player_pos.y, 0.35).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD).set_delay(0.1)
-	)
-
-	tw.tween_interval(0.5)
-
-	# Step 6: "ARRESTED" text slams in — red flash
-	tw.tween_callback(func() -> void:
-		_screen_shake(8.0, 0.5)
-		SceneManager.flash_white(0.3)
-	)
-
-	var arrest_label := Label.new()
-	arrest_label.text = "ARRESTED"
-	arrest_label.add_theme_font_size_override("font_size", 36)
-	arrest_label.add_theme_color_override("font_color", Color(1.0, 0.1, 0.05))
-	arrest_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.95))
-	arrest_label.add_theme_constant_override("shadow_offset_x", 3)
-	arrest_label.add_theme_constant_override("shadow_offset_y", 3)
-	arrest_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	arrest_label.position = Vector2(player_pos.x - 60, player_pos.y - 70)
-	arrest_label.size = Vector2(120, 50)
-	arrest_label.z_index = 17
-	arrest_label.scale = Vector2(2.5, 2.5)
-	arrest_label.pivot_offset = Vector2(60, 25)
-	add_child(arrest_label)
-
-	tw.tween_property(arrest_label, "scale", Vector2(1.0, 1.0), 0.35).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BOUNCE)
-
-	# Step 7: Agents grab player and drag upward toward helicopter
-	tw.tween_interval(0.6)
-	tw.tween_callback(func() -> void:
-		# Move agents + player upward together toward helicopter
-		var lift_duration: float = 1.2
-		if player_node and is_instance_valid(player_node):
-			var lift_tw := create_tween()
-			lift_tw.set_parallel(true)
-			lift_tw.tween_property(player_node, "position:y", player_pos.y - 80, lift_duration).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-			lift_tw.tween_property(player_node, "modulate:a", 0.0, lift_duration).set_delay(0.5)
-		var a1_lift := create_tween()
-		a1_lift.set_parallel(true)
-		a1_lift.tween_property(agent1, "position:y", player_pos.y - 80, lift_duration).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-		a1_lift.tween_property(agent1, "modulate:a", 0.0, lift_duration).set_delay(0.5)
-		var a2_lift := create_tween()
-		a2_lift.set_parallel(true)
-		a2_lift.tween_property(agent2, "position:y", player_pos.y - 80, lift_duration).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-		a2_lift.tween_property(agent2, "modulate:a", 0.0, lift_duration).set_delay(0.5)
-	)
-
-	# Step 8: Helicopter flies away with the drainer
-	tw.tween_interval(0.8)
-	tw.tween_callback(func() -> void:
-		var fly_tw := create_tween()
-		fly_tw.tween_property(cia_heli, "position", Vector2(island_center_x - 600, -30), 1.5).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
-		fly_tw.tween_callback(func() -> void:
-			cia_heli.queue_free()
-			agent1.queue_free()
-			agent2.queue_free()
-		)
-	)
-
-	# Step 9: Politicians look around smugly — they dust off
-	tw.tween_interval(0.8)
-	tw.tween_callback(func() -> void:
-		# Politicians do a little "dust off" wobble
-		for pi in range(politician_nodes.size()):
-			var pn: Node2D = politician_nodes[pi]
-			if is_instance_valid(pn):
-				var dust_tw := create_tween()
-				dust_tw.tween_property(pn, "rotation_degrees", 5.0, 0.15).set_delay(float(pi) * 0.08)
-				dust_tw.tween_property(pn, "rotation_degrees", -5.0, 0.15)
-				dust_tw.tween_property(pn, "rotation_degrees", 0.0, 0.15)
-	)
-
-	# Step 10: Arrest text fades out
-	tw.tween_interval(1.0)
-	tw.tween_callback(func() -> void:
-		var fade_tw := create_tween()
-		fade_tw.tween_property(arrest_label, "modulate:a", 0.0, 0.5)
-		fade_tw.tween_callback(arrest_label.queue_free)
-	)
-
-	# Step 11: Pause then show credits
-	tw.tween_interval(0.8)
-	tw.tween_callback(func() -> void:
-		_show_credits_newspaper()
-	)
-
-func _show_credits_newspaper() -> void:
-	# Build a full-screen credits overlay — similar to milestone newspaper but special
-	var credits_layer := CanvasLayer.new()
-	credits_layer.layer = 95
-	add_child(credits_layer)
-
-	var vp_size: Vector2 = get_viewport_rect().size
-
-	var overlay := ColorRect.new()
-	overlay.size = vp_size
-	overlay.color = Color(0, 0, 0, 0.0)
-	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	credits_layer.add_child(overlay)
-
-	var panel := PanelContainer.new()
-	var panel_w: float = 440.0
-	var panel_h: float = 340.0
-	panel.position = Vector2((vp_size.x - panel_w) * 0.5, (vp_size.y - panel_h) * 0.5)
-	panel.size = Vector2(panel_w, panel_h)
-	panel.modulate = Color(1, 1, 1, 0)
-
-	var paper_style := StyleBoxFlat.new()
-	paper_style.bg_color = Color(0.92, 0.88, 0.78)
-	paper_style.border_color = Color(0.3, 0.25, 0.2)
-	paper_style.border_width_top = 2
-	paper_style.border_width_bottom = 2
-	paper_style.border_width_left = 2
-	paper_style.border_width_right = 2
-	paper_style.corner_radius_top_left = 2
-	paper_style.corner_radius_top_right = 2
-	paper_style.corner_radius_bottom_left = 2
-	paper_style.corner_radius_bottom_right = 2
-	paper_style.content_margin_left = 16
-	paper_style.content_margin_right = 16
-	paper_style.content_margin_top = 12
-	paper_style.content_margin_bottom = 12
-	panel.add_theme_stylebox_override("panel", paper_style)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	panel.add_child(vbox)
-
-	var masthead := Label.new()
-	masthead.text = "THE SWAMP GAZETTE"
-	masthead.add_theme_font_size_override("font_size", 16)
-	masthead.add_theme_color_override("font_color", Color(0.15, 0.12, 0.10))
-	masthead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(masthead)
-
-	var date_lbl := Label.new()
-	date_lbl.text = "SPECIAL EDITION"
-	date_lbl.add_theme_font_size_override("font_size", 8)
-	date_lbl.add_theme_color_override("font_color", Color(0.4, 0.38, 0.35))
-	date_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(date_lbl)
-
-	var sep1 := HSeparator.new()
-	var sep_style := StyleBoxFlat.new()
-	sep_style.bg_color = Color(0.3, 0.25, 0.2, 0.5)
-	sep_style.content_margin_top = 2
-	sep_style.content_margin_bottom = 2
-	sep1.add_theme_stylebox_override("separator", sep_style)
-	vbox.add_child(sep1)
-
-	var headline := Label.new()
-	headline.text = "DRAINER ARRESTED IN DRAMATIC ISLAND RAID"
-	headline.add_theme_font_size_override("font_size", 14)
-	headline.add_theme_color_override("font_color", Color(0.12, 0.10, 0.08))
-	headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	headline.autowrap_mode = TextServer.AUTOWRAP_WORD
-	vbox.add_child(headline)
-
-	var subhead := Label.new()
-	subhead.text = "CIA intercepts lone employee moments before confrontation with officials"
-	subhead.add_theme_font_size_override("font_size", 9)
-	subhead.add_theme_color_override("font_color", Color(0.35, 0.32, 0.28))
-	subhead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(subhead)
-
-	var sep2 := HSeparator.new()
-	var sep_style2 := StyleBoxFlat.new()
-	sep_style2.bg_color = Color(0.3, 0.25, 0.2, 0.5)
-	sep_style2.content_margin_top = 2
-	sep_style2.content_margin_bottom = 2
-	sep2.add_theme_stylebox_override("separator", sep_style2)
-	vbox.add_child(sep2)
-
-	var body := Label.new()
-	body.text = "In a dramatic conclusion to the Swamp Draining Initiative, CIA operatives intercepted the lone employee on the private island moments before he could confront officials. The drainer, armed with what witnesses described as \"some kind of hammer,\" was airlifted from the scene in federal custody.\n\nWHERE ARE THEY NOW:\n\nSENATE MAJORITY LEADER GOODWELL — Issued blanket pardons for all implicated officials. \"There was no corruption. There was never any corruption. Focus on what matters.\"\n\nSENATOR SWAMPSWORTH — Fully exonerated. Appointed head of new \"Wetlands Restoration Committee.\" Budget: $600M.\n\nCONGRESSWOMAN LOBBYTON — Published memoir \"I Was The Victim\" which debuted at #1. Currently suing the drainer for defamation.\n\nTHE CONSULTANT — Hired to lead investigation into the drainer. Budget: $2M. Report due \"eventually.\"\n\nMAYOR KICKBACK — Reinstated. Awarded Medal of Public Service for \"enduring the swamp crisis.\"\n\nPRESS SECRETARY SPINWELL — Promoted. Now leads campaign to rebrand draining as \"aquatic vandalism.\"\n\nJEFF — No comment.\n\nTHE DRAINER — Held at undisclosed location. Charges include \"environmental terrorism\" and \"misappropriation of government spoon.\""
-	body.add_theme_font_size_override("font_size", 7)
-	body.add_theme_color_override("font_color", Color(0.18, 0.15, 0.12))
-	body.autowrap_mode = TextServer.AUTOWRAP_WORD
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(body)
-
-	var credits := Label.new()
-	credits.text = "DRAIN THE SWAMP\nThanks for playing!"
-	credits.add_theme_font_size_override("font_size", 10)
-	credits.add_theme_color_override("font_color", Color(0.5, 0.45, 0.35))
-	credits.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(credits)
-
-	var prompt := Label.new()
-	prompt.text = "[Press any key to continue]"
-	prompt.add_theme_font_size_override("font_size", 10)
-	prompt.add_theme_color_override("font_color", Color(0.9, 0.75, 0.4))
-	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(prompt)
-
-	overlay.add_child(panel)
-
-	# Fade in
-	var tw := create_tween()
-	tw.set_parallel(true)
-	tw.tween_property(overlay, "color:a", 0.85, 0.8)
-	tw.tween_property(panel, "modulate:a", 1.0, 0.8)
-	tw.set_parallel(false)
-	tw.tween_interval(0.5)
-	tw.tween_callback(func() -> void:
-		# Wait for any key, then return to title
-		_wait_for_credits_dismiss(overlay, panel, credits_layer, prompt)
-	)
-
-func _wait_for_credits_dismiss(overlay: ColorRect, panel: PanelContainer, layer: CanvasLayer, prompt: Label) -> void:
-	var elapsed_ref: Array[float] = [0.0]
-	var dismissed: Array[bool] = [false]
-	var check_fn: Callable
-	check_fn = func(delta_val: float) -> void:
-		if dismissed[0]:
-			return
-		elapsed_ref[0] += delta_val
-		prompt.modulate.a = 0.5 + 0.5 * sin(elapsed_ref[0] * 2.0)
-		if Input.is_action_just_pressed("scoop") or Input.is_action_just_pressed("ui_cancel") or Input.is_action_just_pressed("ui_accept"):
-			dismissed[0] = true
-			var tw_out := create_tween()
-			tw_out.set_parallel(true)
-			tw_out.tween_property(overlay, "color:a", 0.0, 0.5)
-			tw_out.tween_property(panel, "modulate:a", 0.0, 0.5)
-			tw_out.set_parallel(false)
-			tw_out.tween_interval(0.3)
-			tw_out.tween_callback(func() -> void:
-				layer.queue_free()
-				_show_refill_cinematic()
-			)
-	get_tree().process_frame.connect(func() -> void:
-		if is_instance_valid(layer):
-			check_fn.call(get_process_delta_time())
-	)
-
-func _show_refill_cinematic() -> void:
-	# Post-credits: camera pans across landscape while pools refill, then final newspaper
-	var cam: Camera2D = get_viewport().get_camera_2d()
-	if not cam:
-		_show_final_newspaper()
-		return
-
-	# Fade to black
-	var fade_layer := CanvasLayer.new()
-	fade_layer.layer = 94
-	add_child(fade_layer)
-	var fade_rect := ColorRect.new()
-	fade_rect.size = get_viewport_rect().size
-	fade_rect.color = Color(0, 0, 0, 0)
-	fade_rect.mouse_filter = Control.MOUSE_FILTER_STOP
-	fade_layer.add_child(fade_rect)
-
-	var tw := create_tween()
-	tw.tween_property(fade_rect, "color:a", 1.0, 0.5)
-	tw.tween_interval(0.5)
-
-	# Detach camera from player and start panning
-	tw.tween_callback(func() -> void:
-		# Position camera at leftmost pool
-		cam.position = Vector2(200, 200)
-		# Disable camera following player
-		var players_rc: Array[Node] = get_tree().get_nodes_in_group("player")
-		if players_rc.size() > 0 and is_instance_valid(players_rc[0]):
-			players_rc[0].visible = false
-	)
-
-	# Fade back in
-	tw.tween_property(fade_rect, "color:a", 0.0, 0.8)
-
-	# Pan camera right across the landscape (x=200 to x=2000 over 4 seconds)
-	tw.tween_property(cam, "position:x", 2000.0, 4.0).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-
-	# During the pan, refill water polygons by emitting signals
-	tw.parallel().tween_callback(func() -> void:
-		_animate_pool_refill()
-	).set_delay(0.5)
-
-	# Pause at end
-	tw.tween_interval(1.0)
-
-	# Fade to black again
-	tw.tween_property(fade_rect, "color:a", 1.0, 0.5)
-	tw.tween_interval(0.3)
-
-	# Show final newspaper
-	tw.tween_callback(func() -> void:
-		fade_layer.queue_free()
-		_show_final_newspaper()
-	)
-
-func _animate_pool_refill() -> void:
-	# Gradually raise water levels across all pools over ~3 seconds
-	# We do this by tweening water polygon top vertices downward (raising water level visually)
-	for i in range(SWAMP_COUNT):
-		if i >= water_polygons.size():
-			break
-		var water_poly: Polygon2D = water_polygons[i]
-		if not is_instance_valid(water_poly):
-			continue
-		# Make water visible and animate alpha up
-		water_poly.visible = true
-		var refill_tw := create_tween()
-		var delay_val: float = float(i) * 0.25  # Stagger each pool
-		refill_tw.tween_property(water_poly, "modulate:a", 1.0, 0.8).set_delay(delay_val)
-
-func _show_final_newspaper() -> void:
-	# Goodwell "Refill the Swamp" newspaper
-	var final_layer := CanvasLayer.new()
-	final_layer.layer = 95
-	add_child(final_layer)
-
-	var vp_size: Vector2 = get_viewport_rect().size
-
-	var overlay := ColorRect.new()
-	overlay.size = vp_size
-	overlay.color = Color(0, 0, 0, 0.0)
-	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	final_layer.add_child(overlay)
-
-	var panel := PanelContainer.new()
-	var panel_w: float = 420.0
-	var panel_h: float = 300.0
-	panel.position = Vector2((vp_size.x - panel_w) * 0.5, (vp_size.y - panel_h) * 0.5)
-	panel.size = Vector2(panel_w, panel_h)
-	panel.modulate = Color(1, 1, 1, 0)
-
-	var paper_style := StyleBoxFlat.new()
-	paper_style.bg_color = Color(0.94, 0.90, 0.82)
-	paper_style.border_color = Color(0.3, 0.25, 0.2)
-	paper_style.border_width_top = 2
-	paper_style.border_width_bottom = 2
-	paper_style.border_width_left = 2
-	paper_style.border_width_right = 2
-	paper_style.corner_radius_top_left = 2
-	paper_style.corner_radius_top_right = 2
-	paper_style.corner_radius_bottom_left = 2
-	paper_style.corner_radius_bottom_right = 2
-	paper_style.content_margin_left = 16
-	paper_style.content_margin_right = 16
-	paper_style.content_margin_top = 12
-	paper_style.content_margin_bottom = 12
-	panel.add_theme_stylebox_override("panel", paper_style)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	panel.add_child(vbox)
-
-	var masthead := Label.new()
-	masthead.text = "THE SWAMP GAZETTE"
-	masthead.add_theme_font_size_override("font_size", 16)
-	masthead.add_theme_color_override("font_color", Color(0.15, 0.12, 0.10))
-	masthead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(masthead)
-
-	var date_lbl := Label.new()
-	date_lbl.text = "SPECIAL EVENING EDITION"
-	date_lbl.add_theme_font_size_override("font_size", 8)
-	date_lbl.add_theme_color_override("font_color", Color(0.4, 0.38, 0.35))
-	date_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(date_lbl)
-
-	var sep1 := HSeparator.new()
-	var sep_style := StyleBoxFlat.new()
-	sep_style.bg_color = Color(0.3, 0.25, 0.2, 0.5)
-	sep_style.content_margin_top = 2
-	sep_style.content_margin_bottom = 2
-	sep1.add_theme_stylebox_override("separator", sep_style)
-	vbox.add_child(sep1)
-
-	var headline := Label.new()
-	headline.text = "GOODWELL: \"IT WAS ALL FAKE. MOVE ON.\""
-	headline.add_theme_font_size_override("font_size", 12)
-	headline.add_theme_color_override("font_color", Color(0.12, 0.10, 0.08))
-	headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	headline.autowrap_mode = TextServer.AUTOWRAP_WORD
-	vbox.add_child(headline)
-
-	var subhead := Label.new()
-	subhead.text = "All officials pardoned, swamp ordered refilled, public told to \"focus on more important things\""
-	subhead.add_theme_font_size_override("font_size", 9)
-	subhead.add_theme_color_override("font_color", Color(0.35, 0.32, 0.28))
-	subhead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subhead.autowrap_mode = TextServer.AUTOWRAP_WORD
-	vbox.add_child(subhead)
-
-	var sep2 := HSeparator.new()
-	var sep_style2 := StyleBoxFlat.new()
-	sep_style2.bg_color = Color(0.3, 0.25, 0.2, 0.5)
-	sep_style2.content_margin_top = 2
-	sep_style2.content_margin_bottom = 2
-	sep2.add_theme_stylebox_override("separator", sep_style2)
-	vbox.add_child(sep2)
-
-	var body := Label.new()
-	body.text = "Senate Majority Leader Goodwell held a press conference today declaring the entire swamp scandal \"fabricated\" and urging citizens to \"focus on more important things.\"\n\n\"There was no island. There were no officials. The swamp was always fine,\" Goodwell said, standing ankle-deep in swamp water. \"This was a coordinated hoax by one disgruntled employee with a spoon.\"\n\nAll seven officials have been pardoned and reinstated. The swamp has been ordered refilled at a cost of $400M to taxpayers. The drainer's $500 field operations budget has been reclassified as \"misappropriated funds\" and added to his growing list of charges.\n\nThe drainer remains in federal custody. His court-appointed attorney says he is \"doing fine\" and \"has requested a larger spoon, which was denied.\""
-	body.add_theme_font_size_override("font_size", 8)
-	body.add_theme_color_override("font_color", Color(0.18, 0.15, 0.12))
-	body.autowrap_mode = TextServer.AUTOWRAP_WORD
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(body)
-
-	var prompt := Label.new()
-	prompt.text = "[Press any key to return to title]"
-	prompt.add_theme_font_size_override("font_size", 10)
-	prompt.add_theme_color_override("font_color", Color(0.9, 0.75, 0.4))
-	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(prompt)
-
-	overlay.add_child(panel)
-
-	# Fade in
-	var tw := create_tween()
-	tw.set_parallel(true)
-	tw.tween_property(overlay, "color:a", 0.85, 0.8)
-	tw.tween_property(panel, "modulate:a", 1.0, 0.8)
-	tw.set_parallel(false)
-	tw.tween_interval(0.5)
-	tw.tween_callback(func() -> void:
-		_wait_for_final_dismiss(overlay, panel, final_layer, prompt)
-	)
-
-func _wait_for_final_dismiss(overlay: ColorRect, panel: PanelContainer, layer: CanvasLayer, prompt: Label) -> void:
-	var elapsed_ref: Array[float] = [0.0]
-	var dismissed: Array[bool] = [false]
-	var check_fn: Callable
-	check_fn = func(delta_val: float) -> void:
-		if dismissed[0]:
-			return
-		elapsed_ref[0] += delta_val
-		prompt.modulate.a = 0.5 + 0.5 * sin(elapsed_ref[0] * 2.0)
-		if Input.is_action_just_pressed("scoop") or Input.is_action_just_pressed("ui_cancel") or Input.is_action_just_pressed("ui_accept"):
-			dismissed[0] = true
-			var tw_out := create_tween()
-			tw_out.set_parallel(true)
-			tw_out.tween_property(overlay, "color:a", 0.0, 0.5)
-			tw_out.tween_property(panel, "modulate:a", 0.0, 0.5)
-			tw_out.set_parallel(false)
-			tw_out.tween_interval(0.3)
-			tw_out.tween_callback(func() -> void:
-				layer.queue_free()
-				SceneManager.transition_to_scene("res://scenes/title_screen.tscn")
-			)
-	get_tree().process_frame.connect(func() -> void:
-		if is_instance_valid(layer):
-			check_fn.call(get_process_delta_time())
-	)
 
 # --- Water Detection ---
 func _build_water_detect_areas() -> void:
@@ -4796,6 +4227,10 @@ func _on_swamp_completed(swamp_index: int, reward: float) -> void:
 	if swamp_index >= 0 and swamp_index < swamp_gallon_labels.size():
 		swamp_gallon_labels[swamp_index].text = "DRAINED"
 		swamp_gallon_labels[swamp_index].add_theme_color_override("font_color", Color(0.3, 1.0, 0.4, 0.8))
+	# Atlantic (pool 9): skip all normal effects, go straight to endgame
+	if swamp_index == 9 and not endgame_triggered:
+		_trigger_endgame()
+		return
 	# Phase 7a: Heavy screen shake on swamp drained
 	_screen_shake(5.0, 0.3)
 	# Phase 7c: Milestone flash — golden vignette pulse + brief scale bounce
@@ -5754,18 +5189,6 @@ func _build_distance_fog() -> void:
 
 # --- Day/Night Cycle & Animation ---
 func _process(delta: float) -> void:
-	# Endgame: check if player is near Jeff and presses scoop
-	if player_near_jeff and not endgame_triggered and Input.is_action_just_pressed("scoop"):
-		if GameManager.is_swamp_completed(9):
-			_trigger_endgame()
-
-	# Consultant reports — check scoop action
-	if Input.is_action_just_pressed("scoop"):
-		for rd in report_areas:
-			if rd["near"]:
-				SceneManager.show_document_popup(rd["text"], rd["title"])
-				break
-
 	# Helicopter flyover — after pool 4 drained
 	if GameManager.is_swamp_completed(4):
 		helicopter_timer += delta
@@ -6848,93 +6271,6 @@ func _build_billboards() -> void:
 		border.z_index = 1
 		sign_node.add_child(border)
 
-func _build_consultant_reports() -> void:
-	var report_data_list: Array[Dictionary] = [
-		{"title": "THE CONSULTANT — QUARTERLY REPORT #1", "text": "After extensive analysis of the swamp drainage situation, I recommend continued monitoring of all variables. A follow-up study is warranted. Budget request: $500,000.\n\n[14 pages of appendices not included]"},
-		{"title": "THE CONSULTANT — QUARTERLY REPORT #7", "text": "Situation unchanged. Recommend patience. See previous reports for details.\n\nBudget request: $500,000.\n\n[No appendices]"},
-		{"title": "THE CONSULTANT — QUARTERLY REPORT #14", "text": "Still wet. Will advise.\n\n$500,000 please."},
-		{"title": "THE CONSULTANT — QUARTERLY REPORT #21", "text": "idk maybe wait?\n\n-TC\n\nP.S. Invoice attached."},
-	]
-	# Place on odd ridges: 1, 3, 5, 7 (0-indexed from SWAMP_RANGES)
-	var ridge_indices: Array[int] = [0, 2, 4, 6]
-	for ri in range(ridge_indices.size()):
-		var rpt: Dictionary = report_data_list[ri]
-		var ridge_i: int = ridge_indices[ri]
-		var ridge_start: int = SWAMP_RANGES[ridge_i][1]
-		var ridge_end: int = SWAMP_RANGES[ridge_i + 1][0]
-		if ridge_start >= terrain_points.size() or ridge_end >= terrain_points.size():
-			continue
-		# Offset from billboard center so they don't overlap
-		var ridge_mid_x: float = (terrain_points[ridge_start].x + terrain_points[ridge_end].x) * 0.5 + 30.0
-		var ground_y: float = _get_terrain_y_at(ridge_mid_x)
-		if ground_y < 0:
-			continue
-
-		var root := Node2D.new()
-		root.position = Vector2(ridge_mid_x, ground_y)
-		root.z_index = 3
-		add_child(root)
-
-		# Crumpled paper visual — tan irregular polygon
-		var paper := Polygon2D.new()
-		paper.polygon = PackedVector2Array([
-			Vector2(-5, -3), Vector2(-3, -6), Vector2(2, -5),
-			Vector2(5, -4), Vector2(6, -1), Vector2(4, 2),
-			Vector2(1, 4), Vector2(-4, 3), Vector2(-6, 0),
-		])
-		paper.color = Color(0.82, 0.76, 0.62, 0.85)
-		root.add_child(paper)
-
-		# Crinkle lines
-		var line1 := Line2D.new()
-		line1.width = 0.5
-		line1.default_color = Color(0.65, 0.58, 0.45, 0.4)
-		line1.add_point(Vector2(-3, -2))
-		line1.add_point(Vector2(3, 1))
-		root.add_child(line1)
-
-		var line2 := Line2D.new()
-		line2.width = 0.5
-		line2.default_color = Color(0.65, 0.58, 0.45, 0.3)
-		line2.add_point(Vector2(-1, -4))
-		line2.add_point(Vector2(2, 3))
-		root.add_child(line2)
-
-		# Interaction area
-		var area := Area2D.new()
-		area.collision_layer = 0
-		area.collision_mask = 1
-		var coll := CollisionShape2D.new()
-		var shape := RectangleShape2D.new()
-		shape.size = Vector2(20, 20)
-		coll.shape = shape
-		coll.position = Vector2(0, -2)
-		area.add_child(coll)
-		root.add_child(area)
-
-		var hint := Label.new()
-		hint.text = "[SPACE]"
-		hint.add_theme_font_size_override("font_size", 10)
-		hint.add_theme_color_override("font_color", Color(0.8, 0.75, 0.6, 0.8))
-		hint.position = Vector2(-16, -20)
-		hint.z_index = 8
-		hint.visible = false
-		root.add_child(hint)
-
-		var report_data: Dictionary = {"area": area, "title": rpt["title"], "text": rpt["text"], "near": false, "hint": hint}
-		report_areas.append(report_data)
-
-		var r_idx: int = ri
-		area.body_entered.connect(func(body: Node2D) -> void:
-			if body is CharacterBody2D:
-				report_areas[r_idx]["near"] = true
-				report_areas[r_idx]["hint"].visible = true
-		)
-		area.body_exited.connect(func(body: Node2D) -> void:
-			if body is CharacterBody2D:
-				report_areas[r_idx]["near"] = false
-				report_areas[r_idx]["hint"].visible = false
-		)
 
 func _build_cave_entrances() -> void:
 	cave_entrances.clear()
