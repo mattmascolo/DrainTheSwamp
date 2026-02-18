@@ -24,15 +24,8 @@ jobs:
 
       - name: Setup export templates
         run: |
-          echo "HOME=$HOME"
-          echo "Looking for templates..."
-          find /root/.local/share/godot -name "*.zip" 2>/dev/null || echo "No zips under /root"
-          find /github/home/.local/share/godot -name "*.zip" 2>/dev/null || echo "No zips under /github/home"
-          ls -la /root/.local/share/godot/export_templates/4.4.stable/ 2>/dev/null || echo "No export_templates under /root"
-          ls -la /root/.local/share/godot/templates/4.4.stable/ 2>/dev/null || echo "No templates under /root"
           mkdir -p /github/home/.local/share/godot/export_templates/4.4.stable
-          cp /root/.local/share/godot/export_templates/4.4.stable/* /github/home/.local/share/godot/export_templates/4.4.stable/ 2>/dev/null || true
-          ls -la /github/home/.local/share/godot/export_templates/4.4.stable/ || echo "Still empty"
+          cp /root/.local/share/godot/export_templates/4.4.stable/* /github/home/.local/share/godot/export_templates/4.4.stable/
 
       - name: Import project
         run: godot --headless --import 2>&1 || true
@@ -46,7 +39,7 @@ jobs:
 
       - name: Add coi-serviceworker for SharedArrayBuffer
         run: |
-          wget -q https://raw.githubusercontent.com/nickcis/coi-serviceworker/master/coi-serviceworker.min.js -O build/web/coi-serviceworker.min.js
+          wget -q https://raw.githubusercontent.com/gzuidhof/coi-serviceworker/master/coi-serviceworker.min.js -O build/web/coi-serviceworker.min.js
           sed -i 's|<head>|<head>\n<script src="coi-serviceworker.min.js"></script>|' build/web/index.html
 
       - uses: actions/upload-pages-artifact@v3
