@@ -4,7 +4,7 @@ var enabled: bool = false
 var _left_pressed: bool = false
 var _right_pressed: bool = false
 var _scoop_pressed: bool = false
-var _scoop_mouse_events: Array = []
+var _cancel_scoop_this_frame: bool = false
 
 var left_btn: TouchScreenButton
 var right_btn: TouchScreenButton
@@ -12,18 +12,24 @@ var scoop_btn: TouchScreenButton
 
 var _container: Control
 
+const LEFT_SIZE := Vector2(50, 50)
+const RIGHT_SIZE := Vector2(50, 50)
+const SCOOP_SIZE := Vector2(72, 72)
+
 func _ready() -> void:
 	layer = 12
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Run physics before player (default 0) so we can cancel spurious scoops
+	process_physics_priority = -1
 
 	_container = Control.new()
 	_container.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_container)
 
-	left_btn = _create_button("<", Vector2(50, 50), 20)
-	right_btn = _create_button(">", Vector2(50, 50), 20)
-	scoop_btn = _create_button("SCOOP", Vector2(72, 72), 14)
+	left_btn = _create_button("<", LEFT_SIZE, 20)
+	right_btn = _create_button(">", RIGHT_SIZE, 20)
+	scoop_btn = _create_button("SCOOP", SCOOP_SIZE, 14)
 
 	# Viewport is 640x360, position above bottom bar
 	left_btn.position = Vector2(8, 260)
@@ -135,6 +141,28 @@ func _on_button_released(which: String) -> void:
 				_scoop_pressed = false
 				Input.action_release("scoop")
 
+func _input(event: InputEvent) -> void:
+	if not enabled or not _container.visible:
+		return
+	# When a touch lands on an arrow button, the emulated mouse click also
+	# triggers scoop. Flag it so _physics_process can cancel before player sees it.
+	if event is InputEventScreenTouch and event.pressed:
+		if _point_on_arrow(event.position):
+			_cancel_scoop_this_frame = true
+
+func _physics_process(_delta: float) -> void:
+	# Runs before player (priority -1 vs 0) to cancel spurious scoops
+	if _cancel_scoop_this_frame:
+		_cancel_scoop_this_frame = false
+		# Only cancel if scoop wasn't intentionally pressed via SCOOP button
+		if not _scoop_pressed:
+			Input.action_release("scoop")
+
+func _point_on_arrow(pos: Vector2) -> bool:
+	var left_rect := Rect2(left_btn.position, LEFT_SIZE)
+	var right_rect := Rect2(right_btn.position, RIGHT_SIZE)
+	return left_rect.has_point(pos) or right_rect.has_point(pos)
+
 func _process(_delta: float) -> void:
 	if not enabled:
 		return
@@ -171,24 +199,8 @@ func set_enabled(value: bool) -> void:
 func _activate() -> void:
 	enabled = true
 	_container.visible = true
-	# Remove mouse click from scoop action so emulated touch-clicks
-	# don't trigger scoop/shop/cave when pressing arrow buttons
-	_remove_mouse_from_scoop()
 
 func _deactivate() -> void:
 	enabled = false
 	_container.visible = false
 	_release_all()
-	_restore_mouse_to_scoop()
-
-func _remove_mouse_from_scoop() -> void:
-	_scoop_mouse_events.clear()
-	for event in InputMap.action_get_events("scoop"):
-		if event is InputEventMouseButton:
-			_scoop_mouse_events.append(event)
-			InputMap.action_erase_event("scoop", event)
-
-func _restore_mouse_to_scoop() -> void:
-	for event in _scoop_mouse_events:
-		InputMap.action_add_event("scoop", event)
-	_scoop_mouse_events.clear()
