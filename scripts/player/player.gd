@@ -287,6 +287,8 @@ func _auto_scoop_water() -> void:
 		_scoop_feedback()
 
 func _handle_scoop() -> void:
+	if not TouchControls.is_intentional_scoop():
+		return
 	if near_cave_entrance and near_cave_id != "":
 		cave_entrance_requested.emit(near_cave_id)
 		scoop_cooldown_timer = SCOOP_COOLDOWN

@@ -77,7 +77,7 @@ func _build_interaction() -> void:
 
 	# Hint label
 	hint_label = Label.new()
-	hint_label.text = "[SPACE]"
+	hint_label.text = "[SCOOP]" if TouchControls.enabled else "[SPACE]"
 	hint_label.add_theme_font_size_override("font_size", 10)
 	hint_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 0.8))
 	hint_label.position = Vector2(-16, -28)
@@ -103,7 +103,7 @@ func _process(delta: float) -> void:
 		glow_light.energy = lerpf(1.0, 2.0, (sin(wave_time * 2.5) + 1.0) * 0.5)
 
 	# Check for interaction
-	if player_in_range and not collected and Input.is_action_just_pressed("scoop"):
+	if player_in_range and not collected and Input.is_action_just_pressed("scoop") and TouchControls.is_intentional_scoop():
 		_collect()
 
 func _collect() -> void:

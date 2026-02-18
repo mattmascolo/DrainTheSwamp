@@ -4,6 +4,7 @@ var enabled: bool = false
 var _left_pressed: bool = false
 var _right_pressed: bool = false
 var _scoop_pressed: bool = false
+var scoop_via_button: bool = false
 
 var left_btn: TouchScreenButton
 var right_btn: TouchScreenButton
@@ -104,24 +105,23 @@ func _create_button(text: String, btn_size: Vector2, font_size: int) -> TouchScr
 
 	return btn
 
+func is_intentional_scoop() -> bool:
+	return not enabled or scoop_via_button
+
 func _on_button_pressed(which: String) -> void:
 	match which:
 		"<":
 			if not _left_pressed:
 				_left_pressed = true
 				Input.action_press("move_left")
-				# The emulated mouse click from this touch already pressed scoop.
-				# Undo it immediately — this runs during input processing, before
-				# any _physics_process sees it.
-				Input.action_release("scoop")
 		">":
 			if not _right_pressed:
 				_right_pressed = true
 				Input.action_press("move_right")
-				Input.action_release("scoop")
 		"SCOOP":
 			if not _scoop_pressed:
 				_scoop_pressed = true
+				scoop_via_button = true
 				Input.action_press("scoop")
 
 func _on_button_released(which: String) -> void:
@@ -137,6 +137,7 @@ func _on_button_released(which: String) -> void:
 		"SCOOP":
 			if _scoop_pressed:
 				_scoop_pressed = false
+				scoop_via_button = false
 				Input.action_release("scoop")
 
 func _process(_delta: float) -> void:
@@ -164,6 +165,7 @@ func _release_all() -> void:
 		Input.action_release("move_right")
 	if _scoop_pressed:
 		_scoop_pressed = false
+		scoop_via_button = false
 		Input.action_release("scoop")
 
 func set_enabled(value: bool) -> void:
