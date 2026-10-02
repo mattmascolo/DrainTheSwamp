@@ -85,15 +85,25 @@ var _tool_ground: bool = false
 var _dbg_walk: int = -1
 var _dbg_scoop: bool = false
 var _dbg_scoop_t: float = 0.0
+var _character_id: String = CharacterCatalog.DEFAULT_ID
 
 func _ready() -> void:
+	_character_id = CharacterCatalog.valid_id(GameManager.character_id)
 	_which = OS.get_environment("DTS_CHAR")
 	if _which == "":
 		_which = DEFAULT_CHAR
-	_load_strip("idle", FRAMES[_which][0])
-	_load_strip("walk", FRAMES[_which][1])
-	if SCOOP_FRAMES.has(_which):
-		_load_strip("scoop", SCOOP_FRAMES[_which])
+	else:
+		_character_id = CharacterCatalog.DEFAULT_ID
+	if _character_id == CharacterCatalog.DEFAULT_ID:
+		if not FRAMES.has(_which):
+			_which = DEFAULT_CHAR
+		_load_strip("idle", FRAMES[_which][0])
+		_load_strip("walk", FRAMES[_which][1])
+		if SCOOP_FRAMES.has(_which):
+			_load_strip("scoop", SCOOP_FRAMES[_which])
+	else:
+		for animation in ["idle", "walk", "scoop", "jump"]:
+			_load_strip(animation, 1 if animation == "idle" else 4)
 	if not _strips.has("idle") or not _strips.has("walk"):
 		return
 	var dw: String = OS.get_environment("DTS_WALK")
@@ -139,7 +149,10 @@ func _ready() -> void:
 	_build_lantern()
 
 func _load_strip(strip: String, n: int) -> void:
-	var tex: Texture2D = load(ART + "player_%s_%s.png" % [_which, strip]) as Texture2D
+	var path: String = ART + "player_%s_%s.png" % [_which, strip]
+	if _character_id != CharacterCatalog.DEFAULT_ID:
+		path = CharacterCatalog.texture_path(_character_id, strip)
+	var tex: Texture2D = load(path) as Texture2D
 	if tex == null:
 		return
 	_strips[strip] = tex
@@ -153,9 +166,14 @@ func _set_strip(strip: String) -> void:
 	_cell = Vector2(float(tex.get_width()) / float(n) * 0.5, tex.get_height() * 0.5)
 	# Feet on the origin: the cell is _cell.y world units tall at 0.5 scale.
 	_sprite.position = Vector2(0.0, -_cell.y * 0.5)
+	if _character_id != CharacterCatalog.DEFAULT_ID:
+		# Meepo sheets have a 120px foot baseline inside 128px cells.
+		_sprite.position.y += 4.0
 	_sprite.frame = 0
 
 func _current_strip() -> String:
+	if _sprite.texture == _strips.get("jump"):
+		return "jump"
 	if _sprite.texture == _strips.get("walk"):
 		return "walk"
 	if _sprite.texture == _strips.get("scoop"):
@@ -184,6 +202,11 @@ func _refresh_tool() -> void:
 	_tool.visible = true
 
 func _hand_anchor(strip: String, frame: int) -> Vector2:
+	if _character_id != CharacterCatalog.DEFAULT_ID:
+		# Root-local facing left; tools stay separate from the character artwork.
+		if strip == "scoop":
+			return [Vector2(-10, -15), Vector2(-14, -9), Vector2(-16, -5), Vector2(-10, -15)][frame]
+		return Vector2(-10, -15)
 	var a: Vector2 = Vector2(_cell.x * 0.3, _cell.y * 0.65)
 	if HAND.has(_which) and HAND[_which].has(strip):
 		var arr: Array = HAND[_which][strip]
@@ -223,7 +246,15 @@ func _process(dt: float) -> void:
 	_t += dt
 	var strip: String = _current_strip()
 	var frame: int = 0
-	if walking:
+	if not player.is_on_floor() and absf(player.velocity.y) > 60.0 and _strips.has("jump"):
+		if strip != "jump":
+			_set_strip("jump")
+			strip = "jump"
+		frame = 1 if player.velocity.y < -60.0 else (2 if player.velocity.y < 60.0 else 3)
+	elif walking:
+		if strip != "walk":
+			_set_strip("walk")
+			strip = "walk"
 		frame = int(_t * WALK_FPS) % _counts["walk"]
 		if _dbg_walk >= 0:
 			frame = _dbg_walk % _counts["walk"]
@@ -238,7 +269,7 @@ func _process(dt: float) -> void:
 			if strip != "scoop":
 				_set_strip("scoop")
 				strip = "scoop"
-			frame = clampi(SCOOP_ORDER[step], 0, _counts["scoop"] - 1)
+			frame = clampi(SCOOP_ORDER[step], 0, _counts["scoop"] - 1) if _character_id == CharacterCatalog.DEFAULT_ID else step
 	else:
 		if strip != "idle":
 			_set_strip("idle")

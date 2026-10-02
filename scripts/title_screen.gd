@@ -2,7 +2,7 @@ extends Node2D
 # v3 pixel-art title (2026-09-11). Gemini key-art plate split into a band sky
 # and a keyed foreground (tools/bake/bake_title.py), baked wordmark, wooden
 # 9-slice Silkscreen menu. Same buttons, same signals into SceneManager /
-# SaveManager / GameManager as before; the newspaper intro is unchanged text.
+# SaveManager / GameManager, with cosmetic character selection for new runs.
 #
 # Art grid: the canvas is 640x360 logical px (2 screen px each at 720p);
 # textures are baked x2 and drawn at scale 0.5, so 1 texel = 1 logical px.
@@ -36,6 +36,10 @@ var btn_quit: Button = null
 var confirm_container: HBoxContainer = null
 var menu_vbox: VBoxContainer = null
 var footer: Control = null
+var character_picker: PanelContainer = null
+var selected_character: String = CharacterCatalog.DEFAULT_ID
+var character_buttons: Array[Button] = []
+var _starting_game: bool = false
 
 # --- Newspaper nodes ---
 var newspaper_overlay: ColorRect = null
@@ -297,7 +301,7 @@ func _create_menu_button(text: String, color: Color, min_w: int = 140) -> Button
 	var btn := Button.new()
 	btn.text = text
 	btn.custom_minimum_size = Vector2(min_w, 22)
-	btn.focus_mode = Control.FOCUS_NONE
+	btn.focus_mode = Control.FOCUS_ALL
 	btn.add_theme_font_override("font", _font())
 	btn.add_theme_font_size_override("font_size", 16)
 	btn.add_theme_color_override("font_color", color)
@@ -310,7 +314,11 @@ func _create_menu_button(text: String, color: Color, min_w: int = 140) -> Button
 	btn.add_theme_stylebox_override("hover", _stylebox("btn_hover"))
 	btn.add_theme_stylebox_override("pressed", _stylebox("btn_pressed", 4, 2))
 	btn.add_theme_stylebox_override("disabled", _stylebox("btn_disabled"))
-	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	var focus := StyleBoxFlat.new()
+	focus.bg_color = Color.TRANSPARENT
+	focus.set_border_width_all(2)
+	focus.border_color = Color(0.96, 0.88, 0.66)
+	btn.add_theme_stylebox_override("focus", focus)
 	return btn
 
 # --- Footer: version + attribution (assets/art/LICENSES.md) ----------------
@@ -550,6 +558,10 @@ func _process(delta: float) -> void:
 
 # --- Input ---
 func _input(event: InputEvent) -> void:
+	if character_picker != null and character_picker.visible and event.is_action_pressed("ui_cancel"):
+		_close_character_picker()
+		get_viewport().set_input_as_handled()
+		return
 	if not showing_newspaper or not newspaper_ready_for_input:
 		return
 	if (event is InputEventKey and event.pressed and not event.echo) or (event is InputEventMouseButton and event.pressed):
@@ -615,9 +627,109 @@ func _on_quit() -> void:
 
 # --- New game flow ---
 func _start_new_game() -> void:
+	_show_character_picker()
+
+func _begin_game() -> void:
+	if _starting_game:
+		return
+	_starting_game = true
 	GameManager.reset_game()
+	GameManager.character_id = selected_character
 	SaveManager.save_game()
 	SceneManager.transition_to_scene("res://scenes/main.tscn")
+
+func _close_character_picker() -> void:
+	character_picker.hide()
+	menu_vbox.show()
+	logo.show()
+	btn_new_game.grab_focus()
+
+func _show_character_picker() -> void:
+	menu_vbox.hide()
+	logo.hide()
+	if character_picker != null:
+		character_picker.show()
+		character_buttons[0].grab_focus()
+		return
+	character_picker = PanelContainer.new()
+	character_picker.position = Vector2(20, 65)
+	character_picker.size = Vector2(600, 270)
+	character_picker.z_index = 10
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.06, 0.1, 0.13, 0.97)
+	panel_style.content_margin_left = 16
+	panel_style.content_margin_right = 16
+	panel_style.content_margin_top = 12
+	panel_style.content_margin_bottom = 12
+	character_picker.add_theme_stylebox_override("panel", panel_style)
+	add_child(character_picker)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	character_picker.add_child(content)
+	var heading := Label.new()
+	heading.text = "CHOOSE YOUR CHARACTER"
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.add_theme_font_size_override("font_size", 20)
+	content.add_child(heading)
+	var hint := Label.new()
+	hint.text = "Same abilities. Your style."
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(hint)
+	var cards := HBoxContainer.new()
+	cards.add_theme_constant_override("separation", 8)
+	content.add_child(cards)
+	var group := ButtonGroup.new()
+	for character in CharacterCatalog.CHARACTERS:
+		var button := Button.new()
+		button.name = character.id
+		button.toggle_mode = true
+		button.button_group = group
+		button.custom_minimum_size = Vector2(136, 130)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.tooltip_text = character.description
+		var selected_style := StyleBoxFlat.new()
+		selected_style.bg_color = Color(0.12, 0.24, 0.19)
+		selected_style.set_border_width_all(2)
+		selected_style.border_color = Color(0.96, 0.88, 0.66)
+		button.add_theme_stylebox_override("pressed", selected_style)
+		cards.add_child(button)
+		var layout := VBoxContainer.new()
+		layout.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		layout.offset_top = 8
+		layout.offset_bottom = -8
+		layout.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		button.add_child(layout)
+		var portrait := TextureRect.new()
+		portrait.texture = CharacterCatalog.preview(character.id)
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		portrait.custom_minimum_size = Vector2(0, 85)
+		portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		layout.add_child(portrait)
+		var label := Label.new()
+		label.text = character.name
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		layout.add_child(label)
+		button.pressed.connect(func() -> void: selected_character = character.id)
+		button.button_pressed = character.id == selected_character
+		character_buttons.append(button)
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 20)
+	content.add_child(actions)
+	var back := Button.new()
+	back.text = "Back"
+	back.custom_minimum_size = Vector2(120, 32)
+	back.pressed.connect(_close_character_picker)
+	actions.add_child(back)
+	var start := Button.new()
+	start.text = "Start game"
+	start.custom_minimum_size = Vector2(160, 32)
+	start.pressed.connect(_begin_game)
+	actions.add_child(start)
+	character_buttons[0].grab_focus()
 
 func _set_newspaper_content(index: int) -> void:
 	var data: Dictionary = newspaper_data[index]

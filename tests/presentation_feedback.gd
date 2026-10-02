@@ -58,6 +58,8 @@ func _run() -> void:
 	root.add_child(title)
 	current_scene = title
 	title._start_new_game()
+	_check(title.character_picker.visible, "New game does not offer character selection")
+	title._begin_game()
 	await create_timer(1.5).timeout
 	_check(current_scene != null and current_scene.scene_file_path == "res://scenes/main.tscn", "New game still waits for a story intro")
 	for failure in failures:

@@ -199,6 +199,7 @@ var stat_definitions: Dictionary = {
 # --- Game State ---
 var money: float = 0.0
 var current_tool_id: String = "hands"
+var character_id: String = CharacterCatalog.DEFAULT_ID
 
 # --- Prestige State ---
 var influence: float = 0.0           # prestige currency; persists through prestige
@@ -1247,6 +1248,7 @@ func _reset_progression(start_money: float) -> void:
 
 # Full restart: wipe everything including prestige progress.
 func reset_game() -> void:
+	character_id = CharacterCatalog.DEFAULT_ID
 	influence = 0.0
 	lifetime_earnings = 0.0
 	prestige_count = 0
@@ -1339,6 +1341,7 @@ func get_save_data() -> Dictionary:
 		"prestige_count": prestige_count,
 		"prestige_upgrades": prestige_upgrades.duplicate(true),
 		"current_tool_id": current_tool_id,
+		"character_id": character_id,
 		"tools_owned": tools_owned.duplicate(true),
 		"stat_levels": stat_levels.duplicate(true),
 		"current_stamina": current_stamina,
@@ -1359,6 +1362,7 @@ func get_save_data() -> Dictionary:
 	}
 
 func load_save_data(data: Dictionary) -> void:
+	character_id = CharacterCatalog.valid_id(data.get("character_id", CharacterCatalog.DEFAULT_ID))
 	money = data.get("money", 0.0)
 	influence = data.get("influence", 0.0)
 	lifetime_earnings = data.get("lifetime_earnings", 0.0)
