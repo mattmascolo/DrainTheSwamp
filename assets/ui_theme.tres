@@ -1,6 +1,6 @@
 [gd_resource type="Theme" load_steps=27 format=3 uid="uid://buitheme0001"]
 
-[ext_resource type="FontFile" path="res://assets/fonts/Silkscreen-Regular.ttf" id="1_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/VT323-Regular.ttf" id="1_font"]
 [ext_resource type="Texture2D" path="res://assets/art/ui/panel_wood.png" id="t_wood"]
 [ext_resource type="Texture2D" path="res://assets/art/ui/panel_inset.png" id="t_inset"]
 [ext_resource type="Texture2D" path="res://assets/art/ui/panel_parchment.png" id="t_parch"]
@@ -146,10 +146,9 @@ content_margin_right = 7.0
 [sub_resource type="StyleBoxEmpty" id="sb_empty"]
 
 [resource]
-default_font = ExtResource("1_font")
-default_font_size = 8
+default_font_size = 12
 Button/colors/font_color = Color(0.96, 0.9, 0.74, 1)
-Button/colors/font_disabled_color = Color(0.6, 0.55, 0.45, 1)
+Button/colors/font_disabled_color = Color(0.8, 0.76, 0.67, 1)
 Button/colors/font_focus_color = Color(0.96, 0.9, 0.74, 1)
 Button/colors/font_hover_color = Color(1, 0.98, 0.86, 1)
 Button/colors/font_hover_pressed_color = Color(1, 0.98, 0.86, 1)
@@ -172,8 +171,8 @@ HSlider/icons/grabber_highlight = ExtResource("t_grab_hi")
 HSlider/icons/grabber_disabled = ExtResource("t_grab")
 HSlider/constants/center_grabber = 0
 HSlider/constants/grabber_offset = 0
-Label/colors/font_color = Color(0.94, 0.88, 0.72, 1)
-Label/colors/font_shadow_color = Color(0.1, 0.06, 0.04, 0.75)
+Label/colors/font_color = Color(1, 0.96, 0.86, 1)
+Label/colors/font_shadow_color = Color(0.04, 0.025, 0.015, 1)
 Label/constants/shadow_offset_x = 1
 Label/constants/shadow_offset_y = 1
 PanelContainer/styles/panel = SubResource("sb_wood")
@@ -183,7 +182,7 @@ ProgressBar/styles/fill = SubResource("bar_fill")
 ScrollContainer/styles/panel = SubResource("sb_empty")
 TooltipLabel/colors/font_color = Color(0.2, 0.14, 0.08, 1)
 TooltipLabel/colors/font_shadow_color = Color(0, 0, 0, 0)
-TooltipLabel/font_sizes/font_size = 8
+TooltipLabel/font_sizes/font_size = 12
 TooltipPanel/styles/panel = SubResource("sb_parch")
 VScrollBar/styles/grabber = SubResource("scroll_grab")
 VScrollBar/styles/grabber_highlight = SubResource("scroll_grab")

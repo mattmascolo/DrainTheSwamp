@@ -80,8 +80,8 @@ text = "0.000/0.100"
 layout_mode = 2
 size_flags_vertical = 4
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.72, 0.66, 0.52, 1)
-theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.88, 0.84, 0.74, 1)
+theme_override_font_sizes/font_size = 12
 text = "BAG"
 
 [node name="Spacer" type="Control" parent="MarginContainer/VBoxContainer/TopBar/HBox"]
@@ -112,8 +112,8 @@ text = "DAY 1"
 layout_mode = 2
 size_flags_vertical = 4
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.72, 0.66, 0.52, 1)
-theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.88, 0.84, 0.74, 1)
+theme_override_font_sizes/font_size = 12
 text = "DAWN"
 
 [node name="WaterCell" type="HBoxContainer" parent="MarginContainer/VBoxContainer/TopBar/HBox"]
@@ -139,8 +139,8 @@ text = "100.0%"
 layout_mode = 2
 size_flags_vertical = 4
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.72, 0.66, 0.52, 1)
-theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.88, 0.84, 0.74, 1)
+theme_override_font_sizes/font_size = 12
 text = "WATER"
 
 [node name="GameArea" type="Control" parent="MarginContainer/VBoxContainer"]
@@ -167,7 +167,7 @@ layout_mode = 2
 size_flags_vertical = 4
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.94, 0.88, 0.72, 1)
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 text = "SPOON"
 
 [node name="BoltIcon" type="TextureRect" parent="MarginContainer/VBoxContainer/BottomBar/LeftCard/HBox"]
@@ -191,7 +191,7 @@ layout_mode = 2
 size_flags_vertical = 4
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.5, 0.88, 1, 1)
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 text = "HOSE 20.0s"
 
 [node name="Spacer2" type="Control" parent="MarginContainer/VBoxContainer/BottomBar"]
@@ -209,5 +209,5 @@ mouse_filter = 2
 
 [node name="MenuButton" type="Button" parent="MarginContainer/VBoxContainer/BottomBar/RightCard/HBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 12
 text = "MENU"

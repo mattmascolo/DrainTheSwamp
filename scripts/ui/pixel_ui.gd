@@ -6,7 +6,7 @@ extends RefCounted
 # can keep their per-category colour cues without building StyleBoxFlats.
 #
 # UI grid: viewport 640x360 stretched x2, so 1 UI px = 1 art px = 2 screen px.
-# Silkscreen sizes are 8 (captions / body) and 16 (headers / hero numbers) only.
+# Readable body text uses the engine font at 12; headers use 16.
 
 const THEME: Theme = preload("res://assets/ui_theme.tres")
 const TEX_INSET: Texture2D = preload("res://assets/art/ui/panel_inset.png")
@@ -18,7 +18,7 @@ const TEX_ROW: Texture2D = preload("res://assets/art/ui/row_card.png")
 const TEX_ROW_ACTIVE: Texture2D = preload("res://assets/art/ui/row_card_active.png")
 const TEX_ROW_LOCKED: Texture2D = preload("res://assets/art/ui/row_card_locked.png")
 const TEX_BAR_FILL: Texture2D = preload("res://assets/art/ui/bar_fill.png")
-const FONT_BODY: FontFile = preload("res://assets/fonts/VT323-Regular.ttf")
+static var FONT_BODY: Font = ThemeDB.fallback_font
 const FONT_SILK: FontFile = preload("res://assets/fonts/Silkscreen-Regular.ttf")
 
 const ICONS: Dictionary = {
@@ -44,13 +44,13 @@ const TOOL_ICONS: Dictionary = {
 }
 
 const CREAM := Color(0.94, 0.88, 0.72)
-const CREAM_DIM := Color(0.72, 0.66, 0.52)
+const CREAM_DIM := Color(0.88, 0.84, 0.74)
 const GOLD := Color(1.0, 0.86, 0.32)
 const GREEN := Color(0.45, 0.9, 0.5)
 const RED := Color(0.95, 0.4, 0.35)
 const INK := Color(0.2, 0.14, 0.08)
 
-const SIZE_CAPTION: int = 8
+const SIZE_CAPTION: int = 12
 const SIZE_HEADER: int = 16
 
 
@@ -229,6 +229,7 @@ static func button(btn: Button, tint: Color = Color.WHITE) -> void:
 static func caption(text: String, color: Color = CREAM, centered: bool = false) -> Label:
 	var l := Label.new()
 	l.text = text
+	l.add_theme_font_override("font", FONT_BODY)
 	l.add_theme_font_size_override("font_size", SIZE_CAPTION)
 	l.add_theme_color_override("font_color", color)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -256,7 +257,7 @@ static func prompt(text: String, color: Color = Color(1.0, 0.92, 0.6)) -> Label:
 	## position/z_index/visibility to the caller.
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_override("font", FONT_SILK)
+	l.add_theme_font_override("font", FONT_BODY)
 	l.add_theme_font_size_override("font_size", SIZE_CAPTION)
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_shadow_color", Color(0.05, 0.03, 0.02, 0.9))

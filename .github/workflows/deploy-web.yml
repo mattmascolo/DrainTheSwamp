@@ -31,6 +31,19 @@ jobs:
         run: godot --headless --import 2>&1 || true
         timeout-minutes: 3
 
+      - name: Verify gameplay regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          export XDG_DATA_HOME=/tmp/dts-ci-data
+          for test in economy_invariants cave_access presentation_feedback pacing; do
+            godot --headless --audio-driver Dummy -s "tests/$test.gd" 2>&1 | tee "/tmp/$test.log"
+            if grep -Eq 'SCRIPT ERROR|Parse Error' "/tmp/$test.log"; then
+              exit 1
+            fi
+          done
+        timeout-minutes: 3
+
       - name: Export to Web
         run: |
           mkdir -p build/web

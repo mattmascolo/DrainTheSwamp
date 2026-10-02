@@ -198,7 +198,7 @@ func _update_tool_label() -> void:
 		tool_icon.texture = PixelUI.TOOL_ICONS.get(GameManager.current_tool_id, PixelUI.TOOL_ICONS["hands"])
 	var tool_data: Dictionary = GameManager.tool_definitions[GameManager.current_tool_id]
 	if GameManager.current_tool_id == "hose":
-		var output: float = GameManager.get_tool_output("hose")
+		var output: float = GameManager.get_tool_output("hose", GameManager.in_cave)
 		tool_label.text = "%s %.3f g/s" % [str(tool_data["name"]).to_upper(), output]
 	else:
 		var output: float = GameManager.get_effective_scoop(GameManager.current_tool_id)

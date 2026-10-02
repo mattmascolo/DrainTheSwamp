@@ -39,6 +39,11 @@ signal sell_window_changed(active: bool, duration: float)
 # Swamp yields ~11.
 const PRESTIGE_SCALE: float = 250_000.0
 
+# First pacing pass: slower surface draining, pricier purchases. Cave
+# scoop rates stay intact so the existing air timer remains playable.
+const SURFACE_DRAIN_MULTIPLIER: float = 1.0 / 3.0
+const PURCHASE_COST_MULTIPLIER: float = 1.5
+
 # --- Swamp Definitions ---
 var swamp_definitions: Array = [
 	{"name": "Puddle", "total_gallons": 5.0, "money_per_gallon": 25.0, "reward": 50.0},
@@ -60,63 +65,63 @@ var tool_definitions: Dictionary = {
 	"hands": {
 		"name": "Hands",
 		"base_output": 0.015,
-		"cost": 0.0,
+		"cost": 0.0 * PURCHASE_COST_MULTIPLIER,
 		"type": "manual",
 		"order": 0
 	},
 	"spoon": {
 		"name": "Spoon",
 		"base_output": 0.02,
-		"cost": 15.0,
+		"cost": 15.0 * PURCHASE_COST_MULTIPLIER,
 		"type": "manual",
 		"order": 1
 	},
 	"cup": {
 		"name": "Cup",
 		"base_output": 0.1,
-		"cost": 200.0,
+		"cost": 200.0 * PURCHASE_COST_MULTIPLIER,
 		"type": "manual",
 		"order": 2
 	},
 	"bucket": {
 		"name": "Bucket",
 		"base_output": 0.5,
-		"cost": 2000.0,
+		"cost": 2000.0 * PURCHASE_COST_MULTIPLIER,
 		"type": "manual",
 		"order": 3
 	},
 	"shovel": {
 		"name": "Shovel",
 		"base_output": 2.5,
-		"cost": 15000.0,
+		"cost": 15000.0 * PURCHASE_COST_MULTIPLIER,
 		"type": "manual",
 		"order": 4
 	},
 	"wheelbarrow": {
 		"name": "Wheelbarrow",
 		"base_output": 12.0,
-		"cost": 75000.0,
+		"cost": 75000.0 * PURCHASE_COST_MULTIPLIER,
 		"type": "manual",
 		"order": 5
 	},
 	"barrel": {
 		"name": "Barrel",
 		"base_output": 50.0,
-		"cost": 400000.0,
+		"cost": 400000.0 * PURCHASE_COST_MULTIPLIER,
 		"type": "manual",
 		"order": 6
 	},
 	"water_wagon": {
 		"name": "Water Wagon",
 		"base_output": 250.0,
-		"cost": 2500000.0,
+		"cost": 2500000.0 * PURCHASE_COST_MULTIPLIER,
 		"type": "manual",
 		"order": 7
 	},
 	"hose": {
 		"name": "Garden Hose",
 		"base_output": 2.0,
-		"cost": 5000.0,
+		"cost": 5000.0 * PURCHASE_COST_MULTIPLIER,
 		"type": "semi_auto",
 		"order": 8
 	}
@@ -136,7 +141,7 @@ var stat_definitions: Dictionary = {
 		"base_value": 1.5,
 		"growth_rate": 1.18,
 		"scale": "exponential",
-		"base_cost": 10.0,
+		"base_cost": 10.0 * PURCHASE_COST_MULTIPLIER,
 		"cost_exponent": 1.22,
 		"format": "gal"
 	},
@@ -145,7 +150,7 @@ var stat_definitions: Dictionary = {
 		"base_value": 1.0,
 		"growth_rate": 1.12,
 		"scale": "exponential",
-		"base_cost": 12.0,
+		"base_cost": 12.0 * PURCHASE_COST_MULTIPLIER,
 		"cost_exponent": 1.12,
 		"max_level": 8,
 		"format": "multiplier"
@@ -155,7 +160,7 @@ var stat_definitions: Dictionary = {
 		"base_value": 20.0,
 		"growth_rate": 1.15,
 		"scale": "exponential",
-		"base_cost": 10.0,
+		"base_cost": 10.0 * PURCHASE_COST_MULTIPLIER,
 		"cost_exponent": 1.17,
 		"format": "value"
 	},
@@ -164,7 +169,7 @@ var stat_definitions: Dictionary = {
 		"base_value": 3.0,
 		"growth_rate": 1.15,
 		"scale": "exponential",
-		"base_cost": 12.0,
+		"base_cost": 12.0 * PURCHASE_COST_MULTIPLIER,
 		"cost_exponent": 1.17,
 		"format": "per_sec"
 	},
@@ -174,7 +179,7 @@ var stat_definitions: Dictionary = {
 		"base_value": 1.0,
 		"growth_rate": 1.12,
 		"scale": "exponential",
-		"base_cost": 50.0,
+		"base_cost": 50.0 * PURCHASE_COST_MULTIPLIER,
 		"cost_exponent": 1.45,
 		"max_value": 50.0,
 		"format": "multiplier"
@@ -184,7 +189,7 @@ var stat_definitions: Dictionary = {
 		"base_value": 1.0,
 		"growth_rate": 1.12,
 		"scale": "exponential",
-		"base_cost": 35.0,
+		"base_cost": 35.0 * PURCHASE_COST_MULTIPLIER,
 		"cost_exponent": 1.40,
 		"max_value": 40.0,
 		"format": "multiplier"
@@ -314,7 +319,7 @@ var upgrade_definitions: Dictionary = {
 	"auto_scooper": {
 		"name": "Auto-Scooper",
 		"description": "Auto scoop near water",
-		"cost": 150.0,
+		"cost": 150.0 * PURCHASE_COST_MULTIPLIER,
 		"cost_exponent": 1.25,
 		"max_level": -1,
 		"order": 0
@@ -322,7 +327,7 @@ var upgrade_definitions: Dictionary = {
 	"lantern": {
 		"name": "Lantern",
 		"description": "Light in the dark, +30s cave air",
-		"cost": 50.0,
+		"cost": 50.0 * PURCHASE_COST_MULTIPLIER,
 		"cost_exponent": 1.30,
 		"max_level": 1,
 		"order": 1
@@ -330,7 +335,7 @@ var upgrade_definitions: Dictionary = {
 	"overflow_valve": {
 		"name": "Overflow Valve",
 		"description": "Bag full? Scoops auto-sell at 60%",
-		"cost": 75000.0,
+		"cost": 75000.0 * PURCHASE_COST_MULTIPLIER,
 		"cost_exponent": 1.0,
 		"max_level": 1,
 		"order": 2
@@ -350,7 +355,7 @@ var upgrades_owned: Dictionary = {
 var pump_levels: Dictionary = {}
 const PUMP_MAX_LEVEL: int = 10
 const PUMP_WHOLESALE: float = 0.6            # pumps sell at 60% of manual value
-const PUMP_BASE_DRAIN_SECONDS: float = 9000.0  # L1 drains its whole pool in ~2.5h
+const PUMP_BASE_DRAIN_SECONDS: float = 27000.0  # L1 drains its pool in ~7.5h
 const PUMP_OFFLINE_CAP_HOURS: float = 8.0
 const PUMP_OFFLINE_EFFICIENCY: float = 0.5
 # Set by load_save_data when offline pump earnings were granted; consumed by the
@@ -490,7 +495,7 @@ func get_tool_raw_output_at_level(tool_id: String, level: int) -> float:
 	var base: float = tool_definitions[tool_id]["base_output"]
 	return base * pow(1.15, level) * pow(2.0, level / 10)
 
-func get_tool_output(tool_id: String) -> float:
+func get_tool_output(tool_id: String, for_cave: bool = false) -> float:
 	var level: int = tools_owned[tool_id]["level"]
 	var raw: float = get_tool_raw_output_at_level(tool_id, level)
 	# Apply scoop power multiplier for manual tools; semi-auto (hose) gets the
@@ -502,10 +507,10 @@ func get_tool_output(tool_id: String) -> float:
 		raw *= sqrt(get_stat_value("scoop_power"))
 	# Prestige: Muscle boosts all scoop output globally (multiplicative, see Kickback)
 	raw *= pow(1.25, prestige_upgrades["muscle"])
-	return raw
+	return raw * (1.0 if for_cave else SURFACE_DRAIN_MULTIPLIER)
 
 func get_effective_scoop(tool_id: String) -> float:
-	return get_tool_output(tool_id)
+	return get_tool_output(tool_id, in_cave)
 
 # Effective cap for a stat — Prestige Cap Hike raises water_value/scoop_power ceilings
 func get_effective_stat_cap(stat_id: String, defn: Dictionary) -> float:
@@ -569,7 +574,7 @@ func get_movement_speed_multiplier() -> float:
 func get_tool_upgrade_cost(tool_id: String) -> float:
 	var base_cost: float = tool_definitions[tool_id]["cost"]
 	if base_cost == 0.0:
-		base_cost = 10.0
+		base_cost = 10.0 * PURCHASE_COST_MULTIPLIER
 	var level: int = tools_owned[tool_id]["level"]
 	return base_cost * pow(1.28, level)
 
@@ -620,7 +625,7 @@ func is_pump_available(swamp_index: int) -> bool:
 func get_pump_cost(swamp_index: int) -> float:
 	# L1 costs ~10% of the pool's total water value; each level x1.5.
 	var d: Dictionary = swamp_definitions[swamp_index]
-	var base: float = d["total_gallons"] * d["money_per_gallon"] * 0.10
+	var base: float = d["total_gallons"] * d["money_per_gallon"] * 0.10 * PURCHASE_COST_MULTIPLIER
 	if prestige_count >= 1:
 		base *= 0.5  # "Federal Infrastructure Grant" — prestige perk
 	return base * pow(1.5, get_pump_level(swamp_index))
@@ -822,7 +827,7 @@ func upgrade_stat(stat_id: String) -> bool:
 
 # --- Camel computed ---
 func get_camel_cost() -> float:
-	return CAMEL_BASE_COST * pow(CAMEL_COST_EXPONENT, camel_count)
+	return CAMEL_BASE_COST * PURCHASE_COST_MULTIPLIER * pow(CAMEL_COST_EXPONENT, camel_count)
 
 func get_camel_capacity() -> float:
 	# Scales with the player's own capacity (25% of it) so camels never become
@@ -834,10 +839,10 @@ func get_camel_speed() -> float:
 	return 35.0 * pow(1.20, camel_speed_level)
 
 func get_camel_capacity_upgrade_cost() -> float:
-	return CAMEL_CAPACITY_UPGRADE_BASE * pow(CAMEL_UPGRADE_EXPONENT, camel_capacity_level)
+	return CAMEL_CAPACITY_UPGRADE_BASE * PURCHASE_COST_MULTIPLIER * pow(CAMEL_UPGRADE_EXPONENT, camel_capacity_level)
 
 func get_camel_speed_upgrade_cost() -> float:
-	return CAMEL_SPEED_UPGRADE_BASE * pow(CAMEL_UPGRADE_EXPONENT, camel_speed_level)
+	return CAMEL_SPEED_UPGRADE_BASE * PURCHASE_COST_MULTIPLIER * pow(CAMEL_UPGRADE_EXPONENT, camel_speed_level)
 
 # --- Upgrade computed ---
 func get_upgrade_cost(upgrade_id: String) -> float:
@@ -1104,7 +1109,7 @@ func try_scoop_cave_pool(cave_id: String, pool_index: int) -> bool:
 	if remaining_space <= 0.001:
 		return false
 
-	var tool_output: float = get_tool_output(current_tool_id)
+	var tool_output: float = get_tool_output(current_tool_id, true)
 	var scoop_amount: float = minf(tool_output, remaining_space)
 
 	current_stamina -= stamina_cost

@@ -106,8 +106,6 @@ func _ready() -> void:
 	popup_layer.layer = 90
 	add_child(popup_layer)
 	_build_popup()
-	_init_milestone_newspapers()
-	_build_newspaper_overlay()
 
 const POPUP_MAX_WIDTH: float = 260.0
 
@@ -297,7 +295,7 @@ func show_document_popup(text: String, title: String = "CAVE INSCRIPTION", kind:
 	)
 
 func show_lore_popup(text: String) -> void:
-	show_document_popup(text, "CAVE INSCRIPTION")
+	pass # Story popups removed; gameplay remains uninterrupted.
 
 func _wait_for_lore_dismiss(overlay: ColorRect, panel: PanelContainer, prompt: Label) -> void:
 	var elapsed_ref: Array[float] = [0.0]
@@ -333,19 +331,14 @@ func _wait_for_lore_dismiss(overlay: ColorRect, panel: PanelContainer, prompt: L
 	get_tree().process_frame.connect(frame_ref[0])
 
 func _on_loot_collected(_cave_id: String, _loot_id: String, reward_text: String) -> void:
-	show_document_popup(reward_text, "CAVE DISCOVERY")
+	pass # Story popups removed; gameplay remains uninterrupted.
 
-# Queues a one-shot NA text beat; no-op if this save has already seen it.
 func _queue_na_text(key: String) -> void:
 	if not NA_TEXTS.has(key):
 		return
 	if not GameManager.mark_story_flag("na_text_" + key):
 		return
-	for msg in NA_TEXTS[key]:
-		phone_queue.append(msg)
-	# First text of a batch waits a few seconds so a milestone newspaper
-	# (fired 2s after pool completion) goes first.
-	phone_cooldown = maxf(phone_cooldown, 3.5)
+	# Keep the story beat recorded without opening a phone message.
 
 func _on_story_swamp_completed(swamp_index: int, _reward: float) -> void:
 	match swamp_index:
@@ -357,15 +350,7 @@ func _on_story_swamp_completed(swamp_index: int, _reward: float) -> void:
 		9: _queue_na_text("atlantic")
 
 func _on_swamp_completed(swamp_index: int, _reward: float) -> void:
-	# Skip milestone newspaper for Atlantic (pool 9) — endgame cinematic handles it
-	if swamp_index == 9:
-		return
-	# Show milestone newspaper after a short delay
-	if swamp_index >= 0 and swamp_index < milestone_newspapers.size():
-		var idx: int = swamp_index
-		get_tree().create_timer(2.0).timeout.connect(func() -> void:
-			_show_milestone_newspaper(idx)
-		)
+	pass # Story popups removed; gameplay remains uninterrupted.
 
 func _init_milestone_newspapers() -> void:
 	milestone_newspapers = [
@@ -691,17 +676,10 @@ func _dismiss_milestone_newspaper() -> void:
 # One standalone newspaper (e.g. "IT'S GONE" when the Atlantic drains) —
 # dismisses back to gameplay instead of rolling into the endgame queue.
 func show_single_newspaper(data: Dictionary) -> void:
-	if showing_newspaper:
-		return
-	_show_newspaper_data(data)
+	pass # Story popups removed; gameplay remains uninterrupted.
 
 func show_endgame_newspapers(newspapers: Array) -> void:
-	if newspapers.size() == 0:
-		return
-	endgame_active = true
-	endgame_newspaper_queue = newspapers.duplicate()
-	var first: Dictionary = endgame_newspaper_queue.pop_front()
-	_show_newspaper_data(first)
+	pass # Story popups removed; gameplay remains uninterrupted.
 
 func _show_newspaper_data(data: Dictionary) -> void:
 	newspaper_date_label.text = data.get("date", "SPECIAL EDITION")
@@ -740,79 +718,8 @@ var ending_choice_layer: CanvasLayer = null
 # Modal binary choice at the island: hand the Guest List to NA, or swing.
 # Calls on_choice with "hand_over" or "swing" after the panel closes.
 func show_ending_choice(on_choice: Callable) -> void:
-	if ending_choice_layer != null:
-		return
-	ending_choice_layer = CanvasLayer.new()
-	ending_choice_layer.layer = 96
-	add_child(ending_choice_layer)
+	pass # Story popups removed; gameplay remains uninterrupted.
 
-	var vp_size: Vector2 = get_viewport().get_visible_rect().size
-
-	var overlay := ColorRect.new()
-	overlay.size = vp_size
-	overlay.color = Color(0, 0, 0, 0.0)
-	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	ending_choice_layer.add_child(overlay)
-
-	# v3 hud: wood card + Silkscreen instead of flat StyleBoxFlat + default
-	# font — this is the ending "confirm dialog" (hand over the list / swing).
-	var panel := PanelContainer.new()
-	panel.theme = PixelUI.THEME
-	var panel_w: float = 430.0
-	var panel_h: float = 210.0
-	panel.position = Vector2((vp_size.x - panel_w) * 0.5, (vp_size.y - panel_h) * 0.5)
-	panel.size = Vector2(panel_w, panel_h)
-	panel.modulate = Color(1, 1, 1, 0)
-	panel.add_theme_stylebox_override("panel", PixelUI.wood(18, 12))
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	panel.add_child(vbox)
-
-	var title_lbl := PixelUI.header("THE GUEST LIST", PixelUI.GOLD)
-	vbox.add_child(title_lbl)
-
-	var body := PixelUI.caption(
-		"Seven officials. One mansion. Nowhere left to hide.\n\nThe burner phone buzzes once: \"The List. Now. — NA\"\n\nIn your bag: every name, every date, every flight.\nIn your hand: the hammer you came here to swing.",
-		PixelUI.CREAM, true)
-	body.autowrap_mode = TextServer.AUTOWRAP_WORD
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(body)
-
-	var btn_row := HBoxContainer.new()
-	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	btn_row.add_theme_constant_override("separation", 20)
-	vbox.add_child(btn_row)
-
-	var make_btn := func(label_text: String, choice: String, accent: Color) -> Button:
-		var b := Button.new()
-		b.text = label_text
-		b.custom_minimum_size = Vector2(160, 28)
-		PixelUI.button(b, accent)
-		b.add_theme_color_override("font_color", accent.lightened(0.2))
-		b.pressed.connect(func() -> void:
-			var layer_ref: CanvasLayer = ending_choice_layer
-			ending_choice_layer = null
-			if is_instance_valid(layer_ref):
-				layer_ref.queue_free()
-			on_choice.call(choice)
-		)
-		return b
-
-	var hand_btn: Button = make_btn.call("HAND OVER THE LIST", "hand_over", Color(0.55, 0.85, 0.60))
-	btn_row.add_child(hand_btn)
-	btn_row.add_child(make_btn.call("SWING", "swing", Color(0.95, 0.55, 0.45)))
-
-	overlay.add_child(panel)
-	hand_btn.grab_focus()
-
-	var tw := create_tween()
-	tw.set_parallel(true)
-	tw.tween_property(overlay, "color:a", 0.75, 0.6)
-	tw.tween_property(panel, "modulate:a", 1.0, 0.6)
-
-# --- Scene Transitions ---
 func transition_to_scene(scene_path: String, use_pixelate: bool = false) -> void:
 	if is_transitioning:
 		return

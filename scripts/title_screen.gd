@@ -506,7 +506,7 @@ func _setup_debug_auto() -> void:
 		if mode == "continue":
 			_on_continue()
 		elif mode == "newspaper":
-			_show_newspaper()
+			SceneManager.transition_to_scene("res://scenes/main.tscn")
 	)
 	add_child(t)
 
@@ -617,7 +617,7 @@ func _on_quit() -> void:
 func _start_new_game() -> void:
 	GameManager.reset_game()
 	SaveManager.save_game()
-	_show_newspaper()
+	SceneManager.transition_to_scene("res://scenes/main.tscn")
 
 func _set_newspaper_content(index: int) -> void:
 	var data: Dictionary = newspaper_data[index]

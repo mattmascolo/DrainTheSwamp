@@ -89,16 +89,19 @@ func _last_x() -> float:
 ## reads as moonlit dirt/water instead of pure black. Alpha ramps with t in
 ## update(); at day it is fully transparent (== no cost, no visual change).
 ## Uses the vertical falloff texture instead of a flat rect so the top edge
-## fades in over ~50 world units instead of cutting hard across the screen.
+## fades in over ~200 world units instead of cutting hard across the screen.
 func _build_floor_wash() -> void:
-	var band_w: float = _last_x() + 500.0
-	var band_h: float = 520.0
+	# Extend beyond both ends of the playable world so the wash has no
+	# vertical boundary through the town (previously x = -250).
+	var band_left: float = world.terrain_points[0].x - 2000.0
+	var band_w: float = _last_x() - band_left + 2000.0
+	var band_h: float = 2000.0
 	_floor_wash = Sprite2D.new()
 	_floor_wash.texture = _vfalloff
 	_floor_wash.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	_floor_wash.centered = false
 	_floor_wash.scale = Vector2(band_w / _vfalloff.width, band_h / _vfalloff.height)
-	_floor_wash.position = Vector2(-250.0, 20.0)
+	_floor_wash.position = Vector2(band_left, 20.0)
 	_floor_wash.modulate = Color(0.16, 0.26, 0.48, 0.0)
 	_floor_wash.z_index = -2
 	var mat := CanvasItemMaterial.new()
@@ -178,7 +181,7 @@ func update(t: float) -> void:
 	elif t < 0.22:
 		night_alpha = clampf(1.0 - (t - 0.15) / 0.07, 0.0, 1.0)
 
-	_floor_wash.modulate.a = night_alpha * 0.85
+	_floor_wash.modulate.a = night_alpha * 0.35
 
 	if world.moon:
 		_moon_wash.position = Vector2(world.moon.position.x, world.moon.position.y + 30.0)

@@ -4781,51 +4781,13 @@ func _on_sell_window_changed(active: bool, duration: float) -> void:
 	else:
 		SceneManager.show_popup("The buyback window closes. The audit found nothing.", 3.0)
 
-# The Atlantic just drained: show the "IT'S GONE" paper, then nudge the player
-# east. The climax itself waits at the island (jeff_area → _on_reached_island).
+# Completion remains a gameplay milestone without a narrative interruption.
 func _on_atlantic_drained() -> void:
-	get_tree().create_timer(2.0).timeout.connect(func() -> void:
-		SceneManager.show_single_newspaper({
-			"date": "SPECIAL EDITION",
-			"headline": "IT'S GONE. HE ACTUALLY DID IT.",
-			"subhead": "Lone government employee drains the Atlantic Ocean with his bare hands",
-			"body": "In what experts are calling \"the most pointlessly determined act in human history,\" the sole employee of the Swamp Draining Initiative has drained the Atlantic Ocean.\n\nThe man, whose name has been redacted from all government records, began with a puddle and a pair of hands. He ended with an empty ocean basin and what neighbors describe as \"a thousand-yard stare.\"\n\n\"We gave him no tools, no budget, and no support,\" said a visibly shaken government spokesperson. \"We honestly thought he'd quit after the first day.\"\n\nThe ocean floor is now visible for the first time in recorded history. Several previously unknown species have been discovered, all of them \"very confused.\""
-		})
-	)
-	get_tree().create_timer(12.0).timeout.connect(func() -> void:
-		if not endgame_triggered:
-			SceneManager.show_popup("The seabed lies bare. The island waits to the east.", 6.0)
-	)
+	SceneManager.show_popup("All water bodies drained! Prestige to start another run.", 5.0)
 
-# Reaching the politicians on the island (only possible once the Atlantic is
-# drained) freezes the player and presents the final choice.
 func _on_reached_island() -> void:
-	if endgame_triggered:
-		return
-	if not GameManager.is_swamp_completed(9):
-		return
-	endgame_triggered = true
-
-	# Freeze player for the confrontation
-	var players_eg: Array[Node] = get_tree().get_nodes_in_group("player")
-	if players_eg.size() > 0 and is_instance_valid(players_eg[0]):
-		players_eg[0].set_physics_process(false)
-		players_eg[0].set_process_unhandled_input(false)
-
-	_screen_shake(2.0, 0.2)
-	SceneManager.show_ending_choice(_trigger_endgame)
-
-# choice: "hand_over" (give NA the Guest List — they whack you quietly) or
-# "swing" (refuse — the CIA road: arrest, pardons, refill). Both roads end the
-# same way for the drainer; that's the point.
-func _trigger_endgame(choice: String) -> void:
-	GameManager.story_flags["ending_chosen"] = choice
-	SceneManager.flash_white(0.25)
-	_screen_shake(4.0, 0.3)
-	if choice == "hand_over":
-		SceneManager.show_endgame_newspapers(_na_ending_newspapers())
-	else:
-		SceneManager.show_endgame_newspapers(_cia_ending_newspapers())
+	# Completion no longer freezes gameplay for a story ending.
+	pass
 
 # The NA road — the List is handed over; the drainer vanishes; Northwind
 # quietly owns everyone. New bosses, same swamp.

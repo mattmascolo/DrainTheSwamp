@@ -11,6 +11,7 @@ extends Node2D
 
 const ART := "res://assets/art/drainsville/"
 const SCALE := 0.5
+const NIGHT_LIGHT_STRENGTH := 0.25
 const FONT := "res://assets/fonts/Silkscreen-Regular.ttf"
 
 var world: Node2D = null
@@ -37,7 +38,7 @@ func update_glow(glow_t: float) -> void:
 		return
 	_glow_last = glow_t
 	for gl in glow_point_lights:
-		(gl["node"] as PointLight2D).energy = (gl["energy"] as float) * glow_t
+		(gl["node"] as PointLight2D).energy = (gl["energy"] as float) * glow_t * NIGHT_LIGHT_STRENGTH
 	for gs in _glow_sprites:
 		(gs["node"] as CanvasItem).modulate = (gs["day"] as Color).lerp(gs["night"], glow_t)
 
@@ -104,9 +105,9 @@ func build() -> void:
 		i += 1
 	# Main street buildings (Hardware is placed by game_world at ~-22).
 	var buildings: Array = [
-		{"x": -130.0, "w": 44.0, "sign": "DINER", "style": 1},
-		{"x": -240.0, "w": 40.0, "sign": "PAWN", "style": 2},
-		{"x": -345.0, "w": 46.0, "sign": "OUTFITTER", "style": 0},
+		{"x": -130.0, "w": 44.0, "sign": "", "style": 1},
+		{"x": -240.0, "w": 40.0, "sign": "", "style": 2},
+		{"x": -345.0, "w": 46.0, "sign": "", "style": 0},
 		{"x": -448.0, "w": 40.0, "sign": "", "style": 3},
 	]
 	for b in buildings:
@@ -152,22 +153,19 @@ func building(base_x: float, ground_y: float, w: float, _h: float, _wall_col: Co
 	# Warm window glow at night: a point light on the facade.
 	_lamp_light(cx, ground_y - 28.0, 0.9, 70.0, Color(1.0, 0.78, 0.45))
 	if sign_text != "":
-		# Baked sign (text rendered into the plate at bake time so it stays crisp).
-		var baked := "sign_" + sign_text.to_lower()
-		if ResourceLoader.exists(ART + baked + ".png"):
-			_sprite(baked, cx, ground_y - 60.0, -1)
-		else:
-			var plate := _sprite("sign_plate", cx, ground_y - 62.0, -1)
-			var lbl := Label.new()
-			lbl.text = sign_text
-			lbl.add_theme_font_override("font", load(FONT))
-			lbl.add_theme_font_size_override("font_size", 5)
-			lbl.add_theme_color_override("font_color", Color(0.93, 0.82, 0.59))
-			lbl.position = Vector2(plate.position.x + 2.0, plate.position.y - 1.0)
-			lbl.size = Vector2(28.0, 7.0)
-			lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			lbl.z_index = -1
-			add_child(lbl)
+		# Functional buildings retain a readable label; decorative ones have none.
+		var text := "SHOP" if sign_text == "HARDWARE" else sign_text
+		var lbl := PixelUI.prompt(text, Color(1.0, 0.94, 0.78))
+		var label_width: float = PixelUI.FONT_BODY.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 8.0
+		var plate := _sprite("sign_plate", cx, ground_y - 60.0, -1)
+		plate.scale = Vector2(label_width / plate.texture.get_width(), 18.0 / plate.texture.get_height())
+		plate.position = Vector2(cx - label_width * 0.5, ground_y - 102.0)
+		lbl.position = plate.position
+		lbl.size = Vector2(label_width, 18.0)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.z_index = -1
+		add_child(lbl)
 
 # Additive warm rects over the window panes; black by day (no-op), lit at night.
 func _window_glow(s: Sprite2D, rects: Array, flip: bool) -> void:
@@ -184,7 +182,7 @@ func _window_glow(s: Sprite2D, rects: Array, flip: bool) -> void:
 		g.color = Color(1.0, 0.72, 0.32)
 		g.z_index = -2
 		add_child(g)
-		_glow_sprites.append({"node": g, "day": Color(0, 0, 0, 1), "night": Color(0.85, 0.6, 0.25, 1)})
+		_glow_sprites.append({"node": g, "day": Color(0, 0, 0, 1), "night": Color(0.22, 0.15, 0.07, 1)})
 
 func water_tower(cx: float, ground_y: float) -> void:
 	_sprite("water_tower", cx, ground_y + 1.0, -2)
@@ -222,5 +220,5 @@ func _string_lights(x0: float, x1: float, y: float) -> void:
 		bulb.position = Vector2(lerpf(x0, x1, t) - 0.75, y + 9.0 * sin(PI * t))
 		bulb.z_index = -1
 		add_child(bulb)
-		_glow_sprites.append({"node": bulb, "day": Color(0.55, 0.45, 0.3), "night": Color(1.0, 0.72, 0.32) * 1.8})
+		_glow_sprites.append({"node": bulb, "day": Color(0.55, 0.45, 0.3), "night": Color(0.75, 0.54, 0.24)})
 		bulb.color = Color.WHITE

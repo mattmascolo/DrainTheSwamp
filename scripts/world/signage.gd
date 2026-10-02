@@ -55,7 +55,7 @@ const RED_TINT := Color(0.96, 0.86, 0.82)
 const BLUE_TINT := Color(0.82, 0.87, 0.98)
 
 var world: Node2D = null
-var _font: FontFile = null
+var _font: Font = null
 var _lamp_tex: ImageTexture = null
 var _snap: Array = []        # adopted Labels, pixel-snapped before every draw
 var _basin: Array = []       # per basin {name: Label, pct: Label, gal: Label, fx, fy, fw: float}
@@ -104,7 +104,7 @@ func _sprite(name: String, x: float, ground_y: float, z: int, flip: bool = false
 	return s
 
 # Label sized to a face rect of a sprite (rect in texture px), centered text.
-func _face_label(s: Sprite2D, face: Rect2, text: String, size: int, col: Color, font: FontFile = null) -> Label:
+func _face_label(s: Sprite2D, face: Rect2, text: String, size: int, col: Color, font: Font = null) -> Label:
 	var lbl := _label(text, size, col, font)
 	# Control.size is clamped up to get_minimum_size() the instant it's
 	# assigned — and with autowrap still OFF (the Label default) that
@@ -122,11 +122,11 @@ func _face_label(s: Sprite2D, face: Rect2, text: String, size: int, col: Color, 
 	add_child(lbl)
 	return lbl
 
-func _label(text: String, size: int, col: Color, font: FontFile = null) -> Label:
+func _label(text: String, size: int, col: Color, font: Font = null) -> Label:
 	var lbl := Label.new()
 	lbl.text = text
-	lbl.add_theme_font_override("font", font if font else _font)
-	lbl.add_theme_font_size_override("font_size", size)
+	lbl.add_theme_font_override("font", font if font else PixelUI.FONT_BODY)
+	lbl.add_theme_font_size_override("font_size", 12 if size == 8 else size)
 	lbl.add_theme_color_override("font_color", col)
 	lbl.add_theme_constant_override("line_spacing", 0)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -583,8 +583,8 @@ func _on_node_added(n: Node) -> void:
 	var fs: int = lbl.get_theme_font_size("font_size")
 	if lbl.has_theme_font_size_override("font_size") and fs < 9:
 		return   # tiny prop lettering (wanted poster, helicopter) is the props track's
-	lbl.add_theme_font_override("font", _font)
-	lbl.add_theme_font_size_override("font_size", 16 if fs >= 16 else 8)
+	lbl.add_theme_font_override("font", PixelUI.FONT_BODY)
+	lbl.add_theme_font_size_override("font_size", 16 if fs >= 16 else 12)
 	_outline(lbl, 2 if fs >= 16 else 1)
 	lbl.add_theme_constant_override("line_spacing", 0)
 	lbl.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST

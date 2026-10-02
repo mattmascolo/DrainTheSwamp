@@ -96,7 +96,7 @@ func _build_buttons() -> void:
 		confirm_row.add_theme_constant_override("separation", 16)
 
 		var yes_btn := Button.new()
-		yes_btn.add_theme_font_size_override("font_size", 8)
+		yes_btn.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
 		yes_btn.text = "Yes, Restart"
 		yes_btn.add_theme_color_override("font_color", PixelUI.RED)
 		yes_btn.pressed.connect(func() -> void: reset_confirmed.emit(); _close())
@@ -104,7 +104,7 @@ func _build_buttons() -> void:
 		confirm_row.add_child(yes_btn)
 
 		var no_btn := Button.new()
-		no_btn.add_theme_font_size_override("font_size", 8)
+		no_btn.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
 		no_btn.text = "Cancel"
 		no_btn.add_theme_color_override("font_color", PixelUI.CREAM)
 		no_btn.pressed.connect(func() -> void: confirming_reset = false; _build_buttons())
@@ -119,7 +119,7 @@ func _build_settings_section() -> void:
 
 	var audio_header := Label.new()
 	audio_header.text = "Audio"
-	audio_header.add_theme_font_size_override("font_size", 8)
+	audio_header.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
 	audio_header.add_theme_color_override("font_color", PixelUI.GREEN)
 	audio_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	button_list.add_child(audio_header)
@@ -155,7 +155,7 @@ func _add_volume_slider(grid: GridContainer, label_text: String, channel: String
 
 	var lbl := Label.new()
 	lbl.text = label_text
-	lbl.add_theme_font_size_override("font_size", 8)
+	lbl.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
 	lbl.add_theme_color_override("font_color", PixelUI.CREAM)
 	lbl.custom_minimum_size = Vector2(46, 0)
 	row.add_child(lbl)
