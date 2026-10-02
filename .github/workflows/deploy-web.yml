@@ -36,7 +36,7 @@ jobs:
         run: |
           set -euo pipefail
           export XDG_DATA_HOME=/tmp/dts-ci-data
-          for test in economy_invariants cave_access presentation_feedback pacing character_selection shop_currency; do
+          for test in economy_invariants cave_access presentation_feedback pacing character_selection shop_currency stamina_balance; do
             godot --headless --audio-driver Dummy -s "tests/$test.gd" 2>&1 | tee "/tmp/$test.log"
             if grep -Eq 'SCRIPT ERROR|Parse Error' "/tmp/$test.log"; then
               exit 1

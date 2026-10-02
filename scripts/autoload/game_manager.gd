@@ -561,7 +561,9 @@ func get_money_multiplier() -> float:
 	return mult
 
 func get_stamina_cost() -> float:
-	return 1.0
+	# At the 0.3s scoop cadence, base regeneration returns 0.9 stamina.
+	# Costing 2 makes sustained scooping exhaust the starting bar in about 5s.
+	return 2.0
 
 func get_max_stamina() -> float:
 	return get_stat_value("stamina")

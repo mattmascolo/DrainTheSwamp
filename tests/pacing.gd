@@ -19,27 +19,27 @@ func _run() -> void:
 	# First tool must remain attainable promptly, before the first pool is empty.
 	var seconds: float = 0.0
 	var spoon_cost: float = gm.tool_definitions["spoon"]["cost"]
-	while gm.money < spoon_cost and seconds < 120.0:
+	while gm.money < spoon_cost and seconds < 150.0:
 		gm.regen_stamina(0.3)
 		gm.try_scoop(0)
 		seconds += 0.3
 		var value: float = gm.water_carried * gm.swamp_definitions[0]["money_per_gallon"]
 		if gm.is_inventory_full() or gm.money + value >= spoon_cost:
 			gm.sell_water()
-	_check(seconds >= 45.0 and seconds <= 90.0, "First spoon outside pacing window: %.1fs" % seconds)
+	_check(seconds >= 100.0 and seconds <= 135.0, "First spoon outside pacing window: %.1fs" % seconds)
 	_check(gm.buy_tool("spoon"), "Cannot buy first spoon after earning its cost")
 	_check(gm.get_swamp_fill_fraction(0) > 0.5, "First tool arrives after half the Puddle is gone")
 	print("First spoon: %.1fs of scoop time, excluding walking" % seconds)
 	# Fixed starter build: significantly slower progress through the Puddle.
 	gm.reset_game()
 	seconds = 0.0
-	while not gm.is_swamp_completed(0) and seconds < 500.0:
+	while not gm.is_swamp_completed(0) and seconds < 750.0:
 		gm.regen_stamina(0.3)
 		gm.try_scoop(0)
 		seconds += 0.3
 		if gm.is_inventory_full():
 			gm.sell_water()
-	_check(gm.is_swamp_completed(0) and seconds >= 300.0 and seconds < 400.0, "Starter drain outside expected window: %.1fs" % seconds)
+	_check(gm.is_swamp_completed(0) and seconds >= 600.0 and seconds < 700.0, "Starter drain outside expected window: %.1fs" % seconds)
 	print("Unupgraded Puddle: %.1fs of scoop/recovery time, excluding walking" % seconds)
 	# The cave air challenge must keep its original tool output.
 	gm.reset_game()
