@@ -5,7 +5,6 @@ extends CanvasLayer
 # signals and GameManager wiring are the pre-v3 ones.
 @onready var money_label: Label = $MarginContainer/VBoxContainer/TopBar/HBox/MoneyCell/MoneyLabel
 @onready var carry_label: Label = $MarginContainer/VBoxContainer/TopBar/HBox/CarryCell/CarryLabel
-@onready var water_label: Label = $MarginContainer/VBoxContainer/TopBar/HBox/WaterCell/WaterLabel
 @onready var day_label: Label = $MarginContainer/VBoxContainer/TopBar/HBox/DayCell/DayLabel
 @onready var phase_label: Label = $MarginContainer/VBoxContainer/TopBar/HBox/DayCell/PhaseLabel
 @onready var day_icon: TextureRect = $MarginContainer/VBoxContainer/TopBar/HBox/DayCell/Icon
@@ -39,13 +38,11 @@ func _ready() -> void:
 	_build_hud_icons()
 	_setup_stamina_gradient()
 	GameManager.money_changed.connect(_on_money_changed)
-	GameManager.water_level_changed.connect(_on_water_level_changed)
 	GameManager.tool_changed.connect(func(_d: Dictionary) -> void: _update_tool_label())
 	GameManager.tool_upgraded.connect(func(_t: String, _l: int) -> void: _update_tool_label())
 	GameManager.stat_upgraded.connect(_on_stat_upgraded)
 	GameManager.stamina_changed.connect(_on_stamina_changed)
 	GameManager.hose_state_changed.connect(_on_hose_state_changed)
-	GameManager.swamp_completed.connect(_on_swamp_completed)
 	GameManager.water_carried_changed.connect(_on_water_carried_changed)
 	GameManager.day_changed.connect(_on_day_changed)
 	_setup_rate_label()
@@ -55,7 +52,6 @@ func _ready() -> void:
 	# Initialize
 	displayed_money = GameManager.money
 	_on_money_changed(GameManager.money)
-	_update_water_label()
 	_update_tool_label()
 	_on_stamina_changed(GameManager.current_stamina, GameManager.get_max_stamina())
 	_on_water_carried_changed(GameManager.water_carried, GameManager.get_carrying_capacity())
@@ -144,13 +140,6 @@ func _on_money_changed(amount: float) -> void:
 			money_label.add_theme_color_override("font_color", PixelUI.GOLD)
 		)
 
-func _on_water_level_changed(_swamp_index: int, _percent: float) -> void:
-	_update_water_label()
-
-func _update_water_label() -> void:
-	var total_pct: float = GameManager.get_total_water_percent()
-	water_label.text = "%.1f%%" % total_pct
-
 func _update_tool_label() -> void:
 	if tool_icon:
 		tool_icon.texture = PixelUI.TOOL_ICONS.get(GameManager.current_tool_id, PixelUI.TOOL_ICONS["hands"])
@@ -198,9 +187,6 @@ func _fmt_gal_compact(v: float) -> String:
 	if v >= 1.0:
 		return "%.2f" % v
 	return "%.3f" % v
-
-func _on_swamp_completed(swamp_index: int, _reward: float) -> void:
-	_update_water_label()
 
 func _build_hud_icons() -> void:
 	# Top-bar icons are pixel textures placed in hud.tscn (assets/art/ui/icon_*.png).

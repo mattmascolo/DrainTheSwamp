@@ -41,10 +41,20 @@ func _run() -> void:
 	root.add_child(main)
 	await process_frame
 	var world = main.get_node("GameWorld")
+	var signage = get_first_node_in_group("signage")
+	_check(signage != null and signage._basin.size() == world.SWAMP_COUNT, "Water-hole information signs were removed")
+	if signage != null:
+		gm._drain_swamp(0, 1.0)
+		_check(signage._basin[0]["name"].text == "Puddle", "Water-hole name is missing")
+		_check(signage._basin[0]["pct"].text == "80.0%", "Water-hole percentage no longer updates")
+		_check(signage._basin[0]["gal"].text.contains("4.0 / 5.0"), "Water-hole gallons no longer update")
+	for sprite in main.find_children("*", "Sprite2D", true, false):
+		_check(sprite.texture == null or not sprite.texture.resource_path.ends_with("/billboard.png"), "Story billboard still appears in the world")
 	for node in main.find_children("*", "Control", true, false):
 		if node is Label or node is Button:
 			_check(not node.text.contains("SWAMP TIMES"), "Swamp Times strip still appears in gameplay")
 	var hud = main.hud
+	_check(not hud.has_node("MarginContainer/VBoxContainer/TopBar/HBox/WaterCell"), "HUD still shows the global water percentage")
 	_check(hud.get_node("MarginContainer/VBoxContainer").get_child_count() == 3, "HUD still attaches a news strip")
 	world._on_reached_island()
 	_check(main.player.is_physics_processing(), "Story ending freezes the player")

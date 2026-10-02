@@ -1,7 +1,7 @@
 extends Node2D
 # v3 signage (2026-09-11): every piece of text that lives in the world.
-# Wooden pixel billboards on the ridges, a wooden name post per basin, SELL
-# planks at the two sell points, pixel cave mouths with a name plank, and
+# Wooden water-information posts per basin, SELL
+# planks at the two sell points, pixel cave mouths, and
 # Silkscreen float text. game_world's old builders are gated off by
 # V3_SIGNAGE; nothing here re-tunes them. Built deferred so it lands after
 # everything game_world creates in _ready().
@@ -32,34 +32,16 @@ const HUD_BOTTOM_CLEAR := 31.0
 # (billboard.png 352x200 — rebaked smaller per Wes's 2026-09-11 review;
 # sign_post.png 178x164, sign_stake.png 84x92, sign_stake_l.png 152x140 —
 # see assets/art/drainsville/).
-const BILLBOARD_FACE := Rect2(13, 10, 325, 107)
 const POST_FACE := Rect2(14, 10, 150, 70)
 const STAKE_FACE := Rect2(6, 6, 72, 42)
 const STAKE_L_FACE := Rect2(12, 10, 128, 70)
-
-# Story content (verbatim from the old _build_billboards): one board per ridge,
-# index = ridge between pool i and pool i+1. Odd ridges red (Swampsworth),
-# even ridges blue (Lobbyton).
-const BILLBOARD_TEXTS: Array[String] = [
-	"VOTE SWAMPSWORTH\nLeadership You\nCan Trust\nPAID FOR BY FRIENDS OF SWAMPSWORTH",
-	"LOBBYTON 2024\nA Fresh Voice\nFor Real Change\nPAID FOR BY LOBBYTON FOR CONGRESS",
-	"INJURED AT WORK?\nCALL 555-SWAMP\nTHE LAW OFFICES OF\nSWAMPSWORTH & SONS",
-	"SWAMP ACRES\nLUXURY CONDOS\nWaterfront Living\nFROM $2.5M",
-	"PROTECT OUR\nWETLANDS\nPAID FOR BY CITIZENS\nAGAINST DRAINING",
-	"RE-ELECT LOBBYTON\nShe Gets Results\n(ask her donors)\nPAID FOR BY LOBBYTON PAC",
-	"GOODWELL\nFOR REFORM\nHonest Government Now\nPAID FOR BY GOODWELL 2024",
-	"EAT AT\nSWAMP MIKE'S\nBBQ & BAIT SHOP\nEXIT 7  -  OPEN 24HRS",
-	"SWAMPSWORTH\nGETS IT DONE*\n*it = fundraising\nPAID FOR BY SWAMPSWORTH PAC",
-]
-const RED_TINT := Color(0.96, 0.86, 0.82)
-const BLUE_TINT := Color(0.82, 0.87, 0.98)
 
 var world: Node2D = null
 var _font: Font = null
 var _lamp_tex: ImageTexture = null
 var _snap: Array = []        # adopted Labels, pixel-snapped before every draw
 var _basin: Array = []       # per basin {name: Label, pct: Label, gal: Label, fx, fy, fw: float}
-var _caves: Array = []       # {ce: Dictionary, sealed: Sprite2D, mouth: Sprite2D, plank: Node2D}
+var _caves: Array = []       # {ce: Dictionary, sealed: Sprite2D, mouth: Sprite2D}
 var _sign_spans: Array = []  # [{x: float, half_w: float}] — every world sign built so far, for overlap avoidance
 var _glow_layers: Array = []  # [{node: CanvasItem, day: Color, night: Color}], driven by _glow_t() each frame
 var _tower_sell_built: bool = false
@@ -235,24 +217,6 @@ func _add_lamp(x: float, top_y: float, z: int) -> void:
 	add_child(fixture)
 	_register_glow(fixture, Color(1, 1, 1, 1), 1.0)
 
-# Builds the billboard face label sized/wrapped to fit, verified by actually
-# measuring the wrapped text against the font (per Wes: "measure with
-# get_multiline_string_size, wrap to the inner width, center vertically").
-# Silkscreen only comes in 8/16 (rule 7) so there's no smaller size to step
-# down to; instead this tightens line_spacing just enough that the measured
-# block height fits the face, and clip_contents (set in _face_label) is the
-# last-resort backstop so text can never draw outside the plank either way.
-func _fit_billboard_text(board: Sprite2D, face: Rect2, text: String) -> Label:
-	var lbl := _face_label(board, face, text, 8, INK)
-	var box: Vector2 = face.size * SCALE
-	var spacing := 0
-	var measured: Vector2 = _font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, box.x, 8)
-	var line_count: int = text.count("\n") + 1
-	while measured.y + float(spacing) * float(line_count - 1) > box.y and spacing > -6:
-		spacing -= 1
-	lbl.add_theme_constant_override("line_spacing", spacing)
-	return lbl
-
 func _outline(lbl: Label, px: int = 1) -> void:
 	lbl.add_theme_color_override("font_outline_color", OUTLINE)
 	lbl.add_theme_constant_override("outline_size", px)
@@ -262,39 +226,11 @@ func _outline(lbl: Label, px: int = 1) -> void:
 
 func _build() -> void:
 	_sign_spans.clear()
-	_build_billboards()
 	_build_basin_signs()
 	_build_shop_sell()
 	_build_cave_mouths()
 	GameManager.water_level_changed.connect(_on_water_level_changed)
 	GameManager.swamp_completed.connect(_on_swamp_completed)
-
-# --- billboards: one wooden board per ridge, story text in Silkscreen -------
-func _build_billboards() -> void:
-	for ridge_i in range(world.SWAMP_COUNT - 1):
-		if ridge_i >= BILLBOARD_TEXTS.size():
-			break
-		var ridge_start: int = world.SWAMP_RANGES[ridge_i][1]
-		var ridge_end: int = world.SWAMP_RANGES[ridge_i + 1][0]
-		if ridge_start >= world.terrain_points.size() or ridge_end >= world.terrain_points.size():
-			continue
-		var mid_x: float = (world.terrain_points[ridge_start].x + world.terrain_points[ridge_end].x) * 0.5
-		var gy: float = world._get_terrain_y_at(mid_x)
-		if gy < 0.0:
-			continue
-		var board := _sprite("billboard", mid_x, gy + 2.0, -1, ridge_i % 2 == 1)
-		var tint: Color = RED_TINT if (ridge_i % 2 == 0) else BLUE_TINT
-		var face := BILLBOARD_FACE
-		if board.flip_h:
-			face.position.x = board.texture.get_width() - face.position.x - face.size.x
-		var text_lbl := _fit_billboard_text(board, face, BILLBOARD_TEXTS[ridge_i])
-		var half_w: float = board.texture.get_width() * SCALE * 0.5
-		_sign_spans.append({"x": mid_x, "half_w": half_w})
-		# Small gooseneck lamp on top; board + ink both self-brighten at night
-		# so the whole face reads regardless of the CanvasModulate night tint.
-		_add_lamp(mid_x, board.position.y, board.z_index)
-		_register_glow(board, tint, 1.0)
-		_register_glow(text_lbl, Color(1, 1, 1, 1), 1.0)
 
 # Nudge a sign's x away from every other sign registered so far (billboards,
 # basin posts, cave planks — everything in this file shares one span list),
@@ -448,7 +384,6 @@ func _build_tower_sell() -> void:
 const CAVE_SCALE := 0.25
 const CAVE_MOUND_HALF_W := 55.0  # cave_mouth.png world half-width at CAVE_SCALE — the sprite is already
 # trimmed to its opaque content in the bake, so this is its true footprint, not padding.
-const CAVE_PLANK_HALF_W := 38.0   # sign_stake_l.png world half-width
 
 func _build_cave_mouths() -> void:
 	_caves.clear()
@@ -470,37 +405,6 @@ func _build_cave_mouths() -> void:
 		glow.energy = 0.0
 		glow.position = Vector2(0.0, -8.0)
 		mouth.add_child(glow)
-		# Name plank beside the mouth: candidate side first, then nudged clear
-		# of every other sign (including the neighboring basin post it used to
-		# sit on top of) the same way basin posts are.
-		var cave_name: String = GameManager.CAVE_DEFINITIONS[ce["cave_id"]]["name"]
-		var root_x: float = ce["x"]
-		var plank_x: float = _clear_of_signs(root_x + (28.0 if k % 2 == 0 else -28.0), CAVE_PLANK_HALF_W)
-		_sign_spans.append({"x": plank_x, "half_w": CAVE_PLANK_HALF_W})
-		var plank := Node2D.new()
-		plank.position = Vector2(plank_x - root_x, 0.0)
-		root.add_child(plank)
-		var stake := Sprite2D.new()
-		stake.texture = _tex("sign_stake_l")
-		stake.centered = false
-		stake.scale = Vector2(SCALE, SCALE)
-		stake.position = Vector2(-stake.texture.get_width() * SCALE * 0.5, 1.0 - stake.texture.get_height() * SCALE).round()
-		plank.add_child(stake)
-		var lbl := _label(cave_name, 8, PLANK_INK)
-		# Autowrap/clip BEFORE size — Control.size is clamped up to
-		# get_minimum_size() the instant it's assigned, and with autowrap
-		# still off that minimum is the unwrapped text width (see the
-		# billboard fix above for the long version of this note).
-		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-		lbl.clip_text = true
-		lbl.clip_contents = true
-		lbl.custom_minimum_size = Vector2.ZERO
-		lbl.position = (stake.position + STAKE_L_FACE.position * SCALE).round()
-		lbl.size = (STAKE_L_FACE.size * SCALE).round()
-		plank.add_child(lbl)
-		# Cave signs get the same night self-brighten as billboards/posts.
-		_register_glow(stake, Color(1, 1, 1, 1), 1.0)
-		_register_glow(lbl, Color(1, 1, 1, 1), 1.0)
 		# The "Press SPACE" hint: pixel font + outline (was still the default
 		# smooth font — cave entrances are this track's scope), centered over
 		# the mouth, restyled on arrival by _on_node_added too but set here
@@ -514,7 +418,7 @@ func _build_cave_mouths() -> void:
 			hint.size = Vector2(140.0, 10.0)
 			hint.position = Vector2(-70.0, -36.0)
 			_register_glow(hint, Color(1, 1, 1, 1), 1.0)
-		_caves.append({"ce": ce, "sealed": sealed, "mouth": mouth, "plank": plank, "glow": glow})
+		_caves.append({"ce": ce, "sealed": sealed, "mouth": mouth, "glow": glow})
 		k += 1
 	_sync_caves()
 
@@ -533,7 +437,6 @@ func _sync_caves() -> void:
 		var ce: Dictionary = c["ce"]
 		var open_vis: bool = is_instance_valid(ce["opening"]) and (ce["opening"] as CanvasItem).visible
 		(c["mouth"] as Sprite2D).visible = open_vis
-		(c["plank"] as Node2D).visible = open_vis
 		(c["sealed"] as Sprite2D).visible = not open_vis
 		if open_vis:
 			var pulse: float = (sin(world.wave_time * 2.0 + ce["x"] * 0.1) + 1.0) * 0.5

@@ -28,6 +28,7 @@ func _run() -> void:
 				text += node.text
 			text = text.to_lower()
 			_check(not text.contains("influence") and not text.contains("sell out") and not text.contains("pending payout"), "Removed currency remains in shop text")
+			_check(not text.contains("pump"), "Shop still offers pool pumps")
 	shop.current_tab = 0
 	shop._refresh()
 	var spoon_button: Button = null

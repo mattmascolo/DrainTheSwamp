@@ -244,7 +244,7 @@ const SWAMP_COUNT: int = 10
 # v3 pixel-art skin (scripts/world/skin.gd) replaces the procedural sky/ground/
 # vegetation; the builders below stay in the file but are not run when it is on.
 const V3_SKIN := true
-# v3 signage (scripts/world/signage.gd): billboards, basin name posts, SELL
+# v3 signage (scripts/world/signage.gd): basin name posts, SELL
 # planks, cave mouths, pixel float text. Old builders below are gated off.
 const V3_SIGNAGE := true
 # v3 pixel water (scripts/world/water_skin.gd) draws over water_polygons; the
@@ -697,7 +697,6 @@ func _ready() -> void:
 	_build_atmosphere()
 	_build_player_shadow()
 	_build_cave_entrances()
-	_build_billboards()
 	_init_drain_thresholds()
 
 	GameManager.water_level_changed.connect(_on_water_level_changed)
@@ -7642,103 +7641,6 @@ func _get_pool_deepest_point(swamp_index: int) -> Vector2:
 			deepest_y = terrain_points[idx].y
 			deepest_x = terrain_points[idx].x
 	return Vector2(deepest_x, deepest_y)
-
-func _build_billboards() -> void:
-	if V3_SIGNAGE:
-		return
-	var billboard_texts: Array[String] = [
-		"VOTE SWAMPSWORTH\nLeadership You\nCan Trust\nPAID FOR BY FRIENDS OF SWAMPSWORTH",
-		"LOBBYTON 2024\nA Fresh Voice\nFor Real Change\nPAID FOR BY LOBBYTON FOR CONGRESS",
-		"INJURED AT WORK?\nCALL 555-SWAMP\nTHE LAW OFFICES OF\nSWAMPSWORTH & SONS",
-		"SWAMP ACRES\nLUXURY CONDOS\nWaterfront Living\nFROM $2.5M",
-		"PROTECT OUR\nWETLANDS\nPAID FOR BY CITIZENS\nAGAINST DRAINING",
-		"RE-ELECT LOBBYTON\nShe Gets Results\n(ask her donors)\nPAID FOR BY LOBBYTON PAC",
-		"GOODWELL\nFOR REFORM\nHonest Government Now\nPAID FOR BY GOODWELL 2024",
-		"EAT AT\nSWAMP MIKE'S\nBBQ & BAIT SHOP\nEXIT 7  -  OPEN 24HRS",
-		"SWAMPSWORTH\nGETS IT DONE*\n*it = fundraising\nPAID FOR BY SWAMPSWORTH PAC",
-	]
-	# Partisan tint colors — odd ridges red (Swampsworth), even ridges blue (Lobbyton)
-	var red_tint := Color(0.90, 0.82, 0.78)
-	var blue_tint := Color(0.78, 0.82, 0.90)
-	var rng_bb := RandomNumberGenerator.new()
-	rng_bb.seed = 54321
-
-	for ridge_i in range(SWAMP_COUNT - 1):
-		var ridge_start: int = SWAMP_RANGES[ridge_i][1]
-		var ridge_end: int = SWAMP_RANGES[ridge_i + 1][0]
-		if ridge_start >= terrain_points.size() or ridge_end >= terrain_points.size():
-			continue
-		var ridge_mid_x: float = (terrain_points[ridge_start].x + terrain_points[ridge_end].x) * 0.5
-		var ground_y: float = _get_terrain_y_at(ridge_mid_x)
-		if ground_y < 0:
-			continue
-
-		var sign_tint: Color = red_tint if (ridge_i % 2 == 0) else blue_tint
-
-		# Post (3px wide)
-		var post_h: float = 45.0
-		var post := ColorRect.new()
-		post.position = Vector2(ridge_mid_x - 1.5, ground_y - post_h)
-		post.size = Vector2(3, post_h)
-		post.color = Color(0.35, 0.25, 0.18)
-		post.z_index = 3
-		add_child(post)
-
-		# Crossbar where post meets sign
-		var crossbar := ColorRect.new()
-		crossbar.position = Vector2(ridge_mid_x - 10, ground_y - post_h - 1)
-		crossbar.size = Vector2(20, 2)
-		crossbar.color = Color(0.35, 0.25, 0.18)
-		crossbar.z_index = 3
-		add_child(crossbar)
-
-		# Sign panel (sized so 5-6 wrapped lines at font 6 fit without clipping)
-		var sign_w: float = 120.0
-		var sign_h: float = 68.0
-		var sign_node := Node2D.new()
-		sign_node.position = Vector2(ridge_mid_x, ground_y - post_h - sign_h * 0.5)
-		sign_node.z_index = 3
-		add_child(sign_node)
-
-		# Sign background — ColorRect as base, Label as its child (Control→Control layout)
-		var sign_bg := ColorRect.new()
-		sign_bg.position = Vector2(-sign_w * 0.5, -sign_h * 0.5)
-		sign_bg.size = Vector2(sign_w, sign_h)
-		sign_bg.color = sign_tint
-		sign_bg.clip_contents = true
-		sign_node.add_child(sign_bg)
-
-		# Text label as child of sign_bg (Control inside Control = reliable positioning)
-		var lbl := Label.new()
-		lbl.text = billboard_texts[ridge_i]
-		lbl.add_theme_font_size_override("font_size", 6)
-		lbl.add_theme_constant_override("line_spacing", -1)
-		lbl.add_theme_color_override("font_color", Color(0.15, 0.12, 0.10))
-		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		lbl.anchor_left = 0.0
-		lbl.anchor_top = 0.0
-		lbl.anchor_right = 1.0
-		lbl.anchor_bottom = 1.0
-		lbl.offset_left = 4
-		lbl.offset_top = 3
-		lbl.offset_right = -4
-		lbl.offset_bottom = -3
-		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-		sign_bg.add_child(lbl)
-
-		# Sign border (Line2D)
-		var border := Line2D.new()
-		border.width = 1.0
-		border.default_color = Color(0.3, 0.25, 0.18, 0.8)
-		border.add_point(Vector2(-sign_w * 0.5, -sign_h * 0.5))
-		border.add_point(Vector2(sign_w * 0.5, -sign_h * 0.5))
-		border.add_point(Vector2(sign_w * 0.5, sign_h * 0.5))
-		border.add_point(Vector2(-sign_w * 0.5, sign_h * 0.5))
-		border.add_point(Vector2(-sign_w * 0.5, -sign_h * 0.5))
-		border.z_index = 1
-		sign_node.add_child(border)
-
 
 func _build_cave_entrances() -> void:
 	cave_entrances.clear()

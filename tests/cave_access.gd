@@ -46,6 +46,9 @@ func _run() -> void:
 	gm._drain_swamp(0, gm.swamp_definitions[0]["total_gallons"])
 	await create_timer(0.5).timeout
 	_check(world.cave_entrances[0]["root"].visible, "Drained cave remains hidden")
+	for label in world.cave_entrances[0]["root"].find_children("*", "Label", true, false):
+		_check(not label.text.to_upper().contains("MUDDY HOLLOW"), "Surface cave nameplate remains")
+	_check(world.cave_entrances[0]["hint"].text.contains("SPACE"), "Useful cave entry prompt was removed")
 	_check(world.cave_entrances[0]["area"].monitoring, "Drained cave has no interaction")
 	gm.swamp_states[0]["gallons_drained"] -= 1.0
 	gm.water_level_changed.emit(0, gm.get_swamp_water_percent(0))
