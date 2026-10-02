@@ -33,8 +33,7 @@ func _ready() -> void:
 		_debug_open_ui.call_deferred(ui_dbg)
 
 func _debug_open_ui(which: String) -> void:
-	# "shop:1" / "shop:2" also selects a tab (0=Tools default, 1=Stats,
-	# 2=Influence) so tools/capture.py can shoot each one.
+	# "shop:1" selects Stats (0=Tools) for UI captures.
 	var parts: PackedStringArray = which.split(":")
 	match parts[0]:
 		"shop":

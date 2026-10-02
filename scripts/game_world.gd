@@ -4783,7 +4783,7 @@ func _on_sell_window_changed(active: bool, duration: float) -> void:
 
 # Completion remains a gameplay milestone without a narrative interruption.
 func _on_atlantic_drained() -> void:
-	SceneManager.show_popup("All water bodies drained! Prestige to start another run.", 5.0)
+	SceneManager.show_popup("All water bodies drained! Start a new game from the title screen to play again.", 5.0)
 
 func _on_reached_island() -> void:
 	# Completion no longer freezes gameplay for a story ending.

@@ -13,12 +13,11 @@ const REFRESH_INTERVAL: float = 0.3
 # Closures registered during a build; run on the money tick to update
 # affordability/labels IN PLACE. A full tree rebuild every 0.3s destroyed
 # hover state and open tooltips mid-interaction, so rebuilds are reserved
-# for structural changes (tab switch, purchases, prestige).
+# for structural changes (tab switch and purchases).
 var _live_updaters: Array[Callable] = []
 
-var current_tab: int = 0  # 0=Tools, 1=Stats, 2=Influence
+var current_tab: int = 0  # 0=Tools, 1=Stats
 var tab_buttons: Array[Button] = []
-var confirming_sellout: bool = false
 
 func _ready() -> void:
 	# Three-surface hierarchy: this panel (frame, darker wood + rivets) >
@@ -35,7 +34,6 @@ func _ready() -> void:
 	GameManager.camel_changed.connect(func() -> void: _mark_structural())
 	GameManager.upgrade_changed.connect(func() -> void: _mark_structural())
 	GameManager.stat_upgraded.connect(func(_s: String, _l: int) -> void: _mark_structural())
-	GameManager.prestige_changed.connect(func() -> void: _mark_structural())
 	GameManager.pump_changed.connect(func(_i: int, _l: int) -> void: _mark_structural())
 	visible = false
 
@@ -67,11 +65,11 @@ func _register_updater(fn: Callable) -> void:
 
 # Standard affordability wiring: the button is always connected (GameManager
 # buy functions self-guard on funds); this just keeps disabled/color live.
-func _register_afford(btn: Button, cost: float, active_color: Color, extra_ok: bool = true, use_influence: bool = false) -> void:
+func _register_afford(btn: Button, cost: float, active_color: Color, extra_ok: bool = true) -> void:
 	_register_updater(func() -> void:
 		if not is_instance_valid(btn):
 			return
-		var funds: float = GameManager.influence if use_influence else GameManager.money
+		var funds: float = GameManager.money
 		var ok: bool = extra_ok and funds >= cost
 		btn.disabled = not ok
 		if ok:
@@ -85,7 +83,6 @@ func _register_afford(btn: Button, cost: float, active_color: Color, extra_ok: b
 
 func open() -> void:
 	visible = true
-	confirming_sellout = false
 	_refresh_cooldown = 0.0
 	_refresh()
 	# Slide in from right
@@ -105,6 +102,7 @@ func close() -> void:
 	tw.tween_callback(func() -> void: visible = false)
 
 func _refresh() -> void:
+	current_tab = clampi(current_tab, 0, 1)
 	_live_updaters.clear()
 	for child in tool_list.get_children():
 		tool_list.remove_child(child)
@@ -115,13 +113,12 @@ func _refresh() -> void:
 	tab_bar.add_theme_constant_override("separation", 4)
 	tab_buttons.clear()
 
-	var tab_names: Array[String] = ["Tools", "Stats", "Influence"]
+	var tab_names: Array[String] = ["Tools", "Stats"]
 	var tab_colors: Array[Color] = [
 		Color(0.55, 0.48, 0.2),   # Gold for tools
 		Color(0.32, 0.5, 0.32),   # Green for stats (was blue — fails on brown)
-		Color(0.55, 0.32, 0.52),  # Warm magenta-purple for influence
 	]
-	for i in range(3):
+	for i in range(tab_names.size()):
 		var tab_idx: int = i
 		var btn := Button.new()
 		btn.text = tab_names[i]
@@ -158,8 +155,6 @@ func _refresh() -> void:
 			_build_tools_tab()
 		1:
 			_build_stats_tab()
-		2:
-			_build_prestige_tab()
 
 # =============================================================================
 # TOOLS TAB
@@ -424,242 +419,6 @@ func _build_stats_tab() -> void:
 
 		u_panel.add_child(u_row)
 		tool_list.add_child(u_panel)
-
-# =============================================================================
-# INFLUENCE (PRESTIGE) TAB
-# =============================================================================
-func _build_prestige_tab() -> void:
-	# --- Balance header ---
-	var bal := Label.new()
-	bal.text = "Influence: %d" % int(GameManager.influence)
-	bal.add_theme_font_size_override("font_size", 16)
-	bal.add_theme_color_override("font_color", Color(0.85, 0.6, 1.0))
-	bal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tool_list.add_child(bal)
-
-	var sub := Label.new()
-	sub.text = "Times Sold Out: %d" % GameManager.prestige_count
-	sub.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
-	sub.add_theme_color_override("font_color", Color(0.86, 0.82, 0.94))
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tool_list.add_child(sub)
-
-	# --- Sell Out panel ---
-	var sellout_panel := PanelContainer.new()
-	var sellout_style: StyleBoxTexture = PixelUI.row(10, 8)
-	sellout_panel.add_theme_stylebox_override("panel", sellout_style)
-
-	var sellout_col := VBoxContainer.new()
-	sellout_col.add_theme_constant_override("separation", 6)
-
-	var pending_lbl := Label.new()
-	pending_lbl.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
-	pending_lbl.add_theme_color_override("font_color", Color(0.8, 0.7, 1.0))
-	pending_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sellout_col.add_child(pending_lbl)
-
-	# Progress toward the NEXT influence point (sqrt curve -> next threshold).
-	# Live-updated: lifetime earnings tick up while the panel is open.
-	var next_lbl := Label.new()
-	next_lbl.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
-	next_lbl.add_theme_color_override("font_color", Color(0.86, 0.82, 0.94))
-	next_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sellout_col.add_child(next_lbl)
-
-	_register_updater(func() -> void:
-		if not is_instance_valid(pending_lbl):
-			return
-		var p: int = GameManager.get_pending_influence()
-		pending_lbl.text = "Pending payout: +%d Influence" % p
-		var next_thresh: float = GameManager.PRESTIGE_SCALE * pow(float(p + 1), 2.0)
-		var prev_thresh: float = GameManager.PRESTIGE_SCALE * pow(float(p), 2.0)
-		var frac: float = clampf((GameManager.lifetime_earnings - prev_thresh) / maxf(next_thresh - prev_thresh, 1.0), 0.0, 1.0)
-		next_lbl.text = "Next +1 at %s lifetime (%d%%)" % [Economy.format_money(next_thresh), int(frac * 100.0)]
-	)
-
-	if not confirming_sellout:
-		var sellout_btn := Button.new()
-		sellout_btn.add_theme_font_size_override("font_size", 16)
-		sellout_btn.text = "SELL OUT"
-		sellout_btn.custom_minimum_size = Vector2(160, 30)
-		sellout_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		sellout_btn.pressed.connect(func() -> void:
-			confirming_sellout = true
-			_refresh()
-		)
-		_register_updater(func() -> void:
-			if not is_instance_valid(sellout_btn):
-				return
-			var ok: bool = GameManager.can_prestige()
-			sellout_btn.disabled = not ok
-			if ok:
-				sellout_btn.add_theme_color_override("font_color", Color(1.0, 0.8, 0.4))
-			else:
-				sellout_btn.remove_theme_color_override("font_color")
-		)
-		_style_button(sellout_btn, Color(0.3, 0.12, 0.3))
-		sellout_col.add_child(sellout_btn)
-	else:
-		var warn := Label.new()
-		warn.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
-		warn.add_theme_color_override("font_color", Color(1.0, 0.6, 0.5))
-		warn.text = "Resets money, tools, stats &\nswamp progress. You keep your Influence."
-		warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		sellout_col.add_child(warn)
-
-		# The handler's blessing — selling out is NA's idea of career growth
-		var na_line := Label.new()
-		na_line.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
-		na_line.add_theme_color_override("font_color", Color(0.55, 0.85, 0.60))
-		na_line.text = "\"The swamp refills. The arrangement continues.\" — NA"
-		na_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		sellout_col.add_child(na_line)
-
-		var confirm_row := HBoxContainer.new()
-		confirm_row.alignment = BoxContainer.ALIGNMENT_CENTER
-		confirm_row.add_theme_constant_override("separation", 16)
-
-		var yes_btn := Button.new()
-		yes_btn.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
-		yes_btn.text = "Yes, Sell Out"
-		yes_btn.add_theme_color_override("font_color", Color(1.0, 0.8, 0.4))
-		yes_btn.pressed.connect(func() -> void:
-			confirming_sellout = false
-			GameManager.prestige()
-		)
-		_style_button(yes_btn, Color(0.3, 0.12, 0.3))
-		confirm_row.add_child(yes_btn)
-
-		var no_btn := Button.new()
-		no_btn.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
-		no_btn.text = "Cancel"
-		no_btn.add_theme_color_override("font_color", Color(0.8, 0.85, 0.9))
-		no_btn.pressed.connect(func() -> void:
-			confirming_sellout = false
-			_refresh()
-		)
-		_style_button(no_btn, Color(0.15, 0.18, 0.22))
-		confirm_row.add_child(no_btn)
-		sellout_col.add_child(confirm_row)
-
-	sellout_panel.add_child(sellout_col)
-	tool_list.add_child(sellout_panel)
-
-	# --- Upgrades header ---
-	var sep := HSeparator.new()
-	sep.add_theme_constant_override("separation", 6)
-	tool_list.add_child(sep)
-	var hdr := Label.new()
-	hdr.text = "-- Permanent Upgrades --"
-	hdr.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
-	hdr.add_theme_color_override("font_color", Color(0.75, 0.55, 0.9))
-	hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tool_list.add_child(hdr)
-
-	_build_prestige_upgrade_row("kickback", "Kickback", "x1.25 money per level")
-	_build_prestige_upgrade_row("muscle", "Muscle", "x1.25 scoop output per level")
-	_build_prestige_upgrade_row("cap_hike", "Cap Hike", "+25% stat caps per level")
-	_build_prestige_upgrade_row("war_chest", "War Chest", "Start with seed money + tools")
-
-	# --- The Arrangement: one perk per sell-out, no purchase needed ---
-	var arr_sep := HSeparator.new()
-	arr_sep.add_theme_constant_override("separation", 6)
-	tool_list.add_child(arr_sep)
-	var arr_hdr := Label.new()
-	arr_hdr.text = "-- The Arrangement --"
-	arr_hdr.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
-	arr_hdr.add_theme_color_override("font_color", Color(0.55, 0.85, 0.60))
-	arr_hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tool_list.add_child(arr_hdr)
-
-	var perks: Array = [
-		{"p": 1, "name": "Federal Infrastructure Grant", "desc": "Pumps at half price",
-			"na": "\"We know a man on the appropriations committee. We know all the men on the appropriations committee.\" — NA"},
-		{"p": 2, "name": "Camel Caravan", "desc": "Camel herd cap x3",
-			"na": "\"A caravan says: this man is settled. Also, they carry water.\" — NA"},
-		{"p": 3, "name": "NA Courier Service", "desc": "In-cave sell basin; documents auto-read",
-			"na": "\"Our couriers were in the caves before you. Do not ask how. They are professionals.\" — NA"},
-		{"p": 4, "name": "Buyback Windows", "desc": "Periodic 2x sell-price events",
-			"na": "\"Sometimes a buyer needs water gone quickly and quietly, at twice the price. You will know the moment.\" — NA"},
-	]
-	for perk in perks:
-		var unlocked: bool = GameManager.prestige_count >= perk["p"]
-		var perk_panel := PanelContainer.new()
-		var perk_style: StyleBoxTexture = PixelUI.row(6, 4, "normal" if unlocked else "locked")
-		perk_panel.add_theme_stylebox_override("panel", perk_style)
-		var perk_lbl := Label.new()
-		perk_lbl.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
-		if unlocked:
-			perk_lbl.text = "[P%d] %s — %s" % [perk["p"], perk["name"], perk["desc"]]
-			perk_lbl.add_theme_color_override("font_color", Color(0.6, 0.95, 0.7))
-		else:
-			perk_lbl.text = "[P%d] Sell out %d times to unlock" % [perk["p"], perk["p"]]
-			perk_lbl.add_theme_color_override("font_color", Color(0.68, 0.7, 0.72))
-		perk_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-		perk_panel.tooltip_text = "%s\n%s\n\n%s" % [perk["name"], perk["desc"], perk["na"]] if unlocked else "Unlocks at %d sell-outs" % perk["p"]
-		perk_panel.mouse_filter = Control.MOUSE_FILTER_PASS
-		perk_panel.add_child(perk_lbl)
-		tool_list.add_child(perk_panel)
-
-func _build_prestige_upgrade_row(key: String, display_name: String, effect: String) -> void:
-	var level: int = GameManager.prestige_upgrades[key]
-	var cost: int = GameManager.get_prestige_upgrade_cost(key)
-
-	var row_panel := PanelContainer.new()
-	var row_style: StyleBoxTexture = PixelUI.row()
-	row_panel.add_theme_stylebox_override("panel", row_style)
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-
-	var info_label := Label.new()
-	info_label.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
-	info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info_label.add_theme_color_override("font_shadow_color", Color(0.1, 0.06, 0.04, 0.75))
-	info_label.add_theme_constant_override("shadow_offset_x", 1)
-	info_label.add_theme_constant_override("shadow_offset_y", 1)
-	if level > 0:
-		info_label.text = "%s Lv%d" % [display_name, level]
-		info_label.add_theme_color_override("font_color", Color(0.8, 0.7, 1.0))
-	else:
-		info_label.text = display_name
-		info_label.add_theme_color_override("font_color", Color(0.8, 0.76, 0.88))
-	row.add_child(info_label)
-
-	var buy_btn := Button.new()
-	buy_btn.add_theme_font_size_override("font_size", PixelUI.SIZE_CAPTION)
-	buy_btn.text = "Buy (%d Inf)" % cost
-	buy_btn.custom_minimum_size = Vector2(110, 0)
-	var k: String = key
-	buy_btn.pressed.connect(func() -> void: GameManager.buy_prestige_upgrade(k))
-	_register_afford(buy_btn, float(cost), Color(0.9, 0.7, 1.0), true, true)
-	_style_button(buy_btn, Color(0.2, 0.1, 0.25))
-	row.add_child(buy_btn)
-
-	var tip: String = "%s\n%s\nLevel: %d\nCost: %d Influence" % [display_name, effect, level, cost]
-	if key == "war_chest":
-		tip += "\nNext start money: %s" % Economy.format_money(_war_chest_seed_at(level + 1))
-		var starter_names: Array = ["Spoon", "Cup", "Bucket"]
-		if level < starter_names.size():
-			tip += "\nAlso starts owned: %s" % ", ".join(starter_names.slice(0, level + 1))
-	# One handler line each — the upgrades are NA's payroll categories
-	var na_notes: Dictionary = {
-		"kickback": "\"Everyone takes a cut. Yours is simply honest about it.\" — NA",
-		"muscle": "\"We sent protein powder and a man who teaches lifting. Do not ask where he teaches.\" — NA",
-		"cap_hike": "\"Regulations are for people without friends.\" — NA",
-		"war_chest": "\"Consider it an advance. Northwind always collects.\" — NA",
-	}
-	if na_notes.has(key):
-		tip += "\n\n%s" % na_notes[key]
-	row_panel.tooltip_text = tip
-	row_panel.mouse_filter = Control.MOUSE_FILTER_PASS
-	row_panel.add_child(row)
-	tool_list.add_child(row_panel)
-
-func _war_chest_seed_at(level: int) -> float:
-	if level <= 0:
-		return 0.0
-	return 500.0 * pow(2.0, level - 1)
 
 func _format_stat_value(stat_id: String, defn: Dictionary, value: float) -> String:
 	var fmt: String = defn.get("format", "value")
