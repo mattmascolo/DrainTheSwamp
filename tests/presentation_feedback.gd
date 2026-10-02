@@ -29,6 +29,14 @@ func _run() -> void:
 	_check(sm.cave_popup.visible, "Gameplay help was removed")
 	await create_timer(0.3).timeout
 	_check(not sm.cave_popup.visible, "Gameplay help does not dismiss")
+	sm.show_document_popup("Gameplay help", "HOW TO PLAY")
+	await create_timer(0.9).timeout
+	var dismiss_key := InputEventKey.new()
+	dismiss_key.keycode = KEY_A
+	dismiss_key.pressed = true
+	sm._input(dismiss_key)
+	await create_timer(0.6).timeout
+	_check(not sm.showing_lore, "Brief arbitrary key press does not dismiss gameplay help")
 	var main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame

@@ -37,6 +37,7 @@ var endgame_active: bool = false
 # --- Lore popup ---
 var lore_layer: CanvasLayer = null
 var showing_lore: bool = false
+var _dismiss_help: Callable
 
 # --- Burner phone (Northwind Analytics) ---
 # Texts queue up and wait for a clear screen (no newspaper/lore/transition), so a
@@ -192,6 +193,12 @@ func _process(delta: float) -> void:
 			phone_cooldown = 0.8
 
 func _input(event: InputEvent) -> void:
+	# Handle the event itself; frame polling can miss brief key presses on web.
+	if showing_lore and _dismiss_help.is_valid():
+		if (event is InputEventKey and event.pressed and not event.echo) or (event is InputEventMouseButton and event.pressed) or (event is InputEventScreenTouch and event.pressed):
+			_dismiss_help.call()
+			get_viewport().set_input_as_handled()
+			return
 	if not showing_newspaper or not newspaper_ready_for_input:
 		return
 	if (event is InputEventKey and event.pressed and not event.echo) or (event is InputEventMouseButton and event.pressed):
@@ -302,32 +309,28 @@ func _wait_for_lore_dismiss(overlay: ColorRect, panel: PanelContainer, prompt: L
 	var dismissed: Array[bool] = [false]
 	var layer_ref: CanvasLayer = lore_layer
 	var frame_ref: Array[Callable] = [Callable()]
-	var check_fn: Callable
-	check_fn = func(delta_val: float) -> void:
+	_dismiss_help = func() -> void:
 		if dismissed[0]:
 			return
-		elapsed_ref[0] += delta_val
-		prompt.modulate.a = 0.5 + 0.5 * sin(elapsed_ref[0] * 2.0)
-		if Input.is_action_just_pressed("scoop") or Input.is_action_just_pressed("ui_cancel") or Input.is_action_just_pressed("ui_accept"):
-			dismissed[0] = true
-			var tw_out := create_tween()
-			tw_out.set_parallel(true)
-			tw_out.tween_property(overlay, "color:a", 0.0, 0.3)
-			tw_out.tween_property(panel, "modulate:a", 0.0, 0.3)
-			tw_out.set_parallel(false)
-			tw_out.tween_interval(0.2)
-			tw_out.tween_callback(func() -> void:
-				# Stop the per-frame poll before the layer dies, else the lambda
-				# errors every frame forever ("Lambda capture at index 0 was freed").
-				if frame_ref[0].is_valid() and get_tree().process_frame.is_connected(frame_ref[0]):
-					get_tree().process_frame.disconnect(frame_ref[0])
-				layer_ref.queue_free()
-				showing_lore = false
-				lore_layer = null
-			)
+		dismissed[0] = true
+		var tw_out := create_tween()
+		tw_out.set_parallel(true)
+		tw_out.tween_property(overlay, "color:a", 0.0, 0.3)
+		tw_out.tween_property(panel, "modulate:a", 0.0, 0.3)
+		tw_out.set_parallel(false)
+		tw_out.tween_interval(0.2)
+		tw_out.tween_callback(func() -> void:
+			if get_tree().process_frame.is_connected(frame_ref[0]):
+				get_tree().process_frame.disconnect(frame_ref[0])
+			_dismiss_help = Callable()
+			layer_ref.queue_free()
+			showing_lore = false
+			lore_layer = null
+		)
 	frame_ref[0] = func() -> void:
-		if is_instance_valid(layer_ref):
-			check_fn.call(get_process_delta_time())
+		if not dismissed[0] and is_instance_valid(layer_ref):
+			elapsed_ref[0] += get_process_delta_time()
+			prompt.modulate.a = 0.5 + 0.5 * sin(elapsed_ref[0] * 2.0)
 	get_tree().process_frame.connect(frame_ref[0])
 
 func _on_loot_collected(_cave_id: String, _loot_id: String, reward_text: String) -> void:
