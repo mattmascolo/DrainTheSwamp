@@ -150,7 +150,7 @@ var stat_definitions: Dictionary = {
 		"scale": "exponential",
 		"base_cost": 12.0 * PURCHASE_COST_MULTIPLIER,
 		"cost_exponent": 1.12,
-		"max_level": 8,
+		"max_level": 13,
 		"format": "multiplier"
 	},
 	"stamina": {
@@ -226,9 +226,9 @@ const SELL_WINDOW_MULT: float = 2.0
 var sell_window_active: bool = false
 var _sell_window_timer: float = 0.0
 
-# P2: the camel herd cap triples ("Camel Caravan").
+# One carrier per player, including legacy prestige saves.
 func get_camel_max_count() -> int:
-	return CAMEL_MAX_COUNT * 3 if prestige_count >= 2 else CAMEL_MAX_COUNT
+	return CAMEL_MAX_COUNT
 
 # P3: NA couriers collect inside caves (sell basin) and photograph documents
 # for you (lore walls auto-read on approach).
@@ -291,8 +291,7 @@ const HOSE_DURATION: float = 20.0
 
 # Camel constants
 const CAMEL_BASE_COST: float = 500.0
-const CAMEL_COST_EXPONENT: float = 10.0   # 500 / 5K / 50K for camels 1/2/3
-const CAMEL_MAX_COUNT: int = 3
+const CAMEL_MAX_COUNT: int = 1
 const CAMEL_CAPACITY_UPGRADE_BASE: float = 50.0
 const CAMEL_SPEED_UPGRADE_BASE: float = 200.0
 const CAMEL_UPGRADE_EXPONENT: float = 1.25  # was 1.35 (> value growth = worsening deal)
@@ -820,7 +819,7 @@ func upgrade_stat(stat_id: String) -> bool:
 
 # --- Camel computed ---
 func get_camel_cost() -> float:
-	return CAMEL_BASE_COST * PURCHASE_COST_MULTIPLIER * pow(CAMEL_COST_EXPONENT, camel_count)
+	return CAMEL_BASE_COST * PURCHASE_COST_MULTIPLIER
 
 func get_camel_capacity() -> float:
 	# Scales with the player's own capacity (25% of it) so camels never become
@@ -1376,7 +1375,7 @@ func load_save_data(data: Dictionary) -> void:
 
 	# Camels
 	camel_unlocked = data.get("camel_unlocked", false)
-	camel_count = int(data.get("camel_count", 0))
+	camel_count = clampi(int(data.get("camel_count", 0)), 0, CAMEL_MAX_COUNT)
 	camel_capacity_level = int(data.get("camel_capacity_level", 0))
 	camel_speed_level = int(data.get("camel_speed_level", 0))
 	# Migration: old saves — unlock camel if they own one, Marsh done, or found cave loot

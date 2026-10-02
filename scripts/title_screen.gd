@@ -490,7 +490,7 @@ func _on_test_endgame() -> void:
 	GameManager.stat_levels["scoop_power"] = 20
 	GameManager.stat_levels["water_value"] = 20
 	GameManager.camel_unlocked = true
-	GameManager.camel_count = 3
+	GameManager.camel_count = 1
 
 	# Unlock all caves
 	for cave_id in GameManager.cave_data:

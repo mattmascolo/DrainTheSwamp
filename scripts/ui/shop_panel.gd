@@ -550,7 +550,7 @@ func _build_camel_section() -> void:
 	camel_info.add_theme_constant_override("shadow_offset_x", 1)
 	camel_info.add_theme_constant_override("shadow_offset_y", 1)
 	if GameManager.camel_count > 0:
-		camel_info.text = "Camels x%d (Cap: %.1fg, Spd: %.0f)" % [GameManager.camel_count, GameManager.get_camel_capacity(), GameManager.get_camel_speed()]
+		camel_info.text = "Camel (Cap: %.1fg, Spd: %.0f)" % [GameManager.get_camel_capacity(), GameManager.get_camel_speed()]
 		camel_info.add_theme_color_override("font_color", Color(0.85, 0.7, 0.4))
 	else:
 		camel_info.text = "Camel (auto-sell carrier)"
@@ -580,9 +580,7 @@ func _build_camel_section() -> void:
 		camel_tip += "Cost: %s" % Economy.format_money(GameManager.get_camel_cost())
 	else:
 		camel_tip += "Capacity: %.1f gal (25%% of yours) | Speed: %.0f px/s\n" % [GameManager.get_camel_capacity(), GameManager.get_camel_speed()]
-		camel_tip += "Max %d camels." % GameManager.get_camel_max_count()
-		if GameManager.prestige_count >= 2:
-			camel_tip += " (Caravan: x3 herd cap)"
+		camel_tip += "One camel maximum."
 	camel_buy_panel.tooltip_text = camel_tip
 	camel_buy_panel.mouse_filter = Control.MOUSE_FILTER_PASS
 	camel_buy_panel.add_child(camel_buy_row)

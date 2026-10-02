@@ -80,8 +80,31 @@ func _init() -> void:
 	if gm3.has_cave_sell_basin() or gm3.has_auto_lore():
 		failures.append("P0: cave perks unlocked before P3")
 	gm3.prestige_count = 2
-	if gm3.get_camel_max_count() != gm3.CAMEL_MAX_COUNT * 3:
-		failures.append("P2: camel caravan should triple cap, got %d" % gm3.get_camel_max_count())
+	if gm3.get_camel_max_count() != 1:
+		failures.append("P2: legacy prestige must retain the single camel cap, got %d" % gm3.get_camel_max_count())
+	gm3.camel_unlocked = true
+	gm3.money = 1000000.0
+	if not gm3.buy_camel() or gm3.camel_count != 1:
+		failures.append("First camel purchase failed")
+	var money_after_camel: float = gm3.money
+	if gm3.buy_camel() or gm3.money != money_after_camel:
+		failures.append("Second camel purchase accepted or charged money")
+	var legacy_save: Dictionary = gm3.get_save_data()
+	legacy_save["camel_count"] = 9
+	legacy_save["camel_capacity_level"] = 4
+	legacy_save["camel_speed_level"] = 3
+	gm3.load_save_data(legacy_save)
+	if gm3.camel_count != 1 or gm3.camel_states.size() != 1 or gm3.camel_capacity_level != 4 or gm3.camel_speed_level != 3:
+		failures.append("Legacy camel migration lost upgrades or retained multiple carriers")
+	gm3.stat_levels["movement_speed"] = 8
+	gm3.money = 1000000.0
+	for level in range(9, 14):
+		var previous_speed: float = gm3.get_movement_speed_multiplier()
+		if not gm3.upgrade_stat("movement_speed") or gm3.stat_levels["movement_speed"] != level or gm3.get_movement_speed_multiplier() <= previous_speed:
+			failures.append("Additional movement speed upgrade failed at level %d" % level)
+	var money_at_max: float = gm3.money
+	if gm3.upgrade_stat("movement_speed") or gm3.money != money_at_max:
+		failures.append("Movement speed purchase exceeded level 13 or charged money")
 	gm3.prestige_count = 3
 	if not (gm3.has_cave_sell_basin() and gm3.has_auto_lore()):
 		failures.append("P3: cave sell basin / auto-lore not unlocked")
