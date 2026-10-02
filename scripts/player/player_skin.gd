@@ -119,6 +119,9 @@ func _ready() -> void:
 	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_sprite.scale = Vector2(0.5, 0.5)
 	_sprite.centered = true
+	# Variant A was baked facing right; normalize it to the left-facing
+	# coordinate system used by the skin root and tools.
+	_sprite.flip_h = _which == "a"
 	_sprite.z_index = 0
 	_root.add_child(_sprite)
 	_set_strip("idle")
@@ -187,6 +190,8 @@ func _hand_anchor(strip: String, frame: int) -> Vector2:
 		if frame < arr.size():
 			a = arr[frame]
 	# frame-space art px -> world (sprite is centred, feet on origin)
+	if _sprite.flip_h:
+		a.x = _cell.x - a.x
 	return Vector2(a.x - _cell.x * 0.5, a.y - _cell.y)
 
 func _on_scooped() -> void:

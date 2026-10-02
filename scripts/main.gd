@@ -94,7 +94,7 @@ func _on_prestige_performed() -> void:
 	get_tree().reload_current_scene()
 
 func _on_cave_entrance_requested(cave_id: String) -> void:
-	if SceneManager.is_transitioning:
+	if SceneManager.is_transitioning or not GameManager.is_cave_unlocked(cave_id):
 		return
 	var defn: Dictionary = GameManager.CAVE_DEFINITIONS.get(cave_id, {})
 	var scene_path: String = defn.get("scene_path", "")
@@ -103,7 +103,8 @@ func _on_cave_entrance_requested(cave_id: String) -> void:
 		return
 	SceneManager.return_position = player.position
 	SceneManager.return_scene_path = "res://scenes/main.tscn"
-	GameManager.enter_cave(cave_id)
+	if not GameManager.enter_cave(cave_id):
+		return
 	SaveManager.save_game()
 	SceneManager.transition_to_scene(scene_path)
 

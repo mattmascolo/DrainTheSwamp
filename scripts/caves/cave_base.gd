@@ -73,6 +73,9 @@ func _ready() -> void:
 	# normal cave-entrance flow, so GameManager.in_cave/cave_air never get
 	# set and the HUD's air bar stays hidden. No-op without DTS_SHOT.
 	if OS.get_environment("DTS_SHOT") != "" and not GameManager.in_cave:
+		# Direct cave captures need an eligible surface pool in memory.
+		var si: int = GameManager.CAVE_DEFINITIONS[cave_id]["swamp_index"]
+		GameManager.swamp_states[si]["gallons_drained"] = GameManager.swamp_definitions[si]["total_gallons"]
 		GameManager.enter_cave(cave_id)
 		# DTS_PROMPT=1 also unlocks the P3 sell-basin (in-memory only, never
 		# saved) so tools/capture.py can shoot its "NA COURIER" PixelUI.prompt()

@@ -7791,6 +7791,7 @@ func _build_cave_entrances() -> void:
 
 		var root := Node2D.new()
 		root.position = Vector2(cx, cy)
+		root.visible = is_unlocked
 		root.z_index = 3
 		add_child(root)
 
@@ -7902,13 +7903,19 @@ func _build_cave_entrances() -> void:
 func _check_cave_entrance_updates(swamp_index: int) -> void:
 	for ce in cave_entrances:
 		var cave_id: String = ce["cave_id"]
-		if ce["open"]:
-			continue
 		var defn: Dictionary = GameManager.CAVE_DEFINITIONS[cave_id]
 		if defn["swamp_index"] != swamp_index:
 			continue
 		if GameManager.is_cave_unlocked(cave_id):
 			_animate_cave_crack_open(ce)
+		elif ce["open"]:
+			ce["open"] = false
+			ce["root"].visible = false
+			ce["hint"].visible = false
+			ce["area"].set_deferred("monitoring", false)
+			for body in get_tree().get_nodes_in_group("player"):
+				if body.has_method("set_near_cave_entrance"):
+					body.set_near_cave_entrance(false, cave_id)
 
 func _on_cave_unlocked(cave_id: String) -> void:
 	var cave_name: String = GameManager.CAVE_DEFINITIONS[cave_id]["name"]
@@ -7950,9 +7957,10 @@ func _spawn_cave_unlock_notification(cave_name: String) -> void:
 	_screen_shake(2.0, 0.15)
 
 func _animate_cave_crack_open(entry: Dictionary) -> void:
-	if entry["open"]:
+	if entry["open"] or not GameManager.is_cave_unlocked(entry["cave_id"]):
 		return
 	entry["open"] = true
+	entry["root"].visible = true
 
 	var root: Node2D = entry["root"]
 
@@ -7976,6 +7984,8 @@ func _animate_cave_crack_open(entry: Dictionary) -> void:
 	var reveal_tw := create_tween()
 	reveal_tw.tween_interval(0.3)
 	reveal_tw.tween_callback(func() -> void:
+		if not GameManager.is_cave_unlocked(entry["cave_id"]):
+			return
 		entry["crack"].visible = false
 		entry["opening"].visible = true
 		entry["edge_left"].visible = true

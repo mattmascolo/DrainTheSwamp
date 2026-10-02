@@ -363,16 +363,16 @@ var touch_controls_enabled: bool = false
 
 # --- Cave Definitions ---
 const CAVE_DEFINITIONS: Dictionary = {
-	"muddy_hollow": {"name": "Muddy Hollow", "swamp_index": 0, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/muddy_hollow.tscn", "order": 0},
-	"gator_den": {"name": "Gator Den", "swamp_index": 1, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/gator_den.tscn", "order": 1},
-	"the_sinkhole": {"name": "The Sinkhole", "swamp_index": 2, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/the_sinkhole.tscn", "order": 2},
-	"collapsed_mine": {"name": "Collapsed Mine", "swamp_index": 3, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/collapsed_mine.tscn", "order": 3},
-	"the_mire": {"name": "The Mire", "swamp_index": 4, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/the_mire.tscn", "order": 4},
-	"sunken_grotto": {"name": "Sunken Grotto", "swamp_index": 5, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/sunken_grotto.tscn", "order": 5},
-	"the_cistern": {"name": "The Cistern", "swamp_index": 6, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/the_cistern.tscn", "order": 6},
-	"coral_cavern": {"name": "Coral Cavern", "swamp_index": 7, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/coral_cavern.tscn", "order": 7},
-	"the_underdark": {"name": "The Underdark", "swamp_index": 8, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/the_underdark.tscn", "order": 8},
-	"mariana_trench": {"name": "Mariana Trench", "swamp_index": 9, "drain_threshold": 0.5, "scene_path": "res://scenes/caves/mariana_trench.tscn", "order": 9},
+	"muddy_hollow": {"name": "Muddy Hollow", "swamp_index": 0, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/muddy_hollow.tscn", "order": 0},
+	"gator_den": {"name": "Gator Den", "swamp_index": 1, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/gator_den.tscn", "order": 1},
+	"the_sinkhole": {"name": "The Sinkhole", "swamp_index": 2, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/the_sinkhole.tscn", "order": 2},
+	"collapsed_mine": {"name": "Collapsed Mine", "swamp_index": 3, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/collapsed_mine.tscn", "order": 3},
+	"the_mire": {"name": "The Mire", "swamp_index": 4, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/the_mire.tscn", "order": 4},
+	"sunken_grotto": {"name": "Sunken Grotto", "swamp_index": 5, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/sunken_grotto.tscn", "order": 5},
+	"the_cistern": {"name": "The Cistern", "swamp_index": 6, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/the_cistern.tscn", "order": 6},
+	"coral_cavern": {"name": "Coral Cavern", "swamp_index": 7, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/coral_cavern.tscn", "order": 7},
+	"the_underdark": {"name": "The Underdark", "swamp_index": 8, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/the_underdark.tscn", "order": 8},
+	"mariana_trench": {"name": "Mariana Trench", "swamp_index": 9, "drain_threshold": 0.0, "scene_path": "res://scenes/caves/mariana_trench.tscn", "order": 9},
 }
 
 # Cave state
@@ -981,14 +981,19 @@ func check_cave_unlocks(swamp_index: int = -1) -> void:
 		if swamp_index >= 0 and si != swamp_index:
 			continue
 		var fill: float = get_swamp_fill_fraction(si)
-		if fill <= defn["drain_threshold"]:
+		if fill <= 0.0:
 			cave_data[cave_id]["unlocked"] = true
 			cave_unlocked.emit(cave_id)
 
 func is_cave_unlocked(cave_id: String) -> bool:
-	return cave_data.get(cave_id, {}).get("unlocked", false)
+	if not CAVE_DEFINITIONS.has(cave_id):
+		return false
+	var si: int = CAVE_DEFINITIONS[cave_id]["swamp_index"]
+	return get_swamp_fill_fraction(si) <= 0.0
 
-func enter_cave(cave_id: String) -> void:
+func enter_cave(cave_id: String) -> bool:
+	if not is_cave_unlocked(cave_id):
+		return false
 	in_cave = true
 	current_cave = cave_id
 	cave_data[cave_id]["entered"] = true
@@ -996,6 +1001,7 @@ func enter_cave(cave_id: String) -> void:
 	cave_air = cave_air_max
 	cave_air_changed.emit(cave_air, cave_air_max)
 	cave_entered.emit(cave_id)
+	return true
 
 func exit_cave() -> void:
 	var old_cave: String = current_cave
@@ -1469,6 +1475,11 @@ func load_save_data(data: Dictionary) -> void:
 				cave_data["the_mire"]["entered"] = old_abyss.get("entered", false)
 				if old_abyss.has("loot_collected"):
 					cave_data["the_mire"]["loot_collected"] = old_abyss["loot_collected"].duplicate()
+
+	# Older saves discovered caves at half-full. Reconcile eligibility with
+	# actual water while retaining entered/loot history.
+	for cave_id: String in CAVE_DEFINITIONS:
+		cave_data[cave_id]["unlocked"] = is_cave_unlocked(cave_id)
 
 	# Emit signals
 	money_changed.emit(money)
