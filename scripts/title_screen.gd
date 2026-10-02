@@ -41,19 +41,6 @@ var selected_character: String = CharacterCatalog.DEFAULT_ID
 var character_buttons: Array[Button] = []
 var _starting_game: bool = false
 
-# --- Newspaper nodes ---
-var newspaper_overlay: ColorRect = null
-var newspaper_panel: PanelContainer = null
-var newspaper_prompt: Label = null
-var newspaper_date_label: Label = null
-var newspaper_headline: Label = null
-var newspaper_subhead: Label = null
-var newspaper_body: Label = null
-var showing_newspaper: bool = false
-var newspaper_ready_for_input: bool = false
-var newspaper_index: int = 0
-var newspaper_data: Array = []
-
 # --- Post-process ---
 var post_layer: CanvasLayer = null
 var post_rect: ColorRect = null
@@ -71,7 +58,6 @@ func _ready() -> void:
 	_build_logo()
 	_build_menu()
 	_build_footer()
-	_build_newspaper()
 	_build_post_process()
 	_setup_debug_auto()
 
@@ -343,107 +329,7 @@ func _build_footer() -> void:
 	right.position = Vector2(6, 0)
 	footer.add_child(right)
 
-# --- Newspaper (story text unchanged) ----------------------------------------
-func _init_newspaper_data() -> void:
-	newspaper_data = [
-		{
-			"date": "Vol. XLII, No. 6 — Wednesday, March 13",
-			"headline": "CONGRESS ANNOUNCES HISTORIC \"DRAIN THE SWAMP\" INITIATIVE",
-			"subhead": "Bipartisan bill allocates $200M to swamp removal program",
-			"body": "In a rare show of unity, both parties voted unanimously to fund a comprehensive swamp-draining program. \"This is what the American people voted for,\" said Senator Swampsworth (R), standing beside Congresswoman Lobbyton (D), who added, \"We are fully committed to transparency.\"\n\nThe program's budget includes $180M for \"administrative oversight,\" $19.5M for \"consulting fees,\" and $500 for \"field operations.\" Critics noted the field operations budget could only cover a single employee with no equipment."
-		},
-		{
-			"date": "Vol. XLII, No. 7 — Thursday, March 14",
-			"headline": "GOVERNMENT HIRES LOCAL MAN TO DRAIN ENTIRE SWAMP",
-			"subhead": "\"Just use your hands,\" supervisor reportedly instructed",
-			"body": "The sole employee of the new Swamp Draining Initiative reported for work yesterday to find no office, no tools, and a handwritten note reading \"good luck.\" When asked about equipment, a government liaison shrugged and said, \"Budget constraints.\"\n\nThe man was last seen kneeling at the edge of the swamp, scooping water with his bare hands. Neighbors describe the scene as \"either inspiring or deeply concerning.\" Several elected officials were seen celebrating at a nearby steakhouse."
-		}
-	]
-
-func _build_newspaper() -> void:
-	_init_newspaper_data()
-
-	newspaper_overlay = ColorRect.new()
-	newspaper_overlay.size = VP
-	newspaper_overlay.color = Color(0, 0, 0, 0.0)
-	newspaper_overlay.visible = false
-	newspaper_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	newspaper_overlay.z_index = 10
-	add_child(newspaper_overlay)
-
-	newspaper_panel = PanelContainer.new()
-	newspaper_panel.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	var panel_w: float = 460.0
-	var panel_h: float = 236.0
-	newspaper_panel.position = Vector2((VP.x - panel_w) * 0.5, (VP.y - panel_h) * 0.5)
-	newspaper_panel.size = Vector2(panel_w, panel_h)
-	newspaper_panel.modulate = Color(1, 1, 1, 0)
-	var paper := _stylebox("panel_paper", 8, 8)
-	paper.content_margin_left = 14
-	paper.content_margin_right = 14
-	newspaper_panel.add_theme_stylebox_override("panel", paper)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 3)
-	newspaper_panel.add_child(vbox)
-
-	var ink := Color(0.16, 0.12, 0.09)
-	var ink_soft := Color(0.36, 0.30, 0.24)
-
-	var masthead := Label.new()
-	masthead.text = "THE SWAMP GAZETTE"
-	_paper_label(masthead, 16, ink)
-	masthead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(masthead)
-
-	newspaper_date_label = Label.new()
-	_paper_label(newspaper_date_label, 8, ink_soft)
-	newspaper_date_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(newspaper_date_label)
-
-	vbox.add_child(_paper_rule())
-
-	newspaper_headline = Label.new()
-	_paper_label(newspaper_headline, 8, ink)
-	newspaper_headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	newspaper_headline.autowrap_mode = TextServer.AUTOWRAP_WORD
-	vbox.add_child(newspaper_headline)
-
-	newspaper_subhead = Label.new()
-	_paper_label(newspaper_subhead, 8, ink_soft)
-	newspaper_subhead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	newspaper_subhead.autowrap_mode = TextServer.AUTOWRAP_WORD
-	vbox.add_child(newspaper_subhead)
-
-	vbox.add_child(_paper_rule())
-
-	newspaper_body = Label.new()
-	_paper_label(newspaper_body, 8, ink)
-	newspaper_body.autowrap_mode = TextServer.AUTOWRAP_WORD
-	newspaper_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(newspaper_body)
-
-	newspaper_prompt = Label.new()
-	newspaper_prompt.text = "[PRESS ANY KEY]"
-	_paper_label(newspaper_prompt, 8, Color(0.22, 0.15, 0.08))
-	newspaper_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(newspaper_prompt)
-
-	newspaper_overlay.add_child(newspaper_panel)
-
-func _paper_label(lbl: Label, size: int, color: Color) -> void:
-	lbl.add_theme_font_override("font", _font())
-	lbl.add_theme_font_size_override("font_size", size)
-	lbl.add_theme_color_override("font_color", color)
-
-func _paper_rule() -> Control:
-	var rule := ColorRect.new()
-	rule.color = Color(0.36, 0.28, 0.2, 0.7)
-	rule.custom_minimum_size = Vector2(0, 1)
-	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return rule
-
-# --- Post-process (the game's grade, softened for a painted plate) ---------
+# --- Post-process ---
 func _build_post_process() -> void:
 	post_layer = CanvasLayer.new()
 	post_layer.layer = 100
@@ -497,7 +383,7 @@ func _save_debug_shot() -> void:
 
 # DTS_TITLE_AUTO=continue|newspaper|night: drive the screen for captures.
 #   continue   press CONTINUE after 1.5 s (routes through SceneManager to main)
-#   newspaper  show the intro paper without touching the save
+#   newspaper  legacy capture mode; routes straight into the game
 #   night      jump the sky crossfade to full night
 func _setup_debug_auto() -> void:
 	var mode: String = OS.get_environment("DTS_TITLE_AUTO")
@@ -548,9 +434,6 @@ func _process(delta: float) -> void:
 		var tw: float = 0.55 + 0.45 * sin(elapsed * s["rate"] + s["phase"])
 		s["node"].modulate.a = clampf(night * 1.3, 0.0, 1.0) * tw
 
-	if showing_newspaper and newspaper_prompt:
-		newspaper_prompt.modulate.a = 0.65 + 0.35 * sin(elapsed * 2.0)
-
 	if post_rect and post_rect.material:
 		var mat := post_rect.material as ShaderMaterial
 		mat.set_shader_parameter("time", elapsed)
@@ -562,12 +445,6 @@ func _input(event: InputEvent) -> void:
 		_close_character_picker()
 		get_viewport().set_input_as_handled()
 		return
-	if not showing_newspaper or not newspaper_ready_for_input:
-		return
-	if (event is InputEventKey and event.pressed and not event.echo) or (event is InputEventMouseButton and event.pressed):
-		_dismiss_newspaper()
-		get_viewport().set_input_as_handled()
-
 # --- Button callbacks ---
 func _on_new_game() -> void:
 	if FileAccess.file_exists("user://save_data.json"):
@@ -730,48 +607,3 @@ func _show_character_picker() -> void:
 	start.pressed.connect(_begin_game)
 	actions.add_child(start)
 	character_buttons[0].grab_focus()
-
-func _set_newspaper_content(index: int) -> void:
-	var data: Dictionary = newspaper_data[index]
-	newspaper_date_label.text = data["date"]
-	newspaper_headline.text = data["headline"]
-	newspaper_subhead.text = data["subhead"]
-	newspaper_body.text = data["body"]
-
-func _show_newspaper() -> void:
-	showing_newspaper = true
-	newspaper_ready_for_input = false
-	newspaper_index = 0
-	menu_vbox.visible = false
-	confirm_container.visible = false
-	logo.visible = false
-	newspaper_overlay.visible = true
-	_set_newspaper_content(0)
-
-	var tw := create_tween()
-	tw.set_parallel(true)
-	tw.tween_property(newspaper_overlay, "color:a", 0.7, 0.5)
-	tw.tween_property(newspaper_panel, "modulate:a", 1.0, 0.5)
-	tw.set_parallel(false)
-	tw.tween_callback(func() -> void: newspaper_ready_for_input = true)
-
-func _dismiss_newspaper() -> void:
-	newspaper_ready_for_input = false
-	newspaper_index += 1
-	if newspaper_index < newspaper_data.size():
-		var tw := create_tween()
-		tw.tween_property(newspaper_panel, "modulate:a", 0.0, 0.3)
-		tw.tween_callback(func() -> void:
-			_set_newspaper_content(newspaper_index)
-		)
-		tw.tween_property(newspaper_panel, "modulate:a", 1.0, 0.3)
-		tw.tween_callback(func() -> void: newspaper_ready_for_input = true)
-	else:
-		var tw := create_tween()
-		tw.set_parallel(true)
-		tw.tween_property(newspaper_overlay, "color:a", 0.0, 0.4)
-		tw.tween_property(newspaper_panel, "modulate:a", 0.0, 0.4)
-		tw.set_parallel(false)
-		tw.tween_callback(func() -> void:
-			SceneManager.transition_to_scene("res://scenes/main.tscn")
-		)

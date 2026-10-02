@@ -37,7 +37,6 @@ var _gal_rate: float = 0.0
 
 func _ready() -> void:
 	_build_hud_icons()
-	_setup_news_ticker()
 	_setup_stamina_gradient()
 	GameManager.money_changed.connect(_on_money_changed)
 	GameManager.water_level_changed.connect(_on_water_level_changed)
@@ -211,13 +210,6 @@ func _build_hud_icons() -> void:
 	var hbox: HBoxContainer = tool_label.get_parent()
 	hbox.add_child(tool_icon)
 	hbox.move_child(tool_icon, tool_label.get_index())
-
-func _setup_news_ticker() -> void:
-	# Throttled headline strip (one fading headline / ~45s) under the top bar.
-	var vbox: VBoxContainer = $MarginContainer/VBoxContainer
-	var ticker: PanelContainer = preload("res://scripts/ui/news_ticker.gd").new()
-	vbox.add_child(ticker)
-	vbox.move_child(ticker, 1)
 
 func _setup_stamina_gradient() -> void:
 	stamina_fill_style = PixelUI.bar_fill(Color(0.2, 0.75, 0.3))

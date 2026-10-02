@@ -41,6 +41,11 @@ func _run() -> void:
 	root.add_child(main)
 	await process_frame
 	var world = main.get_node("GameWorld")
+	for node in main.find_children("*", "Control", true, false):
+		if node is Label or node is Button:
+			_check(not node.text.contains("SWAMP TIMES"), "Swamp Times strip still appears in gameplay")
+	var hud = main.hud
+	_check(hud.get_node("MarginContainer/VBoxContainer").get_child_count() == 3, "HUD still attaches a news strip")
 	world._on_reached_island()
 	_check(main.player.is_physics_processing(), "Story ending freezes the player")
 	var night = world.get("night_skin")
