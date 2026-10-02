@@ -2310,8 +2310,10 @@ func _process(delta: float) -> void:
 			var refs: Dictionary = cave_pool_refs[i]
 			if GameManager.is_cave_pool_completed(cave_id, i):
 				continue
-			# Player is near pool if within 50px left of pool start or inside pool range
-			if px >= refs["x_start"] - 50.0 and px <= refs["x_end"] + 20.0:
+			# Use the same moving shoreline as the blocking wall. Some slopes put
+			# that wall before x_start, so a fixed range can make water unreachable.
+			var shore_x: float = refs["wall_coll"].position.x
+			if px >= shore_x - 50.0 and px <= refs["x_end"] + 20.0:
 				found_pool = i
 				break
 		if found_pool >= 0:

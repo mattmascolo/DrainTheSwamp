@@ -57,6 +57,33 @@ func _run() -> void:
 	hud.queue_free()
 	cave.queue_free()
 	await process_frame
+	# Walk into The Mire's real water barriers, then scoop using player input.
+	gm.reset_game()
+	gm.swamp_states[4]["gallons_drained"] = gm.swamp_definitions[4]["total_gallons"]
+	_check(gm.enter_cave("the_mire"), "The Mire cannot be entered")
+	var mire = load("res://scenes/caves/the_mire.tscn").instantiate()
+	root.add_child(mire)
+	await physics_frame
+	for pool_index in [0, 1]:
+		var refs: Dictionary = mire.cave_pool_refs[pool_index]
+		var shore: float = refs["wall_coll"].position.x
+		mire.player_ref.position = Vector2(shore - 65.0, mire._get_cave_terrain_y_at(shore - 65.0) - 2.0)
+		mire.player_ref.velocity = Vector2.ZERO
+		Input.action_press("move_right")
+		for frame in range(60):
+			await physics_frame
+		Input.action_release("move_right")
+		_check(mire.player_ref.position.x < shore, "Player crossed an undrained Mire pool barrier")
+		_check(mire.player_ref.near_cave_pool and mire.player_ref.cave_pool_index == pool_index, "Mire barrier blocks scoop detection at pool %d" % pool_index)
+		gm.water_carried = 0.0
+		gm.current_stamina = gm.get_max_stamina()
+		var drained_before: float = gm.cave_pool_states["the_mire"][pool_index]["gallons_drained"]
+		mire.player_ref._handle_scoop()
+		_check(gm.cave_pool_states["the_mire"][pool_index]["gallons_drained"] > drained_before and gm.water_carried > 0.0, "Player cannot scoop at Mire pool %d" % pool_index)
+		gm._drain_cave_pool("the_mire", pool_index, 100000.0)
+		await physics_frame
+	mire.queue_free()
+	await process_frame
 	for failure in failures:
 		push_error(failure)
 	print("Cave simplification checks: ", "PASS" if failures.is_empty() else "FAIL")
