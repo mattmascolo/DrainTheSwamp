@@ -158,14 +158,6 @@ max_value = 5.0
 value = 5.0
 show_percentage = false
 
-[node name="HoseLabel" type="Label" parent="MarginContainer/VBoxContainer/BottomBar/LeftCard/HBox"]
-layout_mode = 2
-size_flags_vertical = 4
-mouse_filter = 2
-theme_override_colors/font_color = Color(0.5, 0.88, 1, 1)
-theme_override_font_sizes/font_size = 12
-text = "HOSE 20.0s"
-
 [node name="Spacer2" type="Control" parent="MarginContainer/VBoxContainer/BottomBar"]
 layout_mode = 2
 size_flags_horizontal = 3

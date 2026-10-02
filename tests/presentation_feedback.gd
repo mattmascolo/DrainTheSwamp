@@ -54,6 +54,7 @@ func _run() -> void:
 		if node is Label or node is Button:
 			_check(not node.text.contains("SWAMP TIMES"), "Swamp Times strip still appears in gameplay")
 	var hud = main.hud
+	_check(not hud.has_node("MarginContainer/VBoxContainer/BottomBar/LeftCard/HBox/HoseLabel"), "HUD still shows the hose countdown")
 	_check(not hud.has_node("MarginContainer/VBoxContainer/TopBar/HBox/WaterCell"), "HUD still shows the global water percentage")
 	_check(hud.get_node("MarginContainer/VBoxContainer").get_child_count() == 3, "HUD still attaches a news strip")
 	world._on_reached_island()

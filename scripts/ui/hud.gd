@@ -11,7 +11,6 @@ extends CanvasLayer
 @onready var tool_label: Label = $MarginContainer/VBoxContainer/BottomBar/LeftCard/HBox/ToolLabel
 var tool_icon: TextureRect = null
 @onready var stamina_bar: ProgressBar = $MarginContainer/VBoxContainer/BottomBar/LeftCard/HBox/StaminaBar
-@onready var hose_label: Label = $MarginContainer/VBoxContainer/BottomBar/LeftCard/HBox/HoseLabel
 @onready var menu_button: Button = $MarginContainer/VBoxContainer/BottomBar/RightCard/HBox/MenuButton
 
 signal menu_pressed
@@ -42,7 +41,6 @@ func _ready() -> void:
 	GameManager.tool_upgraded.connect(func(_t: String, _l: int) -> void: _update_tool_label())
 	GameManager.stat_upgraded.connect(_on_stat_upgraded)
 	GameManager.stamina_changed.connect(_on_stamina_changed)
-	GameManager.hose_state_changed.connect(_on_hose_state_changed)
 	GameManager.water_carried_changed.connect(_on_water_carried_changed)
 	GameManager.day_changed.connect(_on_day_changed)
 	_setup_rate_label()
@@ -55,7 +53,6 @@ func _ready() -> void:
 	_update_tool_label()
 	_on_stamina_changed(GameManager.current_stamina, GameManager.get_max_stamina())
 	_on_water_carried_changed(GameManager.water_carried, GameManager.get_carrying_capacity())
-	hose_label.visible = false
 	_update_day_label()
 
 func _process(_delta: float) -> void:
@@ -161,11 +158,6 @@ func _on_stamina_changed(current: float, maximum: float) -> void:
 	stamina_bar.max_value = maximum
 	stamina_bar.value = current
 	_update_stamina_color(current / maxf(maximum, 0.01))
-
-func _on_hose_state_changed(active: bool, time_remaining: float) -> void:
-	hose_label.visible = active
-	if active:
-		hose_label.text = "HOSE %.1fs" % time_remaining
 
 func _on_stat_upgraded(_stat_id: String, _new_level: int) -> void:
 	_update_tool_label()
