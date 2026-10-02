@@ -24,9 +24,6 @@ var money_tween: Tween = null
 # Stamina fill: segmented pixel bar, recoloured by modulate (green -> red)
 var stamina_fill_style: StyleBoxTexture = null
 
-# Cave air (swamp gas) bar — only visible inside caves
-var air_bar: ProgressBar = null
-var air_fill_style: StyleBoxTexture = null
 var _phase_is_night: bool = false
 
 # Earn/drain rate readout (bottom bar): EMA over 1s samples of lifetime
@@ -52,8 +49,6 @@ func _ready() -> void:
 	GameManager.swamp_completed.connect(_on_swamp_completed)
 	GameManager.water_carried_changed.connect(_on_water_carried_changed)
 	GameManager.day_changed.connect(_on_day_changed)
-	_setup_air_bar()
-	GameManager.cave_air_changed.connect(_on_cave_air_changed)
 	_setup_rate_label()
 
 	menu_button.pressed.connect(func() -> void: menu_pressed.emit())
@@ -82,7 +77,7 @@ func _setup_rate_label() -> void:
 	rate_label.visible = false
 	var hbox: HBoxContainer = stamina_bar.get_parent()
 	hbox.add_child(rate_label)
-	hbox.move_child(rate_label, air_bar.get_index() + 1)
+	hbox.move_child(rate_label, stamina_bar.get_index() + 1)
 
 func _update_rates(delta: float) -> void:
 	_rate_timer += delta
@@ -103,42 +98,6 @@ func _update_rates(delta: float) -> void:
 	_rate_last_money = lifetime
 	_rate_last_drained = drained
 	_rate_timer = 0.0
-
-func _setup_air_bar() -> void:
-	air_bar = ProgressBar.new()
-	air_bar.custom_minimum_size = Vector2(84, 12)
-	air_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	air_bar.show_percentage = false
-	air_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	air_bar.tooltip_text = "Swamp gas: air remaining before you're forced out"
-	air_fill_style = PixelUI.bar_fill(Color(0.35, 0.8, 0.85))
-	air_bar.add_theme_stylebox_override("fill", air_fill_style)
-	var air_icon := PixelUI.icon("air")
-	var hbox: HBoxContainer = stamina_bar.get_parent()
-	hbox.add_child(air_icon)
-	hbox.move_child(air_icon, stamina_bar.get_index() + 1)
-	hbox.add_child(air_bar)
-	hbox.move_child(air_bar, air_icon.get_index() + 1)
-	air_icon.visible = GameManager.in_cave
-	air_bar.visibility_changed.connect(func() -> void: air_icon.visible = air_bar.visible)
-	air_bar.visible = GameManager.in_cave
-	if GameManager.in_cave:
-		_on_cave_air_changed(GameManager.cave_air, GameManager.cave_air_max)
-
-func _on_cave_air_changed(current: float, maximum: float) -> void:
-	if not GameManager.in_cave or maximum <= 0.0:
-		air_bar.visible = false
-		return
-	air_bar.visible = true
-	air_bar.max_value = maximum
-	air_bar.value = current
-	var ratio: float = current / maximum
-	if ratio < 0.2:
-		air_fill_style.modulate_color = Color(0.95, 0.30, 0.25)
-	elif ratio < 0.45:
-		air_fill_style.modulate_color = Color(0.95, 0.72, 0.25)
-	else:
-		air_fill_style.modulate_color = Color(0.35, 0.8, 0.85)
 
 func _update_day_label() -> void:
 	var t: float = GameManager.cycle_progress

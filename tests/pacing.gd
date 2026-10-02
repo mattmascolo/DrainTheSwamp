@@ -41,11 +41,11 @@ func _run() -> void:
 			gm.sell_water()
 	_check(gm.is_swamp_completed(0) and seconds >= 600.0 and seconds < 700.0, "Starter drain outside expected window: %.1fs" % seconds)
 	print("Unupgraded Puddle: %.1fs of scoop/recovery time, excluding walking" % seconds)
-	# The cave air challenge must keep its original tool output.
+	# Cave tool output retains its original progression scale.
 	gm.reset_game()
 	var surface_output: float = gm.get_tool_output("hands")
 	gm.in_cave = true
-	_check(is_equal_approx(gm.get_tool_output("hands", true), 0.015), "Cave scoops weakened against unchanged air timer")
+	_check(is_equal_approx(gm.get_tool_output("hands", true), 0.015), "Cave scoop output changed unexpectedly")
 	gm.in_cave = false
 	_check(is_equal_approx(surface_output, 0.005), "Surface starter scoop is not slower")
 	gm.pump_levels[0] = 1

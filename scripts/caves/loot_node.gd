@@ -121,8 +121,8 @@ func _build_interaction() -> void:
 	area.body_exited.connect(_on_body_exited)
 
 	# Hint label
-	hint_label = PixelUI.prompt("[SPACE]", Color(1.0, 0.9, 0.5, 0.9))
-	hint_label.position = Vector2(-16, -30)
+	hint_label = PixelUI.prompt("[SPACE] Collect", Color(1.0, 0.9, 0.5, 0.9))
+	hint_label.position = Vector2(-48, -30)
 	hint_label.z_index = 8
 	hint_label.visible = false
 	add_child(hint_label)
@@ -149,17 +149,17 @@ func _process(delta: float) -> void:
 		_collect()
 
 func _collect() -> void:
+	if collected:
+		return
 	collected = true
 	hint_label.visible = false
 	if v3_sprite:
 		var ctw := create_tween()
 		ctw.tween_property(v3_sprite, "modulate", Color(0.45, 0.42, 0.4), 0.4)
 
-	# Apply rewards (via GameManager so the Daring Bonus + lifetime earnings apply)
+	# Apply gameplay rewards without story popups or timed-air bonuses.
 	if reward_money > 0.0:
-		var grant: Dictionary = GameManager.grant_loot_money(reward_money)
-		if grant["daring"]:
-			SceneManager.show_popup("DARING BONUS x1.5 — grabbed with air to spare!\n+%s" % Economy.format_money(grant["amount"]), 3.5)
+		GameManager.grant_loot_money(reward_money)
 	# Grant tool ownership — or level up if already owned
 	if reward_tool_unlock != "" and GameManager.tools_owned.has(reward_tool_unlock):
 		if GameManager.tools_owned[reward_tool_unlock]["owned"]:
@@ -199,6 +199,10 @@ func _collect() -> void:
 
 	# Mark collected in GameManager
 	GameManager.collect_loot(cave_id, loot_id, reward_text)
+	var message := "Reward collected!"
+	if reward_money > 0.0:
+		message += " +" + Economy.format_money(reward_money)
+	SceneManager.show_popup(message, 3.0)
 
 	# Sparkle burst animation
 	for i in range(8):

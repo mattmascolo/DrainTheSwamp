@@ -70,8 +70,8 @@ var _basin_sell_cooldown: float = 0.0
 func _ready() -> void:
 	# Dev-only (v3 hud track): capturing a cave scene directly via
 	# `capture.py --scene res://scenes/caves/<x>.tscn` skips the overworld's
-	# normal cave-entrance flow, so GameManager.in_cave/cave_air never get
-	# set and the HUD's air bar stays hidden. No-op without DTS_SHOT.
+	# normal cave-entrance flow, so GameManager.in_cave never gets
+	# set. No-op without DTS_SHOT.
 	if OS.get_environment("DTS_SHOT") != "" and not GameManager.in_cave:
 		# Direct cave captures need an eligible surface pool in memory.
 		var si: int = GameManager.CAVE_DEFINITIONS[cave_id]["swamp_index"]
@@ -82,7 +82,7 @@ func _ready() -> void:
 		# tag — otherwise unreachable without hours of real play.
 		if OS.get_environment("DTS_PROMPT") != "":
 			GameManager.prestige_count = maxi(GameManager.prestige_count, 3)
-			# Also force any loot_node/lore_wall hint_label visible so their
+			# Also force any loot_node hint_label visible so their
 			# PixelUI.prompt() can be captured without real play (they're
 			# normally hidden until the pool completes / the player walks up).
 			call_deferred("_debug_force_hint_prompts")
@@ -142,8 +142,6 @@ func _setup_cave() -> void:
 	# Connect cave pool signals
 	GameManager.cave_pool_level_changed.connect(_on_cave_pool_level_changed)
 	GameManager.cave_pool_completed.connect(_on_cave_pool_completed)
-	GameManager.cave_air_changed.connect(_on_cave_air_changed)
-	GameManager.cave_air_depleted.connect(_on_cave_air_depleted)
 
 	_setup_debug_shot()
 
@@ -1900,27 +1898,6 @@ func _on_exit_body_entered(body: Node2D) -> void:
 		return  # debug-only: stay in the cave for screenshots (never set in real builds)
 	if body is CharacterBody2D:
 		SceneManager.transition_to_return()
-
-# --- Cave air (swamp gas) ---
-var _air_warned: bool = false
-
-func _on_cave_air_changed(current: float, maximum: float) -> void:
-	if current <= 15.0 and current > 0.0 and not _air_warned:
-		_air_warned = true
-		SceneManager.show_popup("THE GAS IS RISING — GET OUT!", 3.0)
-		AudioManager.play_error()
-	elif current > 15.0 and _air_warned and current >= maximum * 0.5:
-		_air_warned = false  # re-arm after a pool refill buys real time back
-
-func _on_cave_air_depleted() -> void:
-	if SceneManager.is_transitioning:
-		return
-	# Gas overwhelms you: dropped haul, stumble out.
-	if GameManager.water_carried > 0.0:
-		GameManager.water_carried = 0.0
-		GameManager.water_carried_changed.emit(0.0, GameManager.get_carrying_capacity())
-	SceneManager.show_popup("SWAMP GAS! You black out and stumble to the surface,\ndropping everything you carried...", 5.0)
-	SceneManager.transition_to_return()
 
 # --- Exit Glow (Enhanced) ---
 func _build_exit_glow() -> void:
