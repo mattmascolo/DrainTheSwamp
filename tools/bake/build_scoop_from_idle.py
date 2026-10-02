@@ -57,20 +57,22 @@ def build_frame(art0: Image.Image, torso_dx: int, torso_dy: int, arm_dx: int, ar
     if torso_dx == 0 and torso_dy == 0:
         return art0.copy()
     w, h = art0.size
-    canvas = art0.copy()  # legs/boots stay exactly where they were
+    canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    canvas.paste(art0.crop((0, LEG_SPLIT_Y, w, h)), (0, LEG_SPLIT_Y))
 
     # Upper body (head, hat, torso, arms) — cut from the ORIGINAL frame,
     # not the legs, so nothing below LEG_SPLIT_Y is duplicated or moved.
     upper = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     upper.paste(art0.crop((0, 0, w, LEG_SPLIT_Y)), (0, 0))
-    upper_shifted = shift(upper, torso_dx, torso_dy)
-    canvas.alpha_composite(upper_shifted)
 
     # Front arm/hand: extra shift beyond the torso so it leads the bend
     # (reaches further down/forward than the shoulder it's attached to).
     l, t, r, b = ARM_BOX
     arm = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     arm.paste(art0.crop((l, t, r, b)), (l, t))
+    # Move each source pixel once: remove the arm before translating the torso.
+    upper.paste((0, 0, 0, 0), ARM_BOX)
+    canvas.alpha_composite(shift(upper, torso_dx, torso_dy))
     arm_shifted = shift(arm, torso_dx + arm_dx, torso_dy + arm_dy)
     canvas.alpha_composite(arm_shifted)
     return canvas
